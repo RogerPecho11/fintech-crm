@@ -10,7 +10,7 @@ router.use(authenticate);
 
 // GET /api/v1/reports/merchants
 router.get('/merchants', async (req: AuthenticatedRequest, res: Response) => {
-  const { status, risk_level, date_from, date_to, assigned_to, format = 'json' } = req.query as Record<string, string>;
+  const { status, risk_level, date_from, date_to, assigned_to, onboarding_assigned_to, format = 'json' } = req.query as Record<string, string>;
 
   const conditions: string[] = [];
   const params: any[] = [];
@@ -21,6 +21,7 @@ router.get('/merchants', async (req: AuthenticatedRequest, res: Response) => {
   if (date_from)   { conditions.push('m.created_at >= $' + idx++);  params.push(date_from); }
   if (date_to)     { conditions.push('m.created_at <= $' + idx++);  params.push(date_to); }
   if (assigned_to) { conditions.push('m.assigned_to = $' + idx++);  params.push(assigned_to); }
+  if (onboarding_assigned_to) { conditions.push('m.onboarding_assigned_to = $' + idx++); params.push(onboarding_assigned_to); }
 
   const where = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
 
@@ -30,9 +31,11 @@ router.get('/merchants', async (req: AuthenticatedRequest, res: Response) => {
             m.contact_name, m.contact_email, m.contact_phone,
             m.currency, m.monthly_volume, m.average_ticket,
             m.integration_type, m.created_at, m.last_activity_at,
-            u.first_name || ' ' || u.last_name as assigned_to_name
+            u.first_name || ' ' || u.last_name as assigned_to_name,
+            ob.first_name || ' ' || ob.last_name as onboarding_assigned_to_name
      FROM merchants m
      LEFT JOIN users u ON m.assigned_to = u.id
+     LEFT JOIN users ob ON m.onboarding_assigned_to = ob.id
      ${where}
      ORDER BY m.created_at DESC`,
     params
@@ -109,6 +112,7 @@ const COLUMN_LABELS: Record<string, string> = {
   created_at:       'Fecha Registro',
   last_activity_at: 'Última Actividad',
   assigned_to_name: 'Asignado a',
+  onboarding_assigned_to_name: 'Resp. Onboarding',
 };
 
 function formatValue(key: string, val: any): string {
@@ -270,7 +274,8 @@ function exportPDF(res: Response, data: any[]): void {
     { key: 'score',           label: 'Score',           width: 38  },
     { key: 'mcc_code',        label: 'MCC',             width: 40  },
     { key: 'monthly_volume',  label: 'Vol. Mensual',    width: 75  },
-    { key: 'assigned_to_name',label: 'Asignado a',      width: 90  },
+    { key: 'assigned_to_name',label: 'Asignado a',      width: 80  },
+    { key: 'onboarding_assigned_to_name', label: 'Resp. Onboarding', width: 80 },
   ];
 
   const tableLeft  = 36;

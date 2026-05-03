@@ -3,16 +3,23 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const pool = new Pool({
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  database: process.env.DB_NAME || 'fintech_crm',
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || '',
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-});
+const pool = new Pool(
+  process.env.DATABASE_URL
+    ? {
+        connectionString: process.env.DATABASE_URL,
+        ssl: { rejectUnauthorized: false }, // required by Render
+      }
+    : {
+        host:     process.env.DB_HOST     || 'localhost',
+        port:     parseInt(process.env.DB_PORT || '5432'),
+        database: process.env.DB_NAME     || 'fintech_crm',
+        user:     process.env.DB_USER     || 'postgres',
+        password: process.env.DB_PASSWORD || '',
+        max: 20,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 2000,
+      }
+);
 
 pool.on('error', (err) => {
   console.error('Unexpected error on idle client', err);
@@ -458,6 +465,32 @@ function getMigrations() {
       sql: `
         ALTER TYPE notification_type ADD VALUE IF NOT EXISTS 'sla_warning';
         ALTER TYPE notification_type ADD VALUE IF NOT EXISTS 'sla_breach';
+      `
+    },
+    {
+      name: '014_relax_merchant_constraints',
+      sql: `
+        -- Make required columns optional for flexible form flow
+        ALTER TABLE merchants ALTER COLUMN tax_id DROP NOT NULL;
+        ALTER TABLE merchants ALTER COLUMN country DROP NOT NULL;
+        ALTER TABLE merchants ALTER COLUMN mcc_code DROP NOT NULL;
+        ALTER TABLE merchants ALTER COLUMN contact_name DROP NOT NULL;
+        ALTER TABLE merchants ALTER COLUMN contact_email DROP NOT NULL;
+
+        -- Change status from ENUM to VARCHAR for dynamic statuses
+        ALTER TABLE merchants ALTER COLUMN status TYPE VARCHAR(100) USING status::text;
+        ALTER TABLE merchants ALTER COLUMN status SET DEFAULT 'lead';
+
+        -- Change risk_level from ENUM to VARCHAR for dynamic risk levels
+        ALTER TABLE merchants ALTER COLUMN risk_level TYPE VARCHAR(100) USING risk_level::text;
+        ALTER TABLE merchants ALTER COLUMN risk_level SET DEFAULT 'diamond';
+      `
+    },
+    {
+      name: '015_add_onboarding_assigned_to',
+      sql: `
+        ALTER TABLE merchants ADD COLUMN IF NOT EXISTS onboarding_assigned_to UUID REFERENCES users(id);
+        CREATE INDEX IF NOT EXISTS idx_merchants_onboarding_assigned ON merchants(onboarding_assigned_to);
       `
     }
   ];

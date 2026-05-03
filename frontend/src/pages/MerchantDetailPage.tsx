@@ -321,6 +321,7 @@ export default function MerchantDetailPage() {
 
             <InfoSection title="Onboarding" icon={CheckCircle}>
               <InfoRow label="KAM / Asignado"   value={merchant.assigned_to_name} />
+              <InfoRow label="Resp. Onboarding"  value={(merchant as any).onboarding_assigned_to_name} />
               <InfoRow label="Estado"            value={statusCfg.label} />
               <InfoRow label="Nivel de riesgo"   value={`${riskCfgDisplay.icon} ${riskCfgDisplay.label}`} />
               <InfoRow label="Score"             value={`${merchant.score}/100`} />

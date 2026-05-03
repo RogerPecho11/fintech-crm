@@ -31,9 +31,15 @@ const PRIORITY_COLORS: Record<string, string> = {
 
 export default function ReportsPage() {
   const [filters, setFilters] = useState({
-    status: '', risk_level: '', date_from: '', date_to: '',
+    status: '', risk_level: '', date_from: '', date_to: '', onboarding_assigned_to: '',
   });
   const [exporting, setExporting] = useState<string | null>(null);
+
+  // Fetch onboarding users for filter
+  const { data: onboardingUsers } = useQuery({
+    queryKey: ['users-onboarding'],
+    queryFn: () => api.get('/users').then(r => (r.data || []).filter((u: any) => u.role === 'onboarding' || u.role === 'admin')),
+  });
 
   // Task report filters
   const [taskFilters, setTaskFilters] = useState({
@@ -264,6 +270,12 @@ export default function ReportsPage() {
             <option value="high">Alto</option>
             <option value="critical">Crítico</option>
           </select>
+          <select className="input w-auto text-sm" value={filters.onboarding_assigned_to} onChange={e => set('onboarding_assigned_to', e.target.value)}>
+            <option value="">Todos los técnicos Onboarding</option>
+            {(onboardingUsers || []).map((u: any) => (
+              <option key={u.id} value={u.id}>{u.first_name} {u.last_name}</option>
+            ))}
+          </select>
           <input type="date" className="input w-auto text-sm" value={filters.date_from} onChange={e => set('date_from', e.target.value)} placeholder="Desde" />
           <input type="date" className="input w-auto text-sm" value={filters.date_to} onChange={e => set('date_to', e.target.value)} placeholder="Hasta" />
         </div>
@@ -279,19 +291,21 @@ export default function ReportsPage() {
                 <th className="table-header">MCC</th>
                 <th className="table-header">Score</th>
                 <th className="table-header">País</th>
+                <th className="table-header">Resp. Onboarding</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={6} className="text-center py-8 text-gray-400">Cargando...</td></tr>
+                <tr><td colSpan={7} className="text-center py-8 text-gray-400">Cargando...</td></tr>
               ) : (merchants?.data || []).slice(0, 10).map((m: any) => (
                 <tr key={m.id} className="border-b border-gray-100">
                   <td className="table-cell font-medium text-gray-900">{m.legal_name}</td>
                   <td className="table-cell font-mono text-xs">{m.tax_id}</td>
-                  <td className="table-cell">{STATUS_LABELS[m.status as keyof typeof STATUS_LABELS]}</td>
+                  <td className="table-cell">{STATUS_LABELS[m.status as keyof typeof STATUS_LABELS] || m.status}</td>
                   <td className="table-cell font-mono text-xs">{m.mcc_code}</td>
                   <td className="table-cell">{m.score}</td>
                   <td className="table-cell">{m.country}</td>
+                  <td className="table-cell text-xs text-gray-500">{m.onboarding_assigned_to_name || '—'}</td>
                 </tr>
               ))}
             </tbody>

@@ -1,6 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 //  Configuración dinámica del CRM (persiste en localStorage)
-//  Estados, Niveles de Riesgo y Métodos de Pago son editables
+//  Estados, Niveles de Riesgo, Métodos de Pago, MCC Codes,
+//  Tipos de Comercio, Rubros y Categorías son editables
 //  desde el Dashboard por usuarios admin/onboarding.
 // ─────────────────────────────────────────────────────────────
 
@@ -26,6 +27,26 @@ export interface PaymentMethod {
   name: string;
   type: 'pay_in' | 'pay_out' | 'both';
   countries: string[];  // country codes, empty = all
+}
+
+export interface MccCode {
+  code: string;
+  description: string;
+}
+
+export interface BusinessType {
+  value: string;
+  label: string;
+}
+
+export interface IndustryConfig {
+  value: string;
+  label: string;
+}
+
+export interface CategoryConfig {
+  value: string;
+  label: string;
 }
 
 // ── Defaults ──────────────────────────────────────────────────
@@ -67,10 +88,72 @@ export const DEFAULT_PAYMENT_METHODS: PaymentMethod[] = [
   { id: 'pay4u',          name: 'Pay4U',             type: 'pay_out', countries: [] },
 ];
 
+export const DEFAULT_MCC_CODES: MccCode[] = [
+  { code: '5411', description: 'Grocery Stores, Supermarkets' },
+  { code: '5812', description: 'Eating Places, Restaurants' },
+  { code: '5999', description: 'Miscellaneous and Specialty Retail Stores' },
+  { code: '7372', description: 'Computer Programming, Data Processing' },
+  { code: '5045', description: 'Computers, Peripherals, and Software' },
+  { code: '5912', description: 'Drug Stores and Pharmacies' },
+  { code: '5311', description: 'Department Stores' },
+  { code: '5651', description: 'Family Clothing Stores' },
+  { code: '5661', description: 'Shoe Stores' },
+  { code: '5732', description: 'Electronics Stores' },
+  { code: '5511', description: 'Car and Truck Dealers' },
+  { code: '7011', description: 'Hotels, Motels, Resorts' },
+  { code: '4111', description: 'Transportation - Suburban and Local' },
+  { code: '4814', description: 'Telecommunication Services' },
+  { code: '6011', description: 'Financial Institutions' },
+  { code: '7941', description: 'Sports Clubs, Fields, Athletic Instruction' },
+  { code: '8099', description: 'Health Practitioners' },
+  { code: '8049', description: 'Offices and Clinics of Other Health Practitioners' },
+  { code: '5047', description: 'Medical and Dental Laboratories' },
+  { code: '5065', description: 'Electrical Parts and Equipment' },
+];
+
+export const DEFAULT_BUSINESS_TYPES: BusinessType[] = [
+  { value: 'e-commerce', label: 'E-commerce' },
+  { value: 'retail', label: 'Retail' },
+  { value: 'servicios', label: 'Servicios' },
+  { value: 'marketplace', label: 'Marketplace' },
+  { value: 'saas', label: 'SaaS' },
+  { value: 'fintech', label: 'Fintech' },
+  { value: 'salud', label: 'Salud' },
+  { value: 'educación', label: 'Educación' },
+  { value: 'turismo', label: 'Turismo' },
+  { value: 'otro', label: 'Otro' },
+];
+
+export const DEFAULT_INDUSTRIES: IndustryConfig[] = [
+  { value: 'tecnología', label: 'Tecnología' },
+  { value: 'comercio', label: 'Comercio' },
+  { value: 'servicios_financieros', label: 'Servicios Financieros' },
+  { value: 'salud', label: 'Salud' },
+  { value: 'educación', label: 'Educación' },
+  { value: 'turismo', label: 'Turismo' },
+  { value: 'alimentación', label: 'Alimentación' },
+  { value: 'transporte', label: 'Transporte' },
+  { value: 'entretenimiento', label: 'Entretenimiento' },
+  { value: 'otro', label: 'Otro' },
+];
+
+export const DEFAULT_CATEGORIES: CategoryConfig[] = [
+  { value: 'pequeño_comercio', label: 'Pequeño Comercio' },
+  { value: 'mediano_comercio', label: 'Mediano Comercio' },
+  { value: 'gran_empresa', label: 'Gran Empresa' },
+  { value: 'corporativo', label: 'Corporativo' },
+  { value: 'startup', label: 'Startup' },
+  { value: 'otro', label: 'Otro' },
+];
+
 // ── Storage keys ──────────────────────────────────────────────
 const KEY_STATUSES  = 'crm_statuses';
 const KEY_RISKS     = 'crm_risk_levels';
 const KEY_PAYMENTS  = 'crm_payment_methods';
+const KEY_MCC_CODES      = 'crm_mcc_codes';
+const KEY_BUSINESS_TYPES = 'crm_business_types';
+const KEY_INDUSTRIES     = 'crm_industries';
+const KEY_CATEGORIES     = 'crm_categories';
 
 // ── Getters ───────────────────────────────────────────────────
 export function getStatuses(): MerchantStatusConfig[] {
@@ -94,6 +177,34 @@ export function getPaymentMethods(): PaymentMethod[] {
   } catch { return DEFAULT_PAYMENT_METHODS; }
 }
 
+export function getMccCodes(): MccCode[] {
+  try {
+    const s = localStorage.getItem(KEY_MCC_CODES);
+    return s ? JSON.parse(s) : DEFAULT_MCC_CODES;
+  } catch { return DEFAULT_MCC_CODES; }
+}
+
+export function getBusinessTypes(): BusinessType[] {
+  try {
+    const s = localStorage.getItem(KEY_BUSINESS_TYPES);
+    return s ? JSON.parse(s) : DEFAULT_BUSINESS_TYPES;
+  } catch { return DEFAULT_BUSINESS_TYPES; }
+}
+
+export function getIndustries(): IndustryConfig[] {
+  try {
+    const s = localStorage.getItem(KEY_INDUSTRIES);
+    return s ? JSON.parse(s) : DEFAULT_INDUSTRIES;
+  } catch { return DEFAULT_INDUSTRIES; }
+}
+
+export function getCategories(): CategoryConfig[] {
+  try {
+    const s = localStorage.getItem(KEY_CATEGORIES);
+    return s ? JSON.parse(s) : DEFAULT_CATEGORIES;
+  } catch { return DEFAULT_CATEGORIES; }
+}
+
 // ── Setters ───────────────────────────────────────────────────
 export function saveStatuses(list: MerchantStatusConfig[]): void {
   localStorage.setItem(KEY_STATUSES, JSON.stringify(list));
@@ -105,6 +216,22 @@ export function saveRiskLevels(list: RiskLevelConfig[]): void {
 
 export function savePaymentMethods(list: PaymentMethod[]): void {
   localStorage.setItem(KEY_PAYMENTS, JSON.stringify(list));
+}
+
+export function saveMccCodes(list: MccCode[]): void {
+  localStorage.setItem(KEY_MCC_CODES, JSON.stringify(list));
+}
+
+export function saveBusinessTypes(list: BusinessType[]): void {
+  localStorage.setItem(KEY_BUSINESS_TYPES, JSON.stringify(list));
+}
+
+export function saveIndustries(list: IndustryConfig[]): void {
+  localStorage.setItem(KEY_INDUSTRIES, JSON.stringify(list));
+}
+
+export function saveCategories(list: CategoryConfig[]): void {
+  localStorage.setItem(KEY_CATEGORIES, JSON.stringify(list));
 }
 
 // ── Helpers ───────────────────────────────────────────────────

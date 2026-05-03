@@ -1,0 +1,58 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fintech_crm_db
+    environment:
+      POSTGRES_DB: fintech_crm
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ProntoPaga_DB_2024_Secure!
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fintech_crm_backend
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: fintech_crm
+      DB_USER: postgres
+      DB_PASSWORD: ProntoPaga_DB_2024_Secure!
+      JWT_SECRET: ProntoPaga_JWT_SuperSecret_2024_Production!
+      JWT_EXPIRES_IN: 7d
+      FRONTEND_URL: http://2.24.66.213
+    ports:
+      - "127.0.0.1:3001:3001"
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: fintech_crm_frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  uploads_data:

@@ -128,6 +128,7 @@ export default function MerchantsPage() {
                   <th className="table-header">SLA</th>
                   <th className="table-header">Score</th>
                   <th className="table-header">Asignado a</th>
+                  <th className="table-header">Resp. Onboarding</th>
                   <th className="table-header">Última actividad</th>
                 </tr>
               </thead>
@@ -195,6 +196,11 @@ export default function MerchantsPage() {
                     {/* Asignado */}
                     <td className="table-cell text-xs text-gray-500">
                       {m.assigned_to_name || '—'}
+                    </td>
+
+                    {/* Resp. Onboarding */}
+                    <td className="table-cell text-xs text-gray-500">
+                      {(m as any).onboarding_assigned_to_name || '—'}
                     </td>
 
                     {/* Actividad */}

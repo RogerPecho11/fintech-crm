@@ -3,9 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Save, ArrowLeft, Plus, X, Trash2 } from 'lucide-react';
 import api from '../lib/api';
-import { MCC_CODES } from '../types';
 import { getActiveCountries } from '../lib/countries';
-import { getStatuses, getRiskLevels, getPaymentMethodsForCountry } from '../lib/config';
+import { getStatuses, getRiskLevels, getPaymentMethodsForCountry, getMccCodes, getBusinessTypes, getIndustries, getCategories } from '../lib/config';
 import toast from 'react-hot-toast';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -54,6 +53,7 @@ const defaultForm = {
   country: '',
   business_type: '',
   assigned_to: '',
+  onboarding_assigned_to: '',
   notes: '',
   legal_name: '',
   merchant_email: '',
@@ -92,6 +92,10 @@ export default function MerchantFormPage() {
   const activeCountries = getActiveCountries();
   const statuses = getStatuses();
   const riskLevels = getRiskLevels();
+  const mccCodes = getMccCodes();
+  const businessTypes = getBusinessTypes();
+  const industries = getIndustries();
+  const categories = getCategories();
 
   const { data: users } = useQuery({
     queryKey: ['users'],
@@ -133,6 +137,7 @@ export default function MerchantFormPage() {
         risk_level:            meta.risk_label || merchant.risk_level || 'diamond',
         notes:                 cleanNotes,
         assigned_to:    merchant.assigned_to || '',
+        onboarding_assigned_to: merchant.onboarding_assigned_to || '',
         payment_config: Array.isArray(merchant.payment_methods_detail)
           ? merchant.payment_methods_detail
           : [],
@@ -256,6 +261,7 @@ export default function MerchantFormPage() {
       status:    form.status,
       risk_level: form.risk_level,
       assigned_to: form.assigned_to || null,
+      onboarding_assigned_to: form.onboarding_assigned_to || null,
       notes: combinedNotes,
       payment_methods_detail: form.payment_config,
       accepts_credit_card: form.payment_config.some(pc => pc.pay_in.some(m => m.method_id.includes('card'))),
@@ -360,29 +366,35 @@ export default function MerchantFormPage() {
                 <label className={lc}>Tipo comercio</label>
                 <select className={ic} value={form.business_type} onChange={e => set('business_type', e.target.value)}>
                   <option value="">Seleccionar</option>
-                  {['E-commerce','Retail','Servicios','Marketplace','SaaS','Fintech','Salud','Educación','Turismo','Otro'].map(v => <option key={v}>{v}</option>)}
+                  {businessTypes.map(v => <option key={v.value} value={v.label}>{v.label}</option>)}
                 </select>
               </div>
 
               <div>
                 <label className={lc}>Categoría del comercio</label>
-                <input className={ic} value={form.category} onChange={e => set('category', e.target.value)} />
+                <select className={ic} value={form.category} onChange={e => set('category', e.target.value)}>
+                  <option value="">Seleccionar</option>
+                  {categories.map(c => <option key={c.value} value={c.label}>{c.label}</option>)}
+                </select>
               </div>
 
               <div>
                 <label className={lc}>Rubro</label>
-                <input className={ic} value={form.industry} onChange={e => set('industry', e.target.value)} />
+                <select className={ic} value={form.industry} onChange={e => set('industry', e.target.value)}>
+                  <option value="">Seleccionar</option>
+                  {industries.map(ind => <option key={ind.value} value={ind.label}>{ind.label}</option>)}
+                </select>
               </div>
 
               <div>
                 <label className={lc}>MCC *</label>
                 <select className={ic} value={form.mcc_code} onChange={e => {
-                  const mcc = MCC_CODES.find(m => m.code === e.target.value);
+                  const mcc = mccCodes.find(m => m.code === e.target.value);
                   set('mcc_code', e.target.value);
                   if (mcc) set('mcc_description', mcc.description);
                 }}>
                   <option value="">Seleccionar MCC</option>
-                  {MCC_CODES.map(m => <option key={m.code} value={m.code}>{m.code} - {m.description}</option>)}
+                  {mccCodes.map(m => <option key={m.code} value={m.code}>{m.code} - {m.description}</option>)}
                 </select>
               </div>
 
@@ -442,6 +454,14 @@ export default function MerchantFormPage() {
                 <select className={ic} value={form.assigned_to} onChange={e => set('assigned_to', e.target.value)}>
                   <option value="">Sin asignar</option>
                   {(users || []).map((u: any) => <option key={u.id} value={u.id}>{u.first_name} {u.last_name}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className={lc}>Responsable de Onboarding</label>
+                <select className={ic} value={form.onboarding_assigned_to} onChange={e => set('onboarding_assigned_to', e.target.value)}>
+                  <option value="">Sin asignar</option>
+                  {(users || []).filter((u: any) => u.role === 'onboarding' || u.role === 'admin').map((u: any) => <option key={u.id} value={u.id}>{u.first_name} {u.last_name}</option>)}
                 </select>
               </div>
 

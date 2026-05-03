@@ -229,6 +229,7 @@ export interface PaginatedResponse<T> {
   totalPages: number;
 }
 
+/** @deprecated MCC codes are now managed dynamically from config.ts — use getMccCodes() instead */
 export const MCC_CODES = [
   { code: '5411', description: 'Grocery Stores, Supermarkets' },
   { code: '5812', description: 'Eating Places, Restaurants' },

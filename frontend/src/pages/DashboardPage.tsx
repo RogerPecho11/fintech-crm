@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 import {
   Building2, TrendingUp, Clock, AlertTriangle,
-  ListTodo, Users, Activity, Globe, Plus, X, Settings, Shield, CreditCard, Trash2
+  ListTodo, Users, Activity, Globe, Plus, X, Settings, Shield, CreditCard, Trash2, Tag, Layers, FolderTree, Hash
 } from 'lucide-react';
 import { useState } from 'react';
 import api from '../lib/api';
@@ -19,7 +19,10 @@ import {
 import {
   getStatuses, saveStatuses, getRiskLevels, saveRiskLevels,
   getPaymentMethods, savePaymentMethods,
+  getMccCodes, saveMccCodes, getBusinessTypes, saveBusinessTypes,
+  getIndustries, saveIndustries, getCategories, saveCategories,
   MerchantStatusConfig, RiskLevelConfig, PaymentMethod,
+  MccCode, BusinessType, IndustryConfig, CategoryConfig,
   DEFAULT_STATUSES, DEFAULT_RISK_LEVELS,
 } from '../lib/config';
 import { useAuth } from '../contexts/AuthContext';
@@ -69,12 +72,20 @@ export default function DashboardPage() {
   const [statuses, setStatuses] = useState<MerchantStatusConfig[]>(getStatuses);
   const [riskLevels, setRiskLevels] = useState<RiskLevelConfig[]>(getRiskLevels);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(getPaymentMethods);
-  const [activeConfigPanel, setActiveConfigPanel] = useState<'statuses' | 'risks' | 'payments' | null>(null);
+  const [mccCodes, setMccCodes] = useState<MccCode[]>(getMccCodes);
+  const [businessTypes, setBusinessTypes] = useState<BusinessType[]>(getBusinessTypes);
+  const [industriesList, setIndustriesList] = useState<IndustryConfig[]>(getIndustries);
+  const [categoriesList, setCategoriesList] = useState<CategoryConfig[]>(getCategories);
+  const [activeConfigPanel, setActiveConfigPanel] = useState<'statuses' | 'risks' | 'payments' | 'mcc' | 'business_types' | 'industries' | 'categories' | null>(null);
 
   // New item forms
   const [newStatus, setNewStatus] = useState({ label: '', value: '', hex: '#6B7280' });
   const [newRisk, setNewRisk] = useState({ label: '', value: '', icon: '⭐', hex: '#6B7280' });
   const [newPayment, setNewPayment] = useState({ name: '', type: 'both' as 'pay_in' | 'pay_out' | 'both' });
+  const [newMcc, setNewMcc] = useState({ code: '', description: '' });
+  const [newBusinessType, setNewBusinessType] = useState('');
+  const [newIndustry, setNewIndustry] = useState('');
+  const [newCategory, setNewCategory] = useState('');
 
   const [teamRole, setTeamRole]         = useState('');
   const [teamDateFrom, setTeamDateFrom] = useState('');
@@ -149,6 +160,85 @@ export default function DashboardPage() {
     const updated = paymentMethods.filter(m => m.id !== id);
     setPaymentMethods(updated);
     savePaymentMethods(updated);
+  };
+
+  // MCC management
+  const handleAddMcc = () => {
+    if (!newMcc.code.trim() || !newMcc.description.trim()) return;
+    if (mccCodes.some(m => m.code === newMcc.code.trim())) {
+      toast.error('Ya existe un MCC con ese código');
+      return;
+    }
+    const updated = [...mccCodes, { code: newMcc.code.trim(), description: newMcc.description.trim() }];
+    setMccCodes(updated);
+    saveMccCodes(updated);
+    setNewMcc({ code: '', description: '' });
+    toast.success('Código MCC agregado');
+  };
+  const handleRemoveMcc = (code: string) => {
+    const updated = mccCodes.filter(m => m.code !== code);
+    setMccCodes(updated);
+    saveMccCodes(updated);
+  };
+
+  // Business type management
+  const handleAddBusinessType = () => {
+    if (!newBusinessType.trim()) return;
+    const value = newBusinessType.trim().toLowerCase().replace(/\s+/g, '_');
+    if (businessTypes.some(b => b.value === value)) {
+      toast.error('Ya existe ese tipo de comercio');
+      return;
+    }
+    const updated = [...businessTypes, { value, label: newBusinessType.trim() }];
+    setBusinessTypes(updated);
+    saveBusinessTypes(updated);
+    setNewBusinessType('');
+    toast.success('Tipo de comercio agregado');
+  };
+  const handleRemoveBusinessType = (value: string) => {
+    const updated = businessTypes.filter(b => b.value !== value);
+    setBusinessTypes(updated);
+    saveBusinessTypes(updated);
+  };
+
+  // Industry management
+  const handleAddIndustry = () => {
+    if (!newIndustry.trim()) return;
+    const value = newIndustry.trim().toLowerCase().replace(/\s+/g, '_');
+    if (industriesList.some(i => i.value === value)) {
+      toast.error('Ya existe ese rubro');
+      return;
+    }
+    const updated = [...industriesList, { value, label: newIndustry.trim() }];
+    setIndustriesList(updated);
+    saveIndustries(updated);
+    setNewIndustry('');
+    toast.success('Rubro agregado');
+  };
+  const handleRemoveIndustry = (value: string) => {
+    const updated = industriesList.filter(i => i.value !== value);
+    setIndustriesList(updated);
+    saveIndustries(updated);
+  };
+
+  // Category management
+  const handleAddCategory = () => {
+    if (!newCategory.trim()) return;
+    const value = newCategory.trim().toLowerCase().replace(/\s+/g, '_');
+    if (categoriesList.some(c => c.value === value)) {
+      toast.error('Ya existe esa categoría');
+      return;
+    }
+    const updated = [...categoriesList, { value, label: newCategory.trim() }];
+    setCategoriesList(updated);
+    saveCategories(updated);
+    setNewCategory('');
+    toast.success('Categoría agregada');
+  };
+  const handleRemoveCategory = (value: string) => {
+    const updated = categoriesList.filter(c => c.value !== value);
+    setCategoriesList(updated);
+    saveCategories(updated);
   };
 
   const { data: metrics, isLoading } = useQuery<DashboardMetrics>({
@@ -298,11 +388,15 @@ export default function DashboardPage() {
             <Settings className="w-4 h-4" style={{ color: '#FC2B5F' }} />
             <h3 className="font-semibold text-gray-900 text-sm">Configuración del Sistema</h3>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             {([
-              { key: 'statuses',  icon: Shield,       label: 'Estados' },
-              { key: 'risks',     icon: Shield,       label: 'Niveles de Riesgo' },
-              { key: 'payments',  icon: CreditCard,   label: 'Métodos de Pago' },
+              { key: 'statuses',       icon: Shield,       label: 'Estados' },
+              { key: 'risks',          icon: Shield,       label: 'Niveles de Riesgo' },
+              { key: 'payments',       icon: CreditCard,   label: 'Métodos de Pago' },
+              { key: 'mcc',            icon: Hash,         label: 'Códigos MCC' },
+              { key: 'business_types', icon: Tag,          label: 'Tipos de Comercio' },
+              { key: 'industries',     icon: Layers,       label: 'Rubros' },
+              { key: 'categories',     icon: FolderTree,   label: 'Categorías' },
             ] as const).map(({ key, icon: Icon, label }) => (
               <button
                 key={key}
@@ -521,6 +615,225 @@ export default function DashboardPage() {
                 </select>
               </div>
               <button onClick={handleAddPayment} disabled={!newPayment.name.trim()} className="btn-primary text-sm flex items-center gap-1 h-9 disabled:opacity-40">
+                <Plus className="w-3.5 h-3.5" /> Agregar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Códigos MCC ── */}
+        {activeConfigPanel === 'mcc' && (
+          <div className="mt-3 pt-3 border-t border-gray-100 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Códigos MCC</p>
+              <span className="text-xs text-gray-400">{mccCodes.length} códigos</span>
+            </div>
+
+            <div className="border border-gray-100 rounded-xl overflow-hidden max-h-64 overflow-y-auto">
+              {mccCodes.map((m, i) => (
+                <div
+                  key={m.code}
+                  className={`flex items-center justify-between px-4 py-2.5 ${i < mccCodes.length - 1 ? 'border-b border-gray-50' : ''} hover:bg-gray-50 transition-colors`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="text-sm font-mono font-medium text-gray-800">{m.code}</span>
+                    <span className="text-sm text-gray-500 truncate">{m.description}</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (mccCodes.length <= 1) { toast.error('Debe haber al menos 1 código MCC'); return; }
+                      handleRemoveMcc(m.code);
+                      toast.success(`MCC "${m.code}" eliminado`);
+                    }}
+                    className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0 ml-2"
+                    title={`Eliminar "${m.code}"`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Add form */}
+            <div className="flex gap-2 items-end pt-1">
+              <div className="w-28">
+                <label className="text-xs text-gray-500 mb-1 block">Código (4 dígitos)</label>
+                <input
+                  className="input text-sm"
+                  value={newMcc.code}
+                  onChange={e => setNewMcc(s => ({ ...s, code: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
+                  placeholder="5411"
+                  maxLength={4}
+                  onKeyDown={e => e.key === 'Enter' && handleAddMcc()}
+                />
+              </div>
+              <div className="flex-1">
+                <label className="text-xs text-gray-500 mb-1 block">Descripción</label>
+                <input
+                  className="input text-sm"
+                  value={newMcc.description}
+                  onChange={e => setNewMcc(s => ({ ...s, description: e.target.value }))}
+                  placeholder="Ej: Grocery Stores"
+                  onKeyDown={e => e.key === 'Enter' && handleAddMcc()}
+                />
+              </div>
+              <button onClick={handleAddMcc} disabled={!newMcc.code.trim() || !newMcc.description.trim()} className="btn-primary text-sm flex items-center gap-1 h-9 disabled:opacity-40">
+                <Plus className="w-3.5 h-3.5" /> Agregar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Tipos de Comercio ── */}
+        {activeConfigPanel === 'business_types' && (
+          <div className="mt-3 pt-3 border-t border-gray-100 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Tipos de Comercio</p>
+              <span className="text-xs text-gray-400">{businessTypes.length} tipos</span>
+            </div>
+
+            <div className="border border-gray-100 rounded-xl overflow-hidden">
+              {businessTypes.map((b, i) => (
+                <div
+                  key={b.value}
+                  className={`flex items-center justify-between px-4 py-2.5 ${i < businessTypes.length - 1 ? 'border-b border-gray-50' : ''} hover:bg-gray-50 transition-colors`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-gray-800">{b.label}</span>
+                    <span className="text-xs text-gray-400 font-mono">{b.value}</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (businessTypes.length <= 1) { toast.error('Debe haber al menos 1 tipo'); return; }
+                      handleRemoveBusinessType(b.value);
+                      toast.success(`Tipo "${b.label}" eliminado`);
+                    }}
+                    className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                    title={`Eliminar "${b.label}"`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Add form */}
+            <div className="flex gap-2 items-end pt-1">
+              <div className="flex-1">
+                <label className="text-xs text-gray-500 mb-1 block">Nombre del tipo</label>
+                <input
+                  className="input text-sm"
+                  value={newBusinessType}
+                  onChange={e => setNewBusinessType(e.target.value)}
+                  placeholder="Ej: Logística"
+                  onKeyDown={e => e.key === 'Enter' && handleAddBusinessType()}
+                />
+              </div>
+              <button onClick={handleAddBusinessType} disabled={!newBusinessType.trim()} className="btn-primary text-sm flex items-center gap-1 h-9 disabled:opacity-40">
+                <Plus className="w-3.5 h-3.5" /> Agregar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Rubros ── */}
+        {activeConfigPanel === 'industries' && (
+          <div className="mt-3 pt-3 border-t border-gray-100 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Rubros</p>
+              <span className="text-xs text-gray-400">{industriesList.length} rubros</span>
+            </div>
+
+            <div className="border border-gray-100 rounded-xl overflow-hidden">
+              {industriesList.map((ind, i) => (
+                <div
+                  key={ind.value}
+                  className={`flex items-center justify-between px-4 py-2.5 ${i < industriesList.length - 1 ? 'border-b border-gray-50' : ''} hover:bg-gray-50 transition-colors`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-gray-800">{ind.label}</span>
+                    <span className="text-xs text-gray-400 font-mono">{ind.value}</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (industriesList.length <= 1) { toast.error('Debe haber al menos 1 rubro'); return; }
+                      handleRemoveIndustry(ind.value);
+                      toast.success(`Rubro "${ind.label}" eliminado`);
+                    }}
+                    className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                    title={`Eliminar "${ind.label}"`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Add form */}
+            <div className="flex gap-2 items-end pt-1">
+              <div className="flex-1">
+                <label className="text-xs text-gray-500 mb-1 block">Nombre del rubro</label>
+                <input
+                  className="input text-sm"
+                  value={newIndustry}
+                  onChange={e => setNewIndustry(e.target.value)}
+                  placeholder="Ej: Energía"
+                  onKeyDown={e => e.key === 'Enter' && handleAddIndustry()}
+                />
+              </div>
+              <button onClick={handleAddIndustry} disabled={!newIndustry.trim()} className="btn-primary text-sm flex items-center gap-1 h-9 disabled:opacity-40">
+                <Plus className="w-3.5 h-3.5" /> Agregar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Categorías ── */}
+        {activeConfigPanel === 'categories' && (
+          <div className="mt-3 pt-3 border-t border-gray-100 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Categorías de Comercio</p>
+              <span className="text-xs text-gray-400">{categoriesList.length} categorías</span>
+            </div>
+
+            <div className="border border-gray-100 rounded-xl overflow-hidden">
+              {categoriesList.map((cat, i) => (
+                <div
+                  key={cat.value}
+                  className={`flex items-center justify-between px-4 py-2.5 ${i < categoriesList.length - 1 ? 'border-b border-gray-50' : ''} hover:bg-gray-50 transition-colors`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-gray-800">{cat.label}</span>
+                    <span className="text-xs text-gray-400 font-mono">{cat.value}</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (categoriesList.length <= 1) { toast.error('Debe haber al menos 1 categoría'); return; }
+                      handleRemoveCategory(cat.value);
+                      toast.success(`Categoría "${cat.label}" eliminada`);
+                    }}
+                    className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                    title={`Eliminar "${cat.label}"`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Add form */}
+            <div className="flex gap-2 items-end pt-1">
+              <div className="flex-1">
+                <label className="text-xs text-gray-500 mb-1 block">Nombre de la categoría</label>
+                <input
+                  className="input text-sm"
+                  value={newCategory}
+                  onChange={e => setNewCategory(e.target.value)}
+                  placeholder="Ej: Microempresa"
+                  onKeyDown={e => e.key === 'Enter' && handleAddCategory()}
+                />
+              </div>
+              <button onClick={handleAddCategory} disabled={!newCategory.trim()} className="btn-primary text-sm flex items-center gap-1 h-9 disabled:opacity-40">
                 <Plus className="w-3.5 h-3.5" /> Agregar
               </button>
             </div>

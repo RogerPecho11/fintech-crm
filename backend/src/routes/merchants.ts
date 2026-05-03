@@ -48,9 +48,11 @@ router.get('/', async (req: AuthenticatedRequest, res: Response) => {
     query(
       `SELECT m.*,
          u.first_name || ' ' || u.last_name AS assigned_to_name,
-         u.email AS assigned_to_email
+         u.email AS assigned_to_email,
+         ob.first_name || ' ' || ob.last_name AS onboarding_assigned_to_name
        FROM merchants m
        LEFT JOIN users u ON m.assigned_to = u.id
+       LEFT JOIN users ob ON m.onboarding_assigned_to = ob.id
        ${whereClause}
        ORDER BY m.${sortField} ${sortOrder}
        LIMIT $${idx} OFFSET $${idx + 1}`,
@@ -74,9 +76,12 @@ router.get('/:id', async (req: AuthenticatedRequest, res: Response) => {
     `SELECT m.*,
        u.first_name  || ' ' || u.last_name  AS assigned_to_name,
        u.email AS assigned_to_email,
+       ob.first_name || ' ' || ob.last_name AS onboarding_assigned_to_name,
+       ob.email AS onboarding_assigned_to_email,
        cb.first_name || ' ' || cb.last_name AS created_by_name
      FROM merchants m
      LEFT JOIN users u  ON m.assigned_to = u.id
+     LEFT JOIN users ob ON m.onboarding_assigned_to = ob.id
      LEFT JOIN users cb ON m.created_by  = cb.id
      WHERE m.id = $1`,
     [req.params.id]
@@ -98,7 +103,12 @@ router.get('/:id', async (req: AuthenticatedRequest, res: Response) => {
 // ─── POST /api/v1/merchants ───────────────────────────────────────────────────
 router.post('/', [
   body('legal_name').optional(),
-  body('contact_email').isEmail().normalizeEmail(),
+  body('contact_email').optional().custom((value) => {
+    if (value && value.trim() !== '' && !/.+@.+\..+/.test(value)) {
+      throw new Error('Email inválido');
+    }
+    return true;
+  }),
 ], async (req: AuthenticatedRequest, res: Response) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -125,11 +135,11 @@ router.post('/', [
         payment_methods_detail, monthly_volume, average_ticket, max_transaction, min_transaction, currency,
         integration_type, api_endpoint, webhook_url, ip_whitelist,
         technical_contact_email, technical_contact_phone,
-        status, risk_level, assigned_to, notes, tags, created_by
+        status, risk_level, assigned_to, onboarding_assigned_to, notes, tags, created_by
       ) VALUES (
         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
         $21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,
-        $39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50
+        $39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50,$51
       ) RETURNING *`,
       [
         legalName,           d.trade_name || null,     d.tax_id || null,
@@ -137,7 +147,7 @@ router.post('/', [
         d.address || null,   d.postal_code || null,     d.website || null,
         d.mcc_code || null,  d.mcc_description || null, d.business_type || null,
         d.industry || null,
-        contactName,         d.contact_email,           d.contact_phone || null,
+        contactName,         d.contact_email || null,   d.contact_phone || null,
         d.contact_position || null,
         d.secondary_contact_name || null, d.secondary_contact_email || null,
         d.secondary_contact_phone || null,
@@ -159,6 +169,7 @@ router.post('/', [
         d.status     || 'lead',
         d.risk_level || 'medium',
         d.assigned_to || user.id,
+        d.onboarding_assigned_to || null,
         d.notes || null,
         d.tags  || [],
         user.id,
@@ -201,7 +212,7 @@ router.put('/:id', authorize('admin', 'onboarding'), async (req: AuthenticatedRe
     'payment_methods_detail','monthly_volume','average_ticket','max_transaction',
     'min_transaction','currency','integration_type','api_endpoint','webhook_url',
     'ip_whitelist','technical_contact_email','technical_contact_phone',
-    'risk_level','assigned_to','notes','tags',
+    'risk_level','assigned_to','onboarding_assigned_to','notes','tags',
   ];
 
   const sets: string[]  = [];
