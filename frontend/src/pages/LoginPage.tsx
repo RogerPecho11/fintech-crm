@@ -107,35 +107,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Demo credentials */}
-          <div className="mt-6 pt-5 border-t border-gray-100">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
-              Acceso rápido — Demo
-            </p>
-            <div className="space-y-2">
-              {[
-                { role: 'Admin', email: 'admin@fintechcrm.com', pass: 'Admin123!' },
-                { role: 'Comercial', email: 'commercial@fintechcrm.com', pass: 'Commercial123!' },
-                { role: 'Onboarding', email: 'onboarding@fintechcrm.com', pass: 'Onboarding123!' },
-              ].map(cred => (
-                <button
-                  key={cred.role}
-                  type="button"
-                  onClick={() => { setEmail(cred.email); setPassword(cred.pass); }}
-                  className="w-full text-left px-3 py-2.5 rounded-lg bg-gray-50 hover:bg-gray-100
-                             border border-gray-200 transition-colors group"
-                >
-                  <span
-                    className="text-xs font-semibold"
-                    style={{ color: '#FC2B5F' }}
-                  >
-                    {cred.role}
-                  </span>
-                  <span className="text-xs text-gray-500 ml-2">{cred.email}</span>
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
 
         {/* Footer */}
