@@ -87,6 +87,7 @@ export default function SlaPanel() {
 
       await api.put('/sla/config', entries);
       queryClient.invalidateQueries({ queryKey: ['sla', 'config'] });
+      queryClient.invalidateQueries({ queryKey: ['sla', 'status'] });
       toast.success('Configuración SLA guardada');
     } catch (err: any) {
       const errors = err.response?.data?.errors;
@@ -105,6 +106,7 @@ export default function SlaPanel() {
     try {
       await api.post(`/sla/config/reset/${activeTab}`);
       await refetch();
+      queryClient.invalidateQueries({ queryKey: ['sla', 'status'] });
       toast.success('Valores predeterminados restaurados');
     } catch {
       toast.error('Error al restaurar valores');
