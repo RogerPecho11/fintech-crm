@@ -503,6 +503,34 @@ function getMigrations() {
           updated_at  TIMESTAMP DEFAULT NOW()
         );
       `
+    },
+    {
+      name: '017_create_mexico_submissions',
+      sql: `
+        CREATE TABLE IF NOT EXISTS mexico_submissions (
+          id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          giro            VARCHAR(50) NOT NULL,
+          mcc             VARCHAR(20),
+          trade_name      VARCHAR(255) NOT NULL,
+          legal_name      VARCHAR(255),
+          rfc             VARCHAR(100),
+          address         TEXT,
+          postal_code     VARCHAR(20),
+          website         VARCHAR(255),
+          phone           VARCHAR(50),
+          fiscal_doc_path VARCHAR(255),
+          ine_doc_path    VARCHAR(255),
+          domicilio_doc_path VARCHAR(255),
+          acta_doc_path   VARCHAR(255),
+          licencia_doc_path VARCHAR(255),
+          status          VARCHAR(20) DEFAULT 'pending',
+          notes           TEXT,
+          created_at      TIMESTAMP DEFAULT NOW(),
+          updated_at      TIMESTAMP DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_mexico_submissions_status ON mexico_submissions(status);
+        CREATE INDEX IF NOT EXISTS idx_mexico_submissions_created ON mexico_submissions(created_at DESC);
+      `
     }
   ];
 }

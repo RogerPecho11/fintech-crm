@@ -1,7 +1,7 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Building2, CheckSquare, Calendar, BarChart3,
-  Users, Bell, Webhook, LogOut, Menu, X, Wifi, WifiOff
+  Users, Bell, Webhook, LogOut, Menu, X, Wifi, WifiOff, FileText, Globe
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
@@ -17,11 +17,13 @@ const navItems = [
   { to: '/calendar', icon: Calendar, label: 'Calendario',      roles: ['admin', 'onboarding'] },
   { to: '/reports', icon: BarChart3, label: 'Reportes',        roles: ['admin', 'commercial', 'onboarding'] },
   { to: '/notifications', icon: Bell, label: 'Notificaciones', roles: ['admin', 'commercial', 'onboarding'] },
+  { to: '/mexico-reports', icon: Globe, label: 'Reportería México', roles: ['admin', 'onboarding'] },
 ];
 
 const adminItems = [
   { to: '/users', icon: Users, label: 'Usuarios' },
   { to: '/webhooks', icon: Webhook, label: 'Webhooks' },
+  { to: '/mexico-form', icon: FileText, label: 'Formulario México', external: true },
 ];
 
 export default function Layout() {
@@ -105,15 +107,29 @@ export default function Layout() {
                 </p>
               </div>
               {adminItems.map(item => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <item.icon className="w-4 h-4 flex-shrink-0" />
-                  {item.label}
-                </NavLink>
+                'external' in item && item.external ? (
+                  <a
+                    key={item.to}
+                    href={item.to}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="sidebar-link"
+                    onClick={() => setSidebarOpen(false)}
+                  >
+                    <item.icon className="w-4 h-4 flex-shrink-0" />
+                    {item.label}
+                  </a>
+                ) : (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+                    onClick={() => setSidebarOpen(false)}
+                  >
+                    <item.icon className="w-4 h-4 flex-shrink-0" />
+                    {item.label}
+                  </NavLink>
+                )
               ))}
             </>
           )}

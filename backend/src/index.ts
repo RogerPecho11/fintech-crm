@@ -32,6 +32,7 @@ import calendarRoutes from './routes/calendar';
 import notificationRoutes from './routes/notifications';
 import slaRoutes from './routes/sla';
 import configRoutes from './routes/config';
+import mexicoRoutes from './routes/mexico';
 
 const app = express();
 const httpServer = createServer(app);
@@ -95,6 +96,7 @@ app.use(`${API_PREFIX}/calendar`, calendarRoutes);
 app.use(`${API_PREFIX}/notifications`, notificationRoutes);
 app.use(`${API_PREFIX}/sla`, slaRoutes);
 app.use(`${API_PREFIX}/config`, configRoutes);
+app.use(`${API_PREFIX}/mexico`, mexicoRoutes);
 
 // Health check
 app.get('/health', (_req, res) => {

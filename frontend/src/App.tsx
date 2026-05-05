@@ -13,6 +13,8 @@ import ReportsPage from './pages/ReportsPage';
 import UsersPage from './pages/UsersPage';
 import NotificationsPage from './pages/NotificationsPage';
 import WebhooksPage from './pages/WebhooksPage';
+import MexicoFormPage from './pages/MexicoFormPage';
+import MexicoReportsPage from './pages/MexicoReportsPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -44,6 +46,7 @@ function AppRoutes() {
         path="/login"
         element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />}
       />
+      <Route path="/mexico-form" element={<MexicoFormPage />} />
       <Route
         path="/"
         element={
@@ -65,6 +68,7 @@ function AppRoutes() {
         <Route path="users" element={<UsersPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="webhooks" element={<WebhooksPage />} />
+        <Route path="mexico-reports" element={<MexicoReportsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
