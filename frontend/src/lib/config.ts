@@ -208,30 +208,66 @@ export function getCategories(): CategoryConfig[] {
 // ── Setters ───────────────────────────────────────────────────
 export function saveStatuses(list: MerchantStatusConfig[]): void {
   localStorage.setItem(KEY_STATUSES, JSON.stringify(list));
+  _syncToServer('statuses', list);
 }
 
 export function saveRiskLevels(list: RiskLevelConfig[]): void {
   localStorage.setItem(KEY_RISKS, JSON.stringify(list));
+  _syncToServer('risk_levels', list);
 }
 
 export function savePaymentMethods(list: PaymentMethod[]): void {
   localStorage.setItem(KEY_PAYMENTS, JSON.stringify(list));
+  _syncToServer('payment_methods', list);
 }
 
 export function saveMccCodes(list: MccCode[]): void {
   localStorage.setItem(KEY_MCC_CODES, JSON.stringify(list));
+  _syncToServer('mcc_codes', list);
 }
 
 export function saveBusinessTypes(list: BusinessType[]): void {
   localStorage.setItem(KEY_BUSINESS_TYPES, JSON.stringify(list));
+  _syncToServer('business_types', list);
 }
 
 export function saveIndustries(list: IndustryConfig[]): void {
   localStorage.setItem(KEY_INDUSTRIES, JSON.stringify(list));
+  _syncToServer('industries', list);
 }
 
 export function saveCategories(list: CategoryConfig[]): void {
   localStorage.setItem(KEY_CATEGORIES, JSON.stringify(list));
+  _syncToServer('categories', list);
+}
+
+// ── Server sync ───────────────────────────────────────────────
+import api from './api';
+
+function _syncToServer(key: string, value: any): void {
+  api.put(`/config/${key}`, value).catch(err => {
+    console.warn(`[Config] Error syncing "${key}" to server:`, err.message);
+  });
+}
+
+/** Carga la configuración desde el servidor y actualiza localStorage.
+ *  Llamar al iniciar la app para que todos los usuarios tengan la misma config. */
+export async function syncConfigFromServer(): Promise<void> {
+  try {
+    const res = await api.get('/config');
+    const data = res.data;
+
+    if (data.statuses) localStorage.setItem(KEY_STATUSES, JSON.stringify(data.statuses));
+    if (data.risk_levels) localStorage.setItem(KEY_RISKS, JSON.stringify(data.risk_levels));
+    if (data.payment_methods) localStorage.setItem(KEY_PAYMENTS, JSON.stringify(data.payment_methods));
+    if (data.mcc_codes) localStorage.setItem(KEY_MCC_CODES, JSON.stringify(data.mcc_codes));
+    if (data.business_types) localStorage.setItem(KEY_BUSINESS_TYPES, JSON.stringify(data.business_types));
+    if (data.industries) localStorage.setItem(KEY_INDUSTRIES, JSON.stringify(data.industries));
+    if (data.categories) localStorage.setItem(KEY_CATEGORIES, JSON.stringify(data.categories));
+    if (data.countries) localStorage.setItem('prontopaga_active_countries', JSON.stringify(data.countries));
+  } catch (err: any) {
+    console.warn('[Config] Error loading config from server:', err.message);
+  }
 }
 
 // ── Helpers ───────────────────────────────────────────────────

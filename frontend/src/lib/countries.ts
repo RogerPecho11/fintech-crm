@@ -56,9 +56,16 @@ export function getActiveCountries(): Country[] {
   return DEFAULT_COUNTRIES;
 }
 
-/** Guarda la lista de códigos activos en localStorage */
+/** Guarda la lista de códigos activos en localStorage y sincroniza con el servidor */
 export function saveActiveCountries(countries: Country[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(countries.map(c => c.code)));
+  const codes = countries.map(c => c.code);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(codes));
+  // Sync to server
+  import('./api').then(({ default: api }) => {
+    api.put('/config/countries', codes).catch(err => {
+      console.warn('[Countries] Error syncing to server:', err.message);
+    });
+  });
 }
 
 /** Devuelve los países del catálogo que aún no están activos */

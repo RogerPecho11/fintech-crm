@@ -492,6 +492,17 @@ function getMigrations() {
         ALTER TABLE merchants ADD COLUMN IF NOT EXISTS onboarding_assigned_to UUID REFERENCES users(id);
         CREATE INDEX IF NOT EXISTS idx_merchants_onboarding_assigned ON merchants(onboarding_assigned_to);
       `
+    },
+    {
+      name: '016_create_app_config',
+      sql: `
+        CREATE TABLE IF NOT EXISTS app_config (
+          key         VARCHAR(100) PRIMARY KEY,
+          value       JSONB NOT NULL,
+          updated_by  UUID REFERENCES users(id),
+          updated_at  TIMESTAMP DEFAULT NOW()
+        );
+      `
     }
   ];
 }

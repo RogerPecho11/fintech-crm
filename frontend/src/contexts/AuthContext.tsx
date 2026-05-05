@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { User } from '../types';
 import api from '../lib/api';
+import { syncConfigFromServer } from '../lib/config';
 
 interface AuthContextType {
   user: User | null;
@@ -32,6 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .then(res => {
           setUser(res.data);
           setToken(storedToken);
+          syncConfigFromServer();
         })
         .catch(() => logout())
         .finally(() => setIsLoading(false));
@@ -47,6 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('user', JSON.stringify(newUser));
     setToken(newToken);
     setUser(newUser);
+    syncConfigFromServer();
   };
 
   return (
