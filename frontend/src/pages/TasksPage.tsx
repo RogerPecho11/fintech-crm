@@ -309,49 +309,7 @@ function TaskColumn({ title, tasks, color, icon: Icon, slaData, onStatusChange }
 
       {/* Modal ver detalle tarea completada */}
       {viewModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-semibold text-gray-900">Detalle de Tarea</h3>
-              <button onClick={() => setViewModal(null)} className="text-gray-400 hover:text-gray-600">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <p className="text-xs text-gray-500">Título</p>
-                <p className="text-sm font-medium text-gray-900">{viewModal.title}</p>
-              </div>
-              {viewModal.merchant_name && (
-                <div>
-                  <p className="text-xs text-gray-500">Comercio</p>
-                  <p className="text-sm text-gray-800">{viewModal.merchant_name}</p>
-                </div>
-              )}
-              {viewModal.assigned_to_name && (
-                <div>
-                  <p className="text-xs text-gray-500">Asignado a</p>
-                  <p className="text-sm text-gray-800">{viewModal.assigned_to_name}</p>
-                </div>
-              )}
-              {viewModal.completed_at && (
-                <div>
-                  <p className="text-xs text-gray-500">Completada</p>
-                  <p className="text-sm text-gray-800">{formatDateTime(viewModal.completed_at)}</p>
-                </div>
-              )}
-              {viewModal.description && (
-                <div>
-                  <p className="text-xs text-gray-500">Descripción / Comentario de cierre</p>
-                  <p className="text-sm text-gray-800 whitespace-pre-line bg-gray-50 rounded-lg p-3 mt-1">{viewModal.description}</p>
-                </div>
-              )}
-            </div>
-            <div className="mt-4 pt-3 border-t border-gray-100">
-              <button onClick={() => setViewModal(null)} className="btn-secondary w-full">Cerrar</button>
-            </div>
-          </div>
-        </div>
+        <ViewTaskModal task={viewModal} onClose={() => setViewModal(null)} />
       )}
 
       {/* Modal completar tarea */}
@@ -400,6 +358,86 @@ function TaskColumn({ title, tasks, color, icon: Icon, slaData, onStatusChange }
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function ViewTaskModal({ task, onClose }: { task: Task; onClose: () => void }) {
+  const baseUrl = import.meta.env.VITE_API_URL || '';
+
+  const { data: documents } = useQuery({
+    queryKey: ['task-documents', task.id, task.merchant_id],
+    queryFn: () => task.merchant_id
+      ? api.get(`/documents/merchant/${task.merchant_id}`).then(r => r.data)
+      : Promise.resolve([]),
+    enabled: !!task.merchant_id,
+  });
+
+  // Filtrar documentos que sean evidencia de esta tarea
+  const taskDocs = (documents || []).filter((doc: any) =>
+    doc.document_type === 'evidence' && doc.description?.includes(task.title)
+  );
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-base font-semibold text-gray-900">Detalle de Tarea</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="space-y-3">
+          <div>
+            <p className="text-xs text-gray-500">Título</p>
+            <p className="text-sm font-medium text-gray-900">{task.title}</p>
+          </div>
+          {task.merchant_name && (
+            <div>
+              <p className="text-xs text-gray-500">Comercio</p>
+              <p className="text-sm text-gray-800">{task.merchant_name}</p>
+            </div>
+          )}
+          {task.assigned_to_name && (
+            <div>
+              <p className="text-xs text-gray-500">Asignado a</p>
+              <p className="text-sm text-gray-800">{task.assigned_to_name}</p>
+            </div>
+          )}
+          {task.completed_at && (
+            <div>
+              <p className="text-xs text-gray-500">Completada</p>
+              <p className="text-sm text-gray-800">{formatDateTime(task.completed_at)}</p>
+            </div>
+          )}
+          {task.description && (
+            <div>
+              <p className="text-xs text-gray-500">Descripción / Comentario de cierre</p>
+              <p className="text-sm text-gray-800 whitespace-pre-line bg-gray-50 rounded-lg p-3 mt-1">{task.description}</p>
+            </div>
+          )}
+
+          {/* Documentos adjuntos */}
+          {taskDocs.length > 0 && (
+            <div>
+              <p className="text-xs text-gray-500 mb-2">Archivos adjuntos</p>
+              <div className="space-y-2">
+                {taskDocs.map((doc: any) => (
+                  <div key={doc.id} className="flex items-center gap-3 p-2 border border-gray-100 rounded-lg bg-gray-50">
+                    <Upload className="w-4 h-4 text-pink-500 flex-shrink-0" />
+                    <span className="flex-1 text-xs text-gray-700 truncate">{doc.original_name || doc.name}</span>
+                    <a href={`${baseUrl}/uploads/${doc.file_path}`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">Ver</a>
+                    <a href={`${baseUrl}/uploads/${doc.file_path}`} download className="text-xs text-gray-500 hover:underline">Descargar</a>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="mt-4 pt-3 border-t border-gray-100">
+          <button onClick={onClose} className="btn-secondary w-full">Cerrar</button>
+        </div>
+      </div>
     </div>
   );
 }
