@@ -188,6 +188,7 @@ export default function TasksPage() {
 function TaskColumn({ title, tasks, color, icon: Icon, slaData, onStatusChange }: any) {
   const queryClient = useQueryClient();
   const [completeModal, setCompleteModal] = useState<string | null>(null);
+  const [viewModal, setViewModal] = useState<Task | null>(null);
   const [closeComment, setCloseComment] = useState('');
   const [closeImage, setCloseImage] = useState<File | null>(null);
   const [completing, setCompleting] = useState(false);
@@ -284,6 +285,14 @@ function TaskColumn({ title, tasks, color, icon: Icon, slaData, onStatusChange }
                 Completar
               </button>
             )}
+            {task.status === 'completed' && (
+              <button
+                onClick={() => setViewModal(task)}
+                className="text-xs text-blue-500 hover:text-blue-600 transition-colors ml-auto"
+              >
+                Ver detalle
+              </button>
+            )}
             <button
               onClick={() => handleDelete(task.id)}
               className="p-1 rounded text-gray-300 hover:text-red-500 transition-colors ml-1"
@@ -296,6 +305,53 @@ function TaskColumn({ title, tasks, color, icon: Icon, slaData, onStatusChange }
       ))}
       {tasks.length === 0 && (
         <div className="text-center py-6 text-gray-400 text-sm">Sin tareas</div>
+      )}
+
+      {/* Modal ver detalle tarea completada */}
+      {viewModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-semibold text-gray-900">Detalle de Tarea</h3>
+              <button onClick={() => setViewModal(null)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs text-gray-500">Título</p>
+                <p className="text-sm font-medium text-gray-900">{viewModal.title}</p>
+              </div>
+              {viewModal.merchant_name && (
+                <div>
+                  <p className="text-xs text-gray-500">Comercio</p>
+                  <p className="text-sm text-gray-800">{viewModal.merchant_name}</p>
+                </div>
+              )}
+              {viewModal.assigned_to_name && (
+                <div>
+                  <p className="text-xs text-gray-500">Asignado a</p>
+                  <p className="text-sm text-gray-800">{viewModal.assigned_to_name}</p>
+                </div>
+              )}
+              {viewModal.completed_at && (
+                <div>
+                  <p className="text-xs text-gray-500">Completada</p>
+                  <p className="text-sm text-gray-800">{formatDateTime(viewModal.completed_at)}</p>
+                </div>
+              )}
+              {viewModal.description && (
+                <div>
+                  <p className="text-xs text-gray-500">Descripción / Comentario de cierre</p>
+                  <p className="text-sm text-gray-800 whitespace-pre-line bg-gray-50 rounded-lg p-3 mt-1">{viewModal.description}</p>
+                </div>
+              )}
+            </div>
+            <div className="mt-4 pt-3 border-t border-gray-100">
+              <button onClick={() => setViewModal(null)} className="btn-secondary w-full">Cerrar</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Modal completar tarea */}
