@@ -1,17 +1,20 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, Building2, ChevronLeft, ChevronRight } from 'lucide-react';
 import api from '../lib/api';
 import { Merchant, STATUS_LABELS, STATUS_COLORS } from '../types';
 import { timeAgo, scoreColor, scoreBarColor } from '../lib/utils';
 import { getStatuses, useConfigRefresh } from '../lib/config';
 import { useAuth } from '../contexts/AuthContext';
+import { useSocket } from '../contexts/SocketContext';
 import { useSlaStatus } from '../lib/hooks/useSlaStatus';
 import SlaIndicator from '../components/SlaIndicator';
 
 export default function MerchantsPage() {
   const { user } = useAuth();
+  const { socket } = useSocket();
+  const queryClient = useQueryClient();
   const isCommercial = user?.role === 'commercial';
   const { data: slaData } = useSlaStatus();
   useConfigRefresh();
@@ -19,6 +22,14 @@ export default function MerchantsPage() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [sort, setSort] = useState('created_at');
+
+  // Escuchar eliminaciones de comercios en tiempo real
+  useEffect(() => {
+    if (!socket) return;
+    const handler = () => queryClient.invalidateQueries({ queryKey: ['merchants'] });
+    socket.on('merchant:deleted', handler);
+    return () => { socket.off('merchant:deleted', handler); };
+  }, [socket, queryClient]);
 
   const statuses = getStatuses();
 

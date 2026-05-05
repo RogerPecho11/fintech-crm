@@ -394,6 +394,12 @@ router.delete('/:id', authorize('admin'), async (req: AuthenticatedRequest, res:
   await query('DELETE FROM calendar_events WHERE merchant_id = $1', [id]);
   await query('DELETE FROM merchants WHERE id = $1', [id]);
 
+  // Notificar a todos los clientes conectados
+  if (req.io) {
+    req.io.emit('merchant:deleted', { merchantId: id });
+    req.io.emit('dashboard:refresh');
+  }
+
   res.json({ message: 'Comercio eliminado correctamente' });
 });
 
