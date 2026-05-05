@@ -274,10 +274,12 @@ export default function CertificationForm({ merchant, onClose }: Props) {
 
       const formData = new FormData();
       formData.append('file', file);
+      formData.append('merchant_id', merchant.id);
       formData.append('document_type', 'certification');
       formData.append('description', `Certificación ${env === 'sandbox' ? 'Sandbox' : 'Productivo'} - ${form.review_date}`);
+      formData.append('name', `Certificación ${env === 'sandbox' ? 'Sandbox' : 'Productivo'} - ${form.merchant_name}`);
 
-      await api.post(`/documents/merchant/${merchant.id}`, formData, {
+      await api.post('/documents/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
