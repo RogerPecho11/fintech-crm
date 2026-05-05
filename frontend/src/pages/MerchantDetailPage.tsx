@@ -5,7 +5,7 @@ import {
   ArrowLeft, Edit, FileText, MessageSquare, CheckSquare,
   Globe, Phone, Building, CreditCard, AlertTriangle,
   Upload, Send, CheckCircle, Clock,
-  ShoppingBag, Lock
+  ShoppingBag, Lock, Trash2
 } from 'lucide-react';
 import api from '../lib/api';
 import { Merchant, STATUS_LABELS, STATUS_COLORS, MerchantStatus } from '../types';
@@ -34,6 +34,7 @@ export default function MerchantDetailPage() {
   const [tab, setTab] = useState('Resumen');
   const [comment, setComment] = useState('');
   const [statusModal, setStatusModal] = useState(false);
+  const [deleteModal, setDeleteModal] = useState(false);
   const [newStatus, setNewStatus] = useState<string>('pending');
   const [statusReason, setStatusReason] = useState('');
 
@@ -215,6 +216,15 @@ export default function MerchantDetailPage() {
               <Edit className="w-4 h-4" />
               Editar
             </Link>
+          )}
+          {user?.role === 'admin' && (
+            <button
+              onClick={() => setDeleteModal(true)}
+              className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+              Eliminar
+            </button>
           )}
           {isFinalized && (
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-teal-50 border border-teal-200">
@@ -617,6 +627,41 @@ export default function MerchantDetailPage() {
                 className="btn-primary flex-1 disabled:opacity-40"
               >
                 {changeStatus.isPending ? 'Guardando...' : 'Confirmar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white border border-gray-200 rounded-xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Eliminar Comercio</h3>
+            <p className="text-sm text-gray-600 mb-1">
+              ¿Estás seguro de que deseas eliminar <strong>{merchant.trade_name || merchant.legal_name}</strong>?
+            </p>
+            <p className="text-xs text-red-500 mb-4">
+              Esta acción es irreversible. Se eliminarán todos los datos asociados (documentos, comentarios, tareas, historial).
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setDeleteModal(false)} className="btn-secondary flex-1">Cancelar</button>
+              <button
+                onClick={async () => {
+                  try {
+                    await api.delete(`/merchants/${id}`);
+                    toast.success('Comercio eliminado');
+                    queryClient.invalidateQueries({ queryKey: ['merchants'] });
+                    navigate('/merchants');
+                  } catch (err: any) {
+                    toast.error(err.response?.data?.error || 'Error al eliminar');
+                  } finally {
+                    setDeleteModal(false);
+                  }
+                }}
+                className="flex-1 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors"
+              >
+                Eliminar
               </button>
             </div>
           </div>
