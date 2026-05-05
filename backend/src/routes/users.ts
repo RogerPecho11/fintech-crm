@@ -106,11 +106,22 @@ router.delete('/:id', authorize('admin'), async (req: AuthenticatedRequest, res:
   const existing = await queryOne('SELECT id FROM users WHERE id = $1', [id]);
   if (!existing) return res.status(404).json({ error: 'Usuario no encontrado.' });
 
-  // Desasignar merchants y tasks antes de eliminar
+  // Limpiar todas las referencias al usuario
   await query('UPDATE merchants SET assigned_to = NULL WHERE assigned_to = $1', [id]);
   await query('UPDATE merchants SET onboarding_assigned_to = NULL WHERE onboarding_assigned_to = $1', [id]);
+  await query('UPDATE merchants SET created_by = NULL WHERE created_by = $1', [id]);
   await query('UPDATE tasks SET assigned_to = NULL WHERE assigned_to = $1', [id]);
+  await query('UPDATE tasks SET created_by = NULL WHERE created_by = $1', [id]);
+  await query('UPDATE documents SET uploaded_by = NULL WHERE uploaded_by = $1', [id]);
+  await query('UPDATE documents SET verified_by = NULL WHERE verified_by = $1', [id]);
+  await query('UPDATE sla_config SET updated_by = NULL WHERE updated_by = $1', [id]);
+  await query('UPDATE app_config SET updated_by = NULL WHERE updated_by = $1', [id]);
+  await query('DELETE FROM sla_history WHERE assigned_to = $1', [id]);
   await query('DELETE FROM notifications WHERE user_id = $1', [id]);
+  await query('DELETE FROM comments WHERE user_id = $1', [id]);
+  await query('DELETE FROM audit_logs WHERE user_id = $1', [id]);
+  await query('DELETE FROM merchant_status_history WHERE changed_by = $1', [id]);
+  await query('DELETE FROM calendar_events WHERE created_by = $1', [id]);
   await query('DELETE FROM users WHERE id = $1', [id]);
 
   res.json({ message: 'Usuario eliminado correctamente.' });
