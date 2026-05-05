@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { X, FileText, Eye, Download } from 'lucide-react';
-import { Merchant } from '../types';
+import { Merchant, User } from '../types';
+import api from '../lib/api';
 
 interface Props {
   merchant: Merchant;
@@ -24,6 +26,15 @@ const TABS: { key: TabKey; icon: string; label: string }[] = [
 export default function CertificationForm({ merchant, onClose }: Props) {
   const [activeTab, setActiveTab] = useState<TabKey>('info');
   const [env, setEnv] = useState<Environment>('sandbox');
+
+  const { data: users } = useQuery<User[]>({
+    queryKey: ['users'],
+    queryFn: () => api.get('/users').then(r => r.data),
+  });
+
+  const commercials = (users || []).filter(u => u.role === 'commercial' || u.role === 'admin');
+  const onboardingUsers = (users || []).filter(u => u.role === 'onboarding' || u.role === 'admin');
+
   const [form, setForm] = useState({
     // Info Básica
     review_date: new Date().toISOString().split('T')[0],
@@ -219,8 +230,18 @@ export default function CertificationForm({ merchant, onClose }: Props) {
                 <div className="grid grid-cols-2 gap-4">
                   <div><label className={lc}>Fecha de revisión</label><input type="date" className={ic} value={form.review_date} onChange={e => set('review_date', e.target.value)} /></div>
                   <div><label className={lc}>Nombre del Comercio</label><input className={ic} value={form.merchant_name} onChange={e => set('merchant_name', e.target.value)} /></div>
-                  <div><label className={lc}>KAM</label><input className={ic} value={form.kam} onChange={e => set('kam', e.target.value)} /></div>
-                  <div><label className={lc}>Técnico</label><input className={ic} value={form.technician} onChange={e => set('technician', e.target.value)} /></div>
+                  <div><label className={lc}>KAM</label>
+                    <select className={ic} value={form.kam} onChange={e => set('kam', e.target.value)}>
+                      <option value="">Seleccionar</option>
+                      {commercials.map(u => <option key={u.id} value={`${u.first_name} ${u.last_name}`}>{u.first_name} {u.last_name}</option>)}
+                    </select>
+                  </div>
+                  <div><label className={lc}>Técnico</label>
+                    <select className={ic} value={form.technician} onChange={e => set('technician', e.target.value)}>
+                      <option value="">Seleccionar</option>
+                      {onboardingUsers.map(u => <option key={u.id} value={`${u.first_name} ${u.last_name}`}>{u.first_name} {u.last_name}</option>)}
+                    </select>
+                  </div>
                   <div><label className={lc}>País</label><input className={ic} value={form.country} onChange={e => set('country', e.target.value)} /></div>
                   <div><label className={lc}>Moneda</label><input className={ic} value={form.currency} onChange={e => set('currency', e.target.value)} /></div>
                   <div><label className={lc}>Idioma PDF</label>
