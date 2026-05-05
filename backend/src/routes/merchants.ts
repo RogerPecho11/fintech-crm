@@ -380,11 +380,21 @@ router.get('/:id/timeline', async (req: AuthenticatedRequest, res: Response) => 
 // ─── DELETE /api/v1/merchants/:id ─────────────────────────────────────────────
 router.delete('/:id', authorize('admin'), async (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
-  const existing = await queryOne('SELECT id FROM merchants WHERE id = $1', [id]);
+  const existing = await queryOne('SELECT id, legal_name FROM merchants WHERE id = $1', [id]);
   if (!existing) return res.status(404).json({ error: 'Merchant not found' });
 
+  // Eliminar registros relacionados antes del merchant
+  await query('DELETE FROM sla_history WHERE entity_id = $1', [id]);
+  await query('DELETE FROM notifications WHERE merchant_id = $1', [id]);
+  await query('DELETE FROM audit_logs WHERE merchant_id = $1', [id]);
+  await query('DELETE FROM merchant_status_history WHERE merchant_id = $1', [id]);
+  await query('DELETE FROM comments WHERE merchant_id = $1', [id]);
+  await query('DELETE FROM documents WHERE merchant_id = $1', [id]);
+  await query('DELETE FROM tasks WHERE merchant_id = $1', [id]);
+  await query('DELETE FROM calendar_events WHERE merchant_id = $1', [id]);
   await query('DELETE FROM merchants WHERE id = $1', [id]);
-  res.json({ message: 'Merchant deleted successfully' });
+
+  res.json({ message: 'Comercio eliminado correctamente' });
 });
 
 export default router;
