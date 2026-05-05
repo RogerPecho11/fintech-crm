@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, CheckSquare, Clock, AlertCircle, X } from 'lucide-react';
+import { Plus, CheckSquare, Clock, AlertCircle, X, Trash2, Upload } from 'lucide-react';
 import api from '../lib/api';
 import { Task, PRIORITY_COLORS } from '../types';
 import { formatDateTime, timeAgo } from '../lib/utils';
@@ -186,6 +186,56 @@ export default function TasksPage() {
 }
 
 function TaskColumn({ title, tasks, color, icon: Icon, slaData, onStatusChange }: any) {
+  const queryClient = useQueryClient();
+  const [completeModal, setCompleteModal] = useState<string | null>(null);
+  const [closeComment, setCloseComment] = useState('');
+  const [closeImage, setCloseImage] = useState<File | null>(null);
+  const [completing, setCompleting] = useState(false);
+
+  const handleComplete = async (taskId: string) => {
+    setCompleting(true);
+    try {
+      // Si hay imagen, subirla primero
+      if (closeImage) {
+        const task = tasks.find((t: Task) => t.id === taskId);
+        if (task?.merchant_id) {
+          const formData = new FormData();
+          formData.append('file', closeImage);
+          formData.append('merchant_id', task.merchant_id);
+          formData.append('document_type', 'evidence');
+          formData.append('description', `Evidencia cierre tarea: ${task.title}${closeComment ? ' - ' + closeComment : ''}`);
+          formData.append('name', `Evidencia - ${task.title}`);
+          await api.post('/documents/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+        }
+      }
+      // Actualizar tarea con comentario y status completed
+      await api.put(`/tasks/${taskId}`, {
+        status: 'completed',
+        description: closeComment ? `${tasks.find((t: Task) => t.id === taskId)?.description || ''}\n\n📝 Comentario de cierre: ${closeComment}` : undefined,
+      });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      toast.success('Tarea completada');
+      setCompleteModal(null);
+      setCloseComment('');
+      setCloseImage(null);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Error al completar tarea');
+    } finally {
+      setCompleting(false);
+    }
+  };
+
+  const handleDelete = async (taskId: string) => {
+    if (!confirm('¿Eliminar esta tarea? Esta acción es irreversible.')) return;
+    try {
+      await api.delete(`/tasks/${taskId}`);
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      toast.success('Tarea eliminada');
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Error al eliminar');
+    }
+  };
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
@@ -202,7 +252,7 @@ function TaskColumn({ title, tasks, color, icon: Icon, slaData, onStatusChange }
               <span className={`badge text-xs ${PRIORITY_COLORS[task.priority]}`}>{task.priority}</span>
             </div>
           </div>
-          {task.description && <p className="text-xs text-gray-500">{task.description}</p>}
+          {task.description && <p className="text-xs text-gray-500 whitespace-pre-line">{task.description}</p>}
           {task.merchant_name && (
             <p className="text-xs" style={{ color: '#FC2B5F' }}>{task.merchant_name}</p>
           )}
@@ -217,7 +267,7 @@ function TaskColumn({ title, tasks, color, icon: Icon, slaData, onStatusChange }
               <span className="text-xs text-gray-500">{task.assigned_to_name}</span>
             )}
           </div>
-          <div className="flex gap-1 pt-1 border-t border-gray-100">
+          <div className="flex gap-1 pt-1 border-t border-gray-100 items-center">
             {task.status !== 'in_progress' && task.status !== 'completed' && (
               <button
                 onClick={() => onStatusChange(task.id, 'in_progress')}
@@ -228,17 +278,71 @@ function TaskColumn({ title, tasks, color, icon: Icon, slaData, onStatusChange }
             )}
             {task.status !== 'completed' && (
               <button
-                onClick={() => onStatusChange(task.id, 'completed')}
+                onClick={() => setCompleteModal(task.id)}
                 className="text-xs text-emerald-500 hover:text-emerald-600 transition-colors ml-auto"
               >
                 Completar
               </button>
             )}
+            <button
+              onClick={() => handleDelete(task.id)}
+              className="p-1 rounded text-gray-300 hover:text-red-500 transition-colors ml-1"
+              title="Eliminar tarea"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
       ))}
       {tasks.length === 0 && (
         <div className="text-center py-6 text-gray-400 text-sm">Sin tareas</div>
+      )}
+
+      {/* Modal completar tarea */}
+      {completeModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-semibold text-gray-900">Completar Tarea</h3>
+              <button onClick={() => { setCompleteModal(null); setCloseComment(''); setCloseImage(null); }} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Comentario de cierre</label>
+                <textarea
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-200 h-24 resize-none"
+                  value={closeComment}
+                  onChange={e => setCloseComment(e.target.value)}
+                  placeholder="Describe el resultado o resolución de la tarea..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Imagen / Evidencia (opcional)</label>
+                <div className="border-2 border-dashed border-gray-200 rounded-lg p-4 text-center">
+                  <input type="file" accept="image/*,.pdf" className="hidden" id={`close-img-${completeModal}`}
+                    onChange={e => setCloseImage(e.target.files?.[0] || null)} />
+                  <label htmlFor={`close-img-${completeModal}`} className="cursor-pointer flex items-center justify-center gap-2">
+                    <Upload className="w-5 h-5 text-gray-400" />
+                    <span className="text-sm text-gray-600">{closeImage?.name || 'Click para subir archivo'}</span>
+                  </label>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => { setCompleteModal(null); setCloseComment(''); setCloseImage(null); }} className="btn-secondary flex-1">Cancelar</button>
+                <button
+                  onClick={() => handleComplete(completeModal)}
+                  disabled={completing}
+                  className="flex-1 px-4 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-50"
+                  style={{ background: '#FC2B5F' }}
+                >
+                  {completing ? 'Guardando...' : 'Completar Tarea'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
