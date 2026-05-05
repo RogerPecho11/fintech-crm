@@ -31,6 +31,7 @@ const fileFilter = (_req: any, file: Express.Multer.File, cb: multer.FileFilterC
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'application/vnd.ms-excel',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'text/html',
   ];
 
   if (allowedMimes.includes(file.mimetype)) {
