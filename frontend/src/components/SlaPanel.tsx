@@ -4,6 +4,7 @@ import { Shield, Save, RotateCcw, Loader2 } from 'lucide-react';
 import api from '../lib/api';
 import { useSlaConfig } from '../lib/hooks/useSlaStatus';
 import { SlaConfigEntry } from '../types';
+import { getStatuses, getRiskLevels } from '../lib/config';
 import toast from 'react-hot-toast';
 
 type TabKey = 'merchant_status' | 'risk_level' | 'task_priority' | 'global';
@@ -15,26 +16,20 @@ const TAB_LABELS: Record<TabKey, string> = {
   global:          'Umbral de Alerta',
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  lead: 'Lead', pending: 'Pendiente', in_review: 'En Revisión',
-  documentation_required: 'Docs. Requeridos', approved: 'Aprobado',
-  suspended: 'Suspendido', rejected: 'Rechazado', certified: 'Certificado',
-  inactive: 'Inactivo', finalizado: 'Finalizado',
-};
-
-const RISK_LABELS: Record<string, string> = {
-  diamond: '💎 Diamante', gold: '🥇 Oro', silver: '🥈 Plata', bronze: '🥉 Bronce',
-  low: 'Bajo', medium: 'Medio', high: 'Alto', critical: 'Crítico',
-};
-
 const PRIORITY_LABELS: Record<string, string> = {
   urgent: '🔴 Urgente', high: '🟠 Alta', medium: '🔵 Media', low: '⚪ Baja',
 };
 
 function getLabel(entityType: TabKey, entityKey: string): string {
-  if (entityType === 'merchant_status') return STATUS_LABELS[entityKey] || entityKey;
-  if (entityType === 'risk_level')      return RISK_LABELS[entityKey]   || entityKey;
-  if (entityType === 'task_priority')   return PRIORITY_LABELS[entityKey] || entityKey;
+  if (entityType === 'merchant_status') {
+    const status = getStatuses().find(s => s.value === entityKey);
+    return status?.label || entityKey;
+  }
+  if (entityType === 'risk_level') {
+    const risk = getRiskLevels().find(r => r.value === entityKey);
+    return risk ? `${risk.icon} ${risk.label}` : entityKey;
+  }
+  if (entityType === 'task_priority') return PRIORITY_LABELS[entityKey] || entityKey;
   return entityKey;
 }
 
@@ -69,8 +64,38 @@ export default function SlaPanel() {
   };
 
   const getEntriesForTab = (tab: TabKey): SlaConfigEntry[] => {
-    if (!config) return [];
-    return config.filter(e => e.entity_type === tab);
+    const dbEntries = config ? config.filter(e => e.entity_type === tab) : [];
+
+    // Para merchant_status y risk_level, sincronizar con los estados/riesgos dinámicos
+    if (tab === 'merchant_status') {
+      const allStatuses = getStatuses();
+      const entries: SlaConfigEntry[] = allStatuses.map(s => {
+        const existing = dbEntries.find(e => e.entity_key === s.value);
+        return existing || {
+          entity_type: 'merchant_status' as const,
+          entity_key: s.value,
+          max_hours: null,
+          alert_threshold_pct: null,
+        };
+      });
+      return entries;
+    }
+
+    if (tab === 'risk_level') {
+      const allRisks = getRiskLevels();
+      const entries: SlaConfigEntry[] = allRisks.map(r => {
+        const existing = dbEntries.find(e => e.entity_key === r.value);
+        return existing || {
+          entity_type: 'risk_level' as const,
+          entity_key: r.value,
+          max_hours: null,
+          alert_threshold_pct: null,
+        };
+      });
+      return entries;
+    }
+
+    return dbEntries;
   };
 
   const handleSave = async () => {
