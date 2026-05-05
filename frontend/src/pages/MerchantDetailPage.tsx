@@ -5,7 +5,7 @@ import {
   ArrowLeft, Edit, FileText, MessageSquare, CheckSquare,
   Globe, Phone, Building, CreditCard, AlertTriangle,
   Upload, Send, CheckCircle, Clock,
-  ShoppingBag, Lock, Trash2
+  ShoppingBag, Lock, Trash2, Shield, X
 } from 'lucide-react';
 import api from '../lib/api';
 import { Merchant, STATUS_LABELS, STATUS_COLORS, MerchantStatus } from '../types';
@@ -35,6 +35,7 @@ export default function MerchantDetailPage() {
   const [comment, setComment] = useState('');
   const [statusModal, setStatusModal] = useState(false);
   const [deleteModal, setDeleteModal] = useState(false);
+  const [certModal, setCertModal] = useState(false);
   const [newStatus, setNewStatus] = useState<string>('pending');
   const [statusReason, setStatusReason] = useState('');
 
@@ -224,6 +225,15 @@ export default function MerchantDetailPage() {
             >
               <Trash2 className="w-4 h-4" />
               Eliminar
+            </button>
+          )}
+          {(user?.role === 'admin' || user?.role === 'onboarding') && (
+            <button
+              onClick={() => setCertModal(true)}
+              className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 transition-colors"
+            >
+              <Shield className="w-4 h-4" />
+              Generar Certificación
             </button>
           )}
           {isFinalized && (
@@ -628,6 +638,27 @@ export default function MerchantDetailPage() {
               >
                 {changeStatus.isPending ? 'Guardando...' : 'Confirmar'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Certification Modal */}
+      {certModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Generar Certificación</h3>
+              <button onClick={() => setCertModal(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <iframe
+                src="https://certificaciones.prontopaga.com/"
+                className="w-full h-full border-0"
+                title="Certificaciones ProntoPaga"
+              />
             </div>
           </div>
         </div>

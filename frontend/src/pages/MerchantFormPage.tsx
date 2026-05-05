@@ -221,6 +221,31 @@ export default function MerchantFormPage() {
     updateCountryConfig(countryCode, pc => ({ ...pc, pay4u: { ...pc.pay4u, [field]: value } }));
 
   const handleSubmit = () => {
+    // Validar campos obligatorios de Datos Generales
+    const required: { field: keyof typeof form; label: string }[] = [
+      { field: 'trade_name', label: 'Nombre del comercio' },
+      { field: 'request_type', label: 'Tipo de solicitud' },
+      { field: 'legal_name', label: 'Razón social' },
+      { field: 'tax_id', label: 'RUT/DNI/RUC' },
+      { field: 'country', label: 'País' },
+      { field: 'business_type', label: 'Tipo comercio' },
+      { field: 'category', label: 'Categoría del comercio' },
+      { field: 'industry', label: 'Rubro' },
+      { field: 'mcc_code', label: 'MCC' },
+      { field: 'website', label: 'URL del comercio' },
+      { field: 'address', label: 'Dirección' },
+      { field: 'contact_name', label: 'Nombre de contacto' },
+      { field: 'contact_email', label: 'Email de contacto' },
+      { field: 'contact_phone', label: 'Teléfono de contacto' },
+    ];
+
+    const missing = required.filter(r => !form[r.field]?.toString().trim());
+    if (missing.length > 0) {
+      toast.error(`Campos obligatorios: ${missing.map(m => m.label).join(', ')}`, { duration: 5000 });
+      setStep(1);
+      return;
+    }
+
     // Campos extra que no tienen columna propia en la DB
     // Se serializan en `notes` como bloque JSON _meta
     const metaBlock = JSON.stringify({
