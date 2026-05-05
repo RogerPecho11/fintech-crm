@@ -5,7 +5,7 @@ import { Plus, Search, Building2, ChevronLeft, ChevronRight } from 'lucide-react
 import api from '../lib/api';
 import { Merchant, STATUS_LABELS, STATUS_COLORS } from '../types';
 import { timeAgo, scoreColor, scoreBarColor } from '../lib/utils';
-import { getStatuses } from '../lib/config';
+import { getStatuses, useConfigRefresh } from '../lib/config';
 import { useAuth } from '../contexts/AuthContext';
 import { useSlaStatus } from '../lib/hooks/useSlaStatus';
 import SlaIndicator from '../components/SlaIndicator';
@@ -14,6 +14,7 @@ export default function MerchantsPage() {
   const { user } = useAuth();
   const isCommercial = user?.role === 'commercial';
   const { data: slaData } = useSlaStatus();
+  useConfigRefresh();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');

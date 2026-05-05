@@ -25,8 +25,8 @@ router.get('/:key', async (req: AuthenticatedRequest, res: Response) => {
   res.json(row.value);
 });
 
-// ─── PUT /api/v1/config/:key — solo admin ────────────────────────────────────
-router.put('/:key', authorize('admin'), async (req: AuthenticatedRequest, res: Response) => {
+// ─── PUT /api/v1/config/:key — admin y onboarding ───────────────────────────
+router.put('/:key', authorize('admin', 'onboarding'), async (req: AuthenticatedRequest, res: Response) => {
   const { key } = req.params;
   const value = req.body;
   const user = req.user!;
@@ -51,8 +51,8 @@ router.put('/:key', authorize('admin'), async (req: AuthenticatedRequest, res: R
   res.json({ message: `Configuración "${key}" actualizada.`, value });
 });
 
-// ─── PUT /api/v1/config — solo admin (bulk update) ───────────────────────────
-router.put('/', authorize('admin'), async (req: AuthenticatedRequest, res: Response) => {
+// ─── PUT /api/v1/config — admin y onboarding (bulk update) ───────────────────
+router.put('/', authorize('admin', 'onboarding'), async (req: AuthenticatedRequest, res: Response) => {
   const updates: Record<string, any> = req.body;
   const user = req.user!;
 

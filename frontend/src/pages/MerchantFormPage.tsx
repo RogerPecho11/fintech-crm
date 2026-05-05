@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Save, ArrowLeft, Plus, X, Trash2 } from 'lucide-react';
 import api from '../lib/api';
 import { getActiveCountries } from '../lib/countries';
-import { getStatuses, getRiskLevels, getPaymentMethodsForCountry, getMccCodes, getBusinessTypes, getIndustries, getCategories } from '../lib/config';
+import { getStatuses, getRiskLevels, getPaymentMethodsForCountry, getMccCodes, getBusinessTypes, getIndustries, getCategories, useConfigRefresh } from '../lib/config';
 import toast from 'react-hot-toast';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -84,6 +84,7 @@ export default function MerchantFormPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  useConfigRefresh();
   const isEdit = !!id;
   const [step, setStep] = useState(1);
   const [form, setForm] = useState(defaultForm);

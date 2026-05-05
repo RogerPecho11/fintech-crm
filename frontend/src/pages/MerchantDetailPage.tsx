@@ -12,7 +12,7 @@ import { Merchant, STATUS_LABELS, STATUS_COLORS, MerchantStatus } from '../types
 import { formatDateTime, timeAgo, scoreColor, scoreBarColor, formatCurrency, formatFileSize } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../contexts/SocketContext';
-import { getStatuses, getStatusConfig, getRiskConfig } from '../lib/config';
+import { getStatuses, getStatusConfig, getRiskConfig, useConfigRefresh } from '../lib/config';
 import { getActiveCountries } from '../lib/countries';
 import toast from 'react-hot-toast';
 import { useDropzone } from 'react-dropzone';
@@ -30,6 +30,7 @@ export default function MerchantDetailPage() {
   const { socket } = useSocket();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  useConfigRefresh();
   const [tab, setTab] = useState('Resumen');
   const [comment, setComment] = useState('');
   const [statusModal, setStatusModal] = useState(false);

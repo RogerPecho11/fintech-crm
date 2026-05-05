@@ -42,6 +42,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [logout]);
 
+  // Sincronizar config del servidor cada 30 segundos para que todos los usuarios vean cambios
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(() => {
+      syncConfigFromServer();
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [user]);
+
   const login = async (email: string, password: string) => {
     const res = await api.post('/auth/login', { email, password });
     const { token: newToken, user: newUser } = res.data;

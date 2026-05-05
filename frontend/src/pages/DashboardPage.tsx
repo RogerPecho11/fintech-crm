@@ -7,7 +7,7 @@ import {
   Building2, TrendingUp, Clock, AlertTriangle,
   ListTodo, Users, Activity, Globe, Plus, X, Settings, Shield, CreditCard, Trash2, Tag, Layers, FolderTree, Hash
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import api from '../lib/api';
 import { DashboardMetrics, STATUS_LABELS } from '../types';
 import { timeAgo, scoreColor, scoreBarColor } from '../lib/utils';
@@ -24,6 +24,7 @@ import {
   MerchantStatusConfig, RiskLevelConfig, PaymentMethod,
   MccCode, BusinessType, IndustryConfig, CategoryConfig,
   DEFAULT_STATUSES, DEFAULT_RISK_LEVELS,
+  useConfigRefresh,
 } from '../lib/config';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -63,6 +64,7 @@ function StatCard({ icon: Icon, label, value, sub, accent = false }: any) {
 export default function DashboardPage() {
   const { user } = useAuth();
   const isCommercial = user?.role === 'commercial';
+  const configVersion = useConfigRefresh();
 
   const [activeCountries, setActiveCountries] = useState<Country[]>(getActiveCountries);
   const [showCountryPanel, setShowCountryPanel] = useState(false);
@@ -77,6 +79,19 @@ export default function DashboardPage() {
   const [industriesList, setIndustriesList] = useState<IndustryConfig[]>(getIndustries);
   const [categoriesList, setCategoriesList] = useState<CategoryConfig[]>(getCategories);
   const [activeConfigPanel, setActiveConfigPanel] = useState<'statuses' | 'risks' | 'payments' | 'mcc' | 'business_types' | 'industries' | 'categories' | null>(null);
+
+  // Re-sync local state when config updates from server
+  useEffect(() => {
+    if (configVersion === 0) return;
+    setStatuses(getStatuses());
+    setRiskLevels(getRiskLevels());
+    setPaymentMethods(getPaymentMethods());
+    setMccCodes(getMccCodes());
+    setBusinessTypes(getBusinessTypes());
+    setIndustriesList(getIndustries());
+    setCategoriesList(getCategories());
+    setActiveCountries(getActiveCountries());
+  }, [configVersion]);
 
   // New item forms
   const [newStatus, setNewStatus] = useState({ label: '', value: '', hex: '#6B7280' });

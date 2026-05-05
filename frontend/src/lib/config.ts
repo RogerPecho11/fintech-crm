@@ -257,14 +257,43 @@ export async function syncConfigFromServer(): Promise<void> {
     const res = await api.get('/config');
     const data = res.data;
 
-    if (data.statuses) localStorage.setItem(KEY_STATUSES, JSON.stringify(data.statuses));
-    if (data.risk_levels) localStorage.setItem(KEY_RISKS, JSON.stringify(data.risk_levels));
-    if (data.payment_methods) localStorage.setItem(KEY_PAYMENTS, JSON.stringify(data.payment_methods));
-    if (data.mcc_codes) localStorage.setItem(KEY_MCC_CODES, JSON.stringify(data.mcc_codes));
-    if (data.business_types) localStorage.setItem(KEY_BUSINESS_TYPES, JSON.stringify(data.business_types));
-    if (data.industries) localStorage.setItem(KEY_INDUSTRIES, JSON.stringify(data.industries));
-    if (data.categories) localStorage.setItem(KEY_CATEGORIES, JSON.stringify(data.categories));
-    if (data.countries) localStorage.setItem('prontopaga_active_countries', JSON.stringify(data.countries));
+    let changed = false;
+    if (data.statuses && JSON.stringify(data.statuses) !== localStorage.getItem(KEY_STATUSES)) {
+      localStorage.setItem(KEY_STATUSES, JSON.stringify(data.statuses));
+      changed = true;
+    }
+    if (data.risk_levels && JSON.stringify(data.risk_levels) !== localStorage.getItem(KEY_RISKS)) {
+      localStorage.setItem(KEY_RISKS, JSON.stringify(data.risk_levels));
+      changed = true;
+    }
+    if (data.payment_methods && JSON.stringify(data.payment_methods) !== localStorage.getItem(KEY_PAYMENTS)) {
+      localStorage.setItem(KEY_PAYMENTS, JSON.stringify(data.payment_methods));
+      changed = true;
+    }
+    if (data.mcc_codes && JSON.stringify(data.mcc_codes) !== localStorage.getItem(KEY_MCC_CODES)) {
+      localStorage.setItem(KEY_MCC_CODES, JSON.stringify(data.mcc_codes));
+      changed = true;
+    }
+    if (data.business_types && JSON.stringify(data.business_types) !== localStorage.getItem(KEY_BUSINESS_TYPES)) {
+      localStorage.setItem(KEY_BUSINESS_TYPES, JSON.stringify(data.business_types));
+      changed = true;
+    }
+    if (data.industries && JSON.stringify(data.industries) !== localStorage.getItem(KEY_INDUSTRIES)) {
+      localStorage.setItem(KEY_INDUSTRIES, JSON.stringify(data.industries));
+      changed = true;
+    }
+    if (data.categories && JSON.stringify(data.categories) !== localStorage.getItem(KEY_CATEGORIES)) {
+      localStorage.setItem(KEY_CATEGORIES, JSON.stringify(data.categories));
+      changed = true;
+    }
+    if (data.countries && JSON.stringify(data.countries) !== localStorage.getItem('prontopaga_active_countries')) {
+      localStorage.setItem('prontopaga_active_countries', JSON.stringify(data.countries));
+      changed = true;
+    }
+
+    if (changed) {
+      window.dispatchEvent(new Event('config-updated'));
+    }
   } catch (err: any) {
     console.warn('[Config] Error loading config from server:', err.message);
   }
@@ -288,4 +317,18 @@ export function getPaymentMethodsForCountry(countryCode: string, type: 'pay_in' 
     (m.type === type || m.type === 'both') &&
     (m.countries.length === 0 || m.countries.includes(countryCode))
   );
+}
+
+// ── Hook para re-render cuando la config cambia ───────────────
+import { useState as _useState, useEffect as _useEffect } from 'react';
+
+/** Hook que fuerza re-render cuando la configuración se actualiza desde el servidor */
+export function useConfigRefresh(): number {
+  const [version, setVersion] = _useState(0);
+  _useEffect(() => {
+    const handler = () => setVersion(v => v + 1);
+    window.addEventListener('config-updated', handler);
+    return () => window.removeEventListener('config-updated', handler);
+  }, []);
+  return version;
 }
