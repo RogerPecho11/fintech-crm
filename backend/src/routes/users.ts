@@ -94,4 +94,26 @@ router.put('/:id', authorize('admin'), async (req: AuthenticatedRequest, res: Re
   res.json(updated);
 });
 
+// DELETE /api/v1/users/:id (admin only)
+router.delete('/:id', authorize('admin'), async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  const user = req.user!;
+
+  if (user.id === id) {
+    return res.status(400).json({ error: 'No puedes eliminar tu propia cuenta.' });
+  }
+
+  const existing = await queryOne('SELECT id FROM users WHERE id = $1', [id]);
+  if (!existing) return res.status(404).json({ error: 'Usuario no encontrado.' });
+
+  // Desasignar merchants y tasks antes de eliminar
+  await query('UPDATE merchants SET assigned_to = NULL WHERE assigned_to = $1', [id]);
+  await query('UPDATE merchants SET onboarding_assigned_to = NULL WHERE onboarding_assigned_to = $1', [id]);
+  await query('UPDATE tasks SET assigned_to = NULL WHERE assigned_to = $1', [id]);
+  await query('DELETE FROM notifications WHERE user_id = $1', [id]);
+  await query('DELETE FROM users WHERE id = $1', [id]);
+
+  res.json({ message: 'Usuario eliminado correctamente.' });
+});
+
 export default router;

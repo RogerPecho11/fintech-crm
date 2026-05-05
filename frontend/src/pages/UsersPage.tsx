@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, X, Users, Shield, Pencil, KeyRound } from 'lucide-react';
+import { Plus, X, Users, Shield, Pencil, KeyRound, Trash2 } from 'lucide-react';
 import api from '../lib/api';
 import { User } from '../types';
 import { getInitials, timeAgo } from '../lib/utils';
@@ -280,6 +280,24 @@ export default function UsersPage() {
                           }`}
                         >
                           {u.is_active ? 'Desactivar' : 'Activar'}
+                        </button>
+                      )}
+
+                      {/* Eliminar */}
+                      {u.id !== currentUser?.id && (
+                        <button
+                          onClick={() => {
+                            if (confirm(`¿Eliminar a ${u.first_name} ${u.last_name}? Esta acción es irreversible.`)) {
+                              api.delete(`/users/${u.id}`).then(() => {
+                                queryClient.invalidateQueries({ queryKey: ['users'] });
+                                toast.success('Usuario eliminado');
+                              }).catch((err: any) => toast.error(err.response?.data?.error || 'Error al eliminar'));
+                            }
+                          }}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                          title="Eliminar usuario"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       )}
                     </div>
