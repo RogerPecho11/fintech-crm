@@ -524,12 +524,19 @@ export default function MerchantDetailPage() {
                   </span>
                 )}
                 <a
-                  href={`/uploads/${doc.file_path}`}
+                  href={`${import.meta.env.VITE_API_URL || ''}/uploads/${doc.file_path}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn-secondary text-xs py-1.5 px-3 flex-shrink-0"
                 >
                   Ver
+                </a>
+                <a
+                  href={`${import.meta.env.VITE_API_URL || ''}/uploads/${doc.file_path}`}
+                  download={doc.original_name || doc.name}
+                  className="btn-secondary text-xs py-1.5 px-3 flex-shrink-0"
+                >
+                  Descargar
                 </a>
               </div>
             ))}
