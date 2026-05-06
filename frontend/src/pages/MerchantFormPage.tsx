@@ -88,6 +88,7 @@ export default function MerchantFormPage() {
   const isEdit = !!id;
   const [step, setStep] = useState(1);
   const [form, setForm] = useState(defaultForm);
+  const [contractFile, setContractFile] = useState<File | null>(null);
   const [addingCountryCode, setAddingCountryCode] = useState('');
 
   const activeCountries = getActiveCountries();
@@ -149,10 +150,27 @@ export default function MerchantFormPage() {
   const mutation = useMutation({
     mutationFn: (data: any) =>
       isEdit ? api.put(`/merchants/${id}`, data) : api.post('/merchants', data),
-    onSuccess: (res) => {
+    onSuccess: async (res) => {
+      const merchantId = res.data.id;
+
+      // Subir contrato si se adjuntó
+      if (contractFile) {
+        try {
+          const formData = new FormData();
+          formData.append('file', contractFile);
+          formData.append('merchant_id', merchantId);
+          formData.append('document_type', 'contract');
+          formData.append('description', 'Contrato del comercio');
+          formData.append('name', `Contrato - ${form.trade_name}`);
+          await api.post('/documents/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+        } catch {
+          toast.error('Comercio creado pero error al subir contrato');
+        }
+      }
+
       queryClient.invalidateQueries({ queryKey: ['merchants'] });
       toast.success(isEdit ? 'Comercio actualizado' : 'Comercio registrado exitosamente');
-      navigate(`/merchants/${res.data.id}`);
+      navigate(`/merchants/${merchantId}`);
     },
     onError: (err: any) => {
       toast.error(err.response?.data?.error || 'Error al guardar');
@@ -494,6 +512,18 @@ export default function MerchantFormPage() {
               <div className="sm:col-span-2">
                 <label className={lc}>Comentarios adicionales</label>
                 <textarea className={`${ic} h-24 resize-none`} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Observaciones adicionales..." />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className={lc}>Contrato (archivo adjunto)</label>
+                <div className="border-2 border-dashed border-gray-200 rounded-lg p-4 text-center">
+                  <input type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" className="hidden" id="contract-file"
+                    onChange={e => setContractFile(e.target.files?.[0] || null)} />
+                  <label htmlFor="contract-file" className="cursor-pointer flex items-center justify-center gap-2">
+                    <Plus className="w-5 h-5 text-gray-400" />
+                    <span className="text-sm text-gray-600">{contractFile?.name || 'Click para subir contrato'}</span>
+                  </label>
+                </div>
               </div>
 
             </div>

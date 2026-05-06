@@ -359,6 +359,9 @@ export default function MerchantDetailPage() {
 
           </div>
 
+          {/* Contrato */}
+          <ContractSection merchantId={merchant.id} />
+
           {/* Row 3: Métodos de Pago por País */}
           {paymentConfig.length > 0 && (
             <InfoSection title="Métodos de Pago por País" icon={CreditCard}>
@@ -773,6 +776,47 @@ function TimelineItem({ item }: { item: any }) {
         {item.type === 'task' && (
           <p className="text-sm text-gray-700">Tarea: <span className="text-purple-600">{item.title}</span> ({item.status})</p>
         )}
+      </div>
+    </div>
+  );
+}
+
+function ContractSection({ merchantId }: { merchantId: string }) {
+  const baseUrl = import.meta.env.VITE_API_URL || '';
+
+  const { data: docs } = useQuery({
+    queryKey: ['contract-docs', merchantId],
+    queryFn: () => api.get(`/documents/merchant/${merchantId}`).then(r => r.data),
+  });
+
+  const contracts = (docs || []).filter((d: any) => d.document_type === 'contract');
+
+  if (contracts.length === 0) return null;
+
+  return (
+    <div className="card">
+      <div className="flex items-center gap-2 mb-3 pb-3 border-b border-gray-100">
+        <FileText className="w-4 h-4 text-gray-400" />
+        <h3 className="font-semibold text-gray-900 text-sm">Contrato</h3>
+      </div>
+      <div className="space-y-2">
+        {contracts.map((doc: any) => (
+          <div key={doc.id} className="flex items-center gap-3 p-3 border border-gray-100 rounded-lg bg-gray-50">
+            <FileText className="w-5 h-5 flex-shrink-0" style={{ color: '#FC2B5F' }} />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900 truncate">{doc.name || doc.original_name}</p>
+              <p className="text-xs text-gray-500">{doc.uploaded_by_name} · {new Date(doc.created_at).toLocaleDateString()}</p>
+            </div>
+            <a href={`${baseUrl}/uploads/${doc.file_path}`} target="_blank" rel="noopener noreferrer"
+              className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-100">
+              Ver
+            </a>
+            <a href={`${baseUrl}/uploads/${doc.file_path}`} download={doc.original_name}
+              className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-100">
+              Descargar
+            </a>
+          </div>
+        ))}
       </div>
     </div>
   );
