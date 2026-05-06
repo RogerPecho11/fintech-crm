@@ -17,13 +17,11 @@ const navItems = [
   { to: '/calendar', icon: Calendar, label: 'Calendario',      roles: ['admin', 'onboarding'] },
   { to: '/reports', icon: BarChart3, label: 'Reportes',        roles: ['admin', 'commercial', 'onboarding'] },
   { to: '/notifications', icon: Bell, label: 'Notificaciones', roles: ['admin', 'commercial', 'onboarding'] },
-  { to: '/mexico-reports', icon: Globe, label: 'Reportería México', roles: ['admin', 'onboarding'] },
 ];
 
 const adminItems = [
   { to: '/users', icon: Users, label: 'Usuarios' },
   { to: '/webhooks', icon: Webhook, label: 'Webhooks' },
-  { to: '/mexico-form', icon: FileText, label: 'Formulario México', external: true },
 ];
 
 export default function Layout() {
