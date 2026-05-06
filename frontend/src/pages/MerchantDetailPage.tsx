@@ -152,7 +152,7 @@ export default function MerchantDetailPage() {
   // Helper: resolve country name from code or return as-is
   const resolveCountry = (val?: string) => {
     if (!val) return undefined;
-    const found = activeCountries.find(c => c.code === val);
+    const found = activeCountries.find(c => c.code === val || c.name === val);
     return found ? `${found.flag} ${found.name}` : val;
   };
 
@@ -298,8 +298,8 @@ export default function MerchantDetailPage() {
               <InfoRow label="Categoría"          value={meta.category || (merchant as any).category} />
               <InfoRow label="Rubro"              value={merchant.industry} />
               <InfoRow label="MCC"                value={merchant.mcc_code ? `${merchant.mcc_code} — ${merchant.mcc_description || ''}` : undefined} />
-              <InfoRow label="País"               value={resolveCountry(merchant.country)} />
-              <InfoRow label="País origen"        value={resolveCountry(meta.origin_country || (merchant as any).origin_country)} />
+              <InfoRow label="País"               value={resolveCountry(merchant.country) || '—'} />
+              <InfoRow label="País origen"        value={resolveCountry(meta.origin_country || (merchant as any).origin_country) || '—'} />
               <InfoRow label="Dirección"          value={merchant.address} />
               {merchant.website && (
                 <InfoRow label="URL comercio" value={
