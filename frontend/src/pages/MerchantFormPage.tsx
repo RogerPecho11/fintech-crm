@@ -724,10 +724,6 @@ function PaySection({ title, entries, available, onAdd, onRemove, onUpdate, ic }
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-xs text-gray-500 mb-0.5 block">Proveedor</label>
-              <input className={ic} value={entry.provider} onChange={e => onUpdate(entry.method_id, 'provider', e.target.value)} placeholder="Proveedor" />
-            </div>
-            <div>
               <label className="text-xs text-gray-500 mb-0.5 block">Comisión %</label>
               <input type="number" className={ic} value={entry.commission} onChange={e => onUpdate(entry.method_id, 'commission', e.target.value)} placeholder="0.00" />
             </div>
