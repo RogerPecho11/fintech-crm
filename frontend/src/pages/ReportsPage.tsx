@@ -621,60 +621,158 @@ export default function ReportsPage() {
 }
 
 function MonitoringSection() {
-  const { data, isLoading } = useQuery({
-    queryKey: ['merchants-finalized'],
-    queryFn: () => api.get('/merchants', { params: { status: 'finalizado', limit: 100 } }).then(r => r.data),
+  const [selectedCommerce, setSelectedCommerce] = useState<any>(null);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
+  const { data: commerces, isLoading } = useQuery({
+    queryKey: ['tx-commerces'],
+    queryFn: () => api.get('/transactions/commerces').then(r => r.data),
   });
 
-  const merchants = data?.data || [];
+  const { data: summary } = useQuery({
+    queryKey: ['tx-summary', selectedCommerce?.id, dateFrom, dateTo],
+    queryFn: () => api.get(`/transactions/summary/${selectedCommerce.id}`, {
+      params: { date_from: dateFrom || undefined, date_to: dateTo || undefined }
+    }).then(r => r.data),
+    enabled: !!selectedCommerce,
+  });
+
+  const { data: movements } = useQuery({
+    queryKey: ['tx-movements', selectedCommerce?.id, dateFrom, dateTo],
+    queryFn: () => api.get(`/transactions/movements/${selectedCommerce.id}`, {
+      params: { date_from: dateFrom || undefined, date_to: dateTo || undefined, limit: 20 }
+    }).then(r => r.data),
+    enabled: !!selectedCommerce,
+  });
 
   return (
     <div className="card p-6">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="text-lg font-bold text-gray-900">Monitoreo de Transacciones</h2>
-          <p className="text-sm text-gray-500">Comercios con estado Finalizado</p>
-        </div>
-        <span className="text-xs bg-teal-50 text-teal-700 border border-teal-200 px-2.5 py-1 rounded-full font-medium">
-          {merchants.length} comercios
-        </span>
+      <div className="mb-4">
+        <h2 className="text-lg font-bold text-gray-900">Monitoreo de Transacciones</h2>
+        <p className="text-sm text-gray-500">Datos en tiempo real de la base de producción</p>
       </div>
 
-      {isLoading ? (
-        <div className="text-center py-8 text-gray-400">Cargando...</div>
-      ) : merchants.length === 0 ? (
-        <div className="text-center py-8 text-gray-400">No hay comercios finalizados</div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="table-header">Comercio</th>
-                <th className="table-header">Razón Social</th>
-                <th className="table-header">País</th>
-                <th className="table-header">MCC</th>
-                <th className="table-header">Riesgo</th>
-                <th className="table-header">Score</th>
-                <th className="table-header">KAM</th>
-              </tr>
-            </thead>
-            <tbody>
-              {merchants.map((m: any) => (
-                <tr key={m.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                  <td className="table-cell font-medium text-gray-900">{m.trade_name || m.legal_name}</td>
-                  <td className="table-cell text-xs text-gray-600">{m.legal_name}</td>
-                  <td className="table-cell text-xs">{m.country || '—'}</td>
-                  <td className="table-cell font-mono text-xs">{m.mcc_code || '—'}</td>
-                  <td className="table-cell text-xs">{m.risk_level}</td>
-                  <td className="table-cell">
-                    <span className="text-xs font-semibold" style={{ color: scoreColor(m.score) }}>{m.score}/100</span>
-                  </td>
-                  <td className="table-cell text-xs text-gray-500">{m.assigned_to_name || '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Filtros */}
+      <div className="flex flex-wrap gap-3 mb-4 p-3 bg-gray-50 rounded-lg items-end">
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Comercio</label>
+          <select
+            className="input text-sm w-64"
+            value={selectedCommerce?.id || ''}
+            onChange={e => {
+              const c = (commerces || []).find((c: any) => c.id == e.target.value);
+              setSelectedCommerce(c || null);
+            }}
+          >
+            <option value="">Seleccionar comercio</option>
+            {(commerces || []).map((c: any) => (
+              <option key={c.id} value={c.id}>{c.name} ({c.country || '—'})</option>
+            ))}
+          </select>
         </div>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Desde</label>
+          <input type="date" className="input text-sm" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Hasta</label>
+          <input type="date" className="input text-sm" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+        </div>
+      </div>
+
+      {isLoading && <div className="text-center py-8 text-gray-400">Cargando comercios...</div>}
+
+      {/* Resumen */}
+      {selectedCommerce && summary && (
+        <div className="space-y-4">
+          {/* Totales */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="bg-gray-50 rounded-lg p-3">
+              <p className="text-xs text-gray-500">Total Transacciones</p>
+              <p className="text-xl font-bold text-gray-900">{Number(summary.totals?.total_transactions || 0).toLocaleString()}</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <p className="text-xs text-gray-500">Monto Total</p>
+              <p className="text-xl font-bold text-gray-900">${Number(summary.totals?.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <p className="text-xs text-gray-500">Primera Transacción</p>
+              <p className="text-sm font-medium text-gray-700">{summary.totals?.first_date || '—'}</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <p className="text-xs text-gray-500">Última Transacción</p>
+              <p className="text-sm font-medium text-gray-700">{summary.totals?.last_date || '—'}</p>
+            </div>
+          </div>
+
+          {/* Por tipo */}
+          {summary.summary?.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700 mb-2">Por Tipo de Transacción</h4>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-100">
+                      <th className="table-header">Tipo</th>
+                      <th className="table-header">Cantidad</th>
+                      <th className="table-header">Monto Total</th>
+                      <th className="table-header">Promedio</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {summary.summary.map((s: any) => (
+                      <tr key={s.transaction_type} className="border-b border-gray-50">
+                        <td className="table-cell font-medium">{s.transaction_type || '—'}</td>
+                        <td className="table-cell">{Number(s.total_transactions).toLocaleString()}</td>
+                        <td className="table-cell font-mono">${Number(s.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                        <td className="table-cell font-mono">${Number(s.avg_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Últimos movimientos */}
+          {movements?.data?.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700 mb-2">Últimos Movimientos</h4>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-100">
+                      <th className="table-header">Fecha</th>
+                      <th className="table-header">Tipo</th>
+                      <th className="table-header">Monto</th>
+                      <th className="table-header">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {movements.data.map((m: any) => (
+                      <tr key={m.id} className="border-b border-gray-50">
+                        <td className="table-cell text-xs">{new Date(m.created_at).toLocaleString('es-PE')}</td>
+                        <td className="table-cell">{m.transaction_type || '—'}</td>
+                        <td className="table-cell font-mono">${Number(m.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                        <td className="table-cell">
+                          <span className={`text-xs font-medium ${m.validation_status === 'validated' ? 'text-emerald-600' : 'text-orange-500'}`}>
+                            {m.validation_status || '—'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-xs text-gray-400 mt-2">Mostrando {movements.data.length} de {movements.total} movimientos</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!selectedCommerce && !isLoading && (
+        <div className="text-center py-8 text-gray-400">Selecciona un comercio para ver sus transacciones</div>
       )}
     </div>
   );

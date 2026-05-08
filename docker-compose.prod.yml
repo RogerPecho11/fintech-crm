@@ -33,6 +33,11 @@ services:
       JWT_SECRET: ProntoPaga_JWT_SuperSecret_2024_Production!
       JWT_EXPIRES_IN: 7d
       FRONTEND_URL: https://crm-onboarding.online
+      MYSQL_HOST: replica-produccion-brasil.chm5clze4j9i.us-east-1.rds.amazonaws.com
+      MYSQL_PORT: 3306
+      MYSQL_USER: roger.pecho
+      MYSQL_PASSWORD: T9x#vB7q!LmZ2rWdXf6A
+      MYSQL_DATABASE: prontopaga_com
     ports:
       - "127.0.0.1:3001:3001"
     volumes:
