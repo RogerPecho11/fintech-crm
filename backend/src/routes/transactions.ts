@@ -46,12 +46,11 @@ router.get('/summary/:commerceId', async (req: AuthenticatedRequest, res: Respon
         p.type,
         p.status,
         COUNT(*) as total_transactions,
-        SUM(p.amount) as total_amount,
-        AVG(p.amount) as avg_amount
+        SUM(p.amount) as total_amount
        FROM payment p
        WHERE p.commerce_id = ? AND p.deleted_at IS NULL ${dateFilter}
        GROUP BY p.type, p.status
-       ORDER BY total_amount DESC`,
+       ORDER BY total_transactions DESC`,
       params
     );
 
@@ -66,7 +65,26 @@ router.get('/summary/:commerceId', async (req: AuthenticatedRequest, res: Respon
       params
     );
 
-    res.json({ summary, totals: totals[0] || {} });
+    // Obtener moneda del comercio
+    const commerceInfo = await mysqlQuery(
+      `SELECT c.country, cc.code as currency_code
+       FROM commerce c
+       LEFT JOIN commerce_currency cc ON cc.commerce_id = c.id
+       WHERE c.id = ?
+       LIMIT 1`,
+      [commerceId]
+    );
+
+    const currency = commerceInfo[0]?.currency_code || null;
+    const totalCount = Number(totals[0]?.total_transactions || 0);
+
+    // Agregar porcentaje a cada fila del summary
+    const summaryWithPct = summary.map((s: any) => ({
+      ...s,
+      percentage: totalCount > 0 ? Math.round((Number(s.total_transactions) / totalCount) * 10000) / 100 : 0,
+    }));
+
+    res.json({ summary: summaryWithPct, totals: { ...totals[0], currency }, currency });
   } catch (err: any) {
     console.error('[Transactions] Error fetching summary:', err.message);
     res.status(500).json({ error: 'Error al consultar transacciones.' });

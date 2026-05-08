@@ -694,15 +694,15 @@ function MonitoringSection() {
             </div>
             <div className="bg-gray-50 rounded-lg p-3">
               <p className="text-xs text-gray-500">Monto Total</p>
-              <p className="text-xl font-bold text-gray-900">${Number(summary.totals?.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+              <p className="text-xl font-bold text-gray-900">{summary.currency || '$'} {Number(summary.totals?.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
             </div>
             <div className="bg-gray-50 rounded-lg p-3">
               <p className="text-xs text-gray-500">Primera Transacción</p>
-              <p className="text-sm font-medium text-gray-700">{summary.totals?.first_date || '—'}</p>
+              <p className="text-sm font-medium text-gray-700">{summary.totals?.first_date ? new Date(summary.totals.first_date).toLocaleDateString('es-PE') : '—'}</p>
             </div>
             <div className="bg-gray-50 rounded-lg p-3">
               <p className="text-xs text-gray-500">Última Transacción</p>
-              <p className="text-sm font-medium text-gray-700">{summary.totals?.last_date || '—'}</p>
+              <p className="text-sm font-medium text-gray-700">{summary.totals?.last_date ? new Date(summary.totals.last_date).toLocaleDateString('es-PE') : '—'}</p>
             </div>
           </div>
 
@@ -718,7 +718,7 @@ function MonitoringSection() {
                       <th className="table-header">Estado</th>
                       <th className="table-header">Cantidad</th>
                       <th className="table-header">Monto Total</th>
-                      <th className="table-header">Promedio</th>
+                      <th className="table-header">% del Total</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -729,8 +729,15 @@ function MonitoringSection() {
                           <span className={`text-xs font-medium ${s.status === 'success' ? 'text-emerald-600' : s.status === 'pending' ? 'text-yellow-600' : 'text-red-500'}`}>{s.status || '—'}</span>
                         </td>
                         <td className="table-cell">{Number(s.total_transactions).toLocaleString()}</td>
-                        <td className="table-cell font-mono">${Number(s.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                        <td className="table-cell font-mono">${Number(s.avg_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                        <td className="table-cell font-mono">{summary.currency || '$'} {Number(s.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                        <td className="table-cell">
+                          <div className="flex items-center gap-2">
+                            <div className="w-16 bg-gray-100 rounded-full h-1.5">
+                              <div className={`h-1.5 rounded-full ${s.status === 'success' ? 'bg-emerald-500' : s.status === 'pending' ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${Math.min(100, s.percentage)}%` }} />
+                            </div>
+                            <span className="text-xs font-semibold text-gray-700">{s.percentage}%</span>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -761,7 +768,7 @@ function MonitoringSection() {
                         <td className="table-cell text-xs">{new Date(m.created_at).toLocaleString('es-PE')}</td>
                         <td className="table-cell">{m.type || '—'}</td>
                         <td className="table-cell text-xs">{m.method || '—'}</td>
-                        <td className="table-cell font-mono">${Number(m.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                        <td className="table-cell font-mono">{summary?.currency || '$'} {Number(m.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                         <td className="table-cell">
                           <span className={`text-xs font-medium ${m.status === 'success' ? 'text-emerald-600' : m.status === 'pending' ? 'text-yellow-600' : 'text-red-500'}`}>
                             {m.status || '—'}
