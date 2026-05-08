@@ -152,20 +152,25 @@ router.get('/history-export', async (_req: AuthenticatedRequest, res: Response) 
        ORDER BY c.name ASC`
     );
 
-    // Obtener monedas configuradas por comercio (de commerce_currency)
-    const configuredCurrencies = await mysqlQuery(
-      `SELECT cc.commerce_id, cur.isocode as currency_code
-       FROM commerce_currency cc
-       JOIN currency cur ON cur.id = cc.currency_id`
-    );
+    // Obtener monedas configuradas por comercio
+    let configuredCurrencies: any[] = [];
+    try {
+      configuredCurrencies = await mysqlQuery(
+        `SELECT cc.commerce_id, cur.isocode as currency_code
+         FROM commerce_currency cc
+         JOIN currency cur ON cur.id = cc.currency_id
+         LIMIT 5000`
+      );
+    } catch { /* tabla puede no existir o estar vacía */ }
 
-    // Obtener monedas usadas en transacciones por comercio
+    // Obtener monedas usadas en transacciones (solo últimos 6 meses para performance)
     const usedCurrencies = await mysqlQuery(
       `SELECT p.commerce_id, cur.isocode as currency_code
        FROM payment p
        JOIN currency cur ON cur.id = p.currency_id
-       WHERE p.deleted_at IS NULL
-       GROUP BY p.commerce_id, cur.isocode`
+       WHERE p.deleted_at IS NULL AND p.created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+       GROUP BY p.commerce_id, cur.isocode
+       LIMIT 5000`
     );
 
     // Mapear monedas configuradas por commerce_id
@@ -187,7 +192,6 @@ router.get('/history-export', async (_req: AuthenticatedRequest, res: Response) 
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Historial de Comercios');
 
-    // Headers
     sheet.columns = [
       { header: 'ID', key: 'id', width: 8 },
       { header: 'Nombre del Comercio', key: 'name', width: 35 },
@@ -197,11 +201,8 @@ router.get('/history-export', async (_req: AuthenticatedRequest, res: Response) 
       { header: 'Monedas en Transacciones', key: 'used_currencies', width: 25 },
     ];
 
-    // Style headers
     sheet.getRow(1).font = { bold: true };
-    sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E7EB' } };
 
-    // Data rows
     for (const c of commerces as any[]) {
       sheet.addRow({
         id: c.id,

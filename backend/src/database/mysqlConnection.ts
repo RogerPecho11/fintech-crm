@@ -9,7 +9,7 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 5,
   queueLimit: 0,
-  connectTimeout: 10000,
+  connectTimeout: 30000,
 });
 
 export async function mysqlQuery<T = any>(sql: string, params?: any[]): Promise<T[]> {
