@@ -144,48 +144,17 @@ router.get('/movements/:commerceId', async (req: AuthenticatedRequest, res: Resp
 // ─── GET /api/v1/transactions/history-export — Excel con historial de comercios
 router.get('/history-export', async (_req: AuthenticatedRequest, res: Response) => {
   try {
-    // Obtener todos los comercios con su estado
-    const commerces = await mysqlQuery(
-      `SELECT c.id, c.name, c.country, c.enabled
+    // Query simple: comercios + monedas configuradas en una sola query
+    const data = await mysqlQuery(
+      `SELECT c.id, c.name, c.country, c.enabled,
+              GROUP_CONCAT(DISTINCT cur.isocode SEPARATOR ', ') as currencies
        FROM commerce c
+       LEFT JOIN commerce_currency cc ON cc.commerce_id = c.id
+       LEFT JOIN currency cur ON cur.id = cc.currency_id
        WHERE (c.is_deleted IS NULL OR c.is_deleted = 0)
+       GROUP BY c.id, c.name, c.country, c.enabled
        ORDER BY c.name ASC`
     );
-
-    // Obtener monedas configuradas por comercio
-    let configuredCurrencies: any[] = [];
-    try {
-      configuredCurrencies = await mysqlQuery(
-        `SELECT cc.commerce_id, cur.isocode as currency_code
-         FROM commerce_currency cc
-         JOIN currency cur ON cur.id = cc.currency_id
-         LIMIT 5000`
-      );
-    } catch { /* tabla puede no existir o estar vacía */ }
-
-    // Obtener monedas usadas en transacciones (solo últimos 6 meses para performance)
-    const usedCurrencies = await mysqlQuery(
-      `SELECT p.commerce_id, cur.isocode as currency_code
-       FROM payment p
-       JOIN currency cur ON cur.id = p.currency_id
-       WHERE p.deleted_at IS NULL AND p.created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
-       GROUP BY p.commerce_id, cur.isocode
-       LIMIT 5000`
-    );
-
-    // Mapear monedas configuradas por commerce_id
-    const configMap: Record<number, Set<string>> = {};
-    for (const row of configuredCurrencies as any[]) {
-      if (!configMap[row.commerce_id]) configMap[row.commerce_id] = new Set();
-      configMap[row.commerce_id].add(row.currency_code);
-    }
-
-    // Mapear monedas usadas por commerce_id
-    const usedMap: Record<number, Set<string>> = {};
-    for (const row of usedCurrencies as any[]) {
-      if (!usedMap[row.commerce_id]) usedMap[row.commerce_id] = new Set();
-      usedMap[row.commerce_id].add(row.currency_code);
-    }
 
     // Generar Excel
     const ExcelJS = require('exceljs');
@@ -197,20 +166,18 @@ router.get('/history-export', async (_req: AuthenticatedRequest, res: Response) 
       { header: 'Nombre del Comercio', key: 'name', width: 35 },
       { header: 'País de Origen', key: 'country', width: 15 },
       { header: 'Estado', key: 'status', width: 15 },
-      { header: 'Monedas Configuradas', key: 'configured_currencies', width: 25 },
-      { header: 'Monedas en Transacciones', key: 'used_currencies', width: 25 },
+      { header: 'Monedas Configuradas', key: 'currencies', width: 30 },
     ];
 
     sheet.getRow(1).font = { bold: true };
 
-    for (const c of commerces as any[]) {
+    for (const c of data as any[]) {
       sheet.addRow({
         id: c.id,
         name: c.name,
         country: c.country || '—',
         status: c.enabled ? 'Habilitado' : 'Deshabilitado',
-        configured_currencies: configMap[c.id] ? Array.from(configMap[c.id]).join(', ') : '—',
-        used_currencies: usedMap[c.id] ? Array.from(usedMap[c.id]).join(', ') : '—',
+        currencies: c.currencies || '—',
       });
     }
 
@@ -221,7 +188,7 @@ router.get('/history-export', async (_req: AuthenticatedRequest, res: Response) 
     res.end();
   } catch (err: any) {
     console.error('[Transactions] Error generating history export:', err.message);
-    res.status(500).json({ error: 'Error al generar el reporte.' });
+    res.status(500).json({ error: 'Error al generar el reporte: ' + err.message });
   }
 });
 
