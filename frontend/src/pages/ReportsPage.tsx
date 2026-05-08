@@ -655,9 +655,14 @@ function MonitoringSection() {
         </div>
         <button
           onClick={async () => {
+            const token = localStorage.getItem('token');
             try {
-              const response = await api.get('/transactions/history-export', { responseType: 'blob' });
-              const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+              const response = await fetch(
+                `${import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL + '/api/v1' : '/api/v1'}/transactions/history-export`,
+                { headers: { Authorization: `Bearer ${token}` } }
+              );
+              if (!response.ok) throw new Error('Error');
+              const blob = await response.blob();
               const url = URL.createObjectURL(blob);
               const link = document.createElement('a');
               link.href = url;
@@ -666,7 +671,6 @@ function MonitoringSection() {
               link.click();
               document.body.removeChild(link);
               URL.revokeObjectURL(url);
-              toast.success('Excel descargado');
             } catch { toast.error('Error al descargar'); }
           }}
           className="btn-secondary flex items-center gap-2 text-sm"
