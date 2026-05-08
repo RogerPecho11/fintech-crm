@@ -1221,6 +1221,20 @@ function GatewayEmailsPanel() {
             <button onClick={addEmail} disabled={!newEmail.trim()} className="btn-primary text-sm flex items-center gap-1 disabled:opacity-40">
               <Plus className="w-3.5 h-3.5" /> Agregar
             </button>
+            <button
+              onClick={async () => {
+                try {
+                  await api.post('/transactions/gateway-report-test');
+                  toast.success('Correo de prueba enviado');
+                } catch (err: any) {
+                  toast.error(err.response?.data?.error || 'Error al enviar');
+                }
+              }}
+              disabled={emails.length === 0}
+              className="btn-secondary text-sm flex items-center gap-1 disabled:opacity-40"
+            >
+              Enviar prueba
+            </button>
           </div>
         </>
       )}

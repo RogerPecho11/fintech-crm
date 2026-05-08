@@ -375,4 +375,16 @@ router.get('/gateway-changes-export', async (_req: AuthenticatedRequest, res: Re
   }
 });
 
+// ─── POST /api/v1/transactions/gateway-report-test — Enviar correo de prueba
+router.post('/gateway-report-test', async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { sendDailyGatewayReport } = require('../services/gatewayReportService');
+    await sendDailyGatewayReport();
+    res.json({ message: 'Correo de prueba enviado correctamente.' });
+  } catch (err: any) {
+    console.error('[Transactions] Error sending test report:', err.message);
+    res.status(500).json({ error: 'Error al enviar correo: ' + err.message });
+  }
+});
+
 export default router;
