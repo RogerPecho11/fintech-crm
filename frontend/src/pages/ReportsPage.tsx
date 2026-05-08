@@ -653,31 +653,58 @@ function MonitoringSection() {
           <h2 className="text-lg font-bold text-gray-900">Monitoreo de Transacciones</h2>
           <p className="text-sm text-gray-500">Datos en tiempo real de la base de producción</p>
         </div>
-        <button
-          onClick={async () => {
-            const token = localStorage.getItem('token');
-            try {
-              const response = await fetch(
-                `${import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL + '/api/v1' : '/api/v1'}/transactions/history-export`,
-                { headers: { Authorization: `Bearer ${token}` } }
-              );
-              if (!response.ok) throw new Error('Error');
-              const blob = await response.blob();
-              const url = URL.createObjectURL(blob);
-              const link = document.createElement('a');
-              link.href = url;
-              link.download = `historial_comercios_${new Date().toISOString().slice(0,10)}.xlsx`;
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-              URL.revokeObjectURL(url);
-            } catch { toast.error('Error al descargar'); }
-          }}
-          className="btn-secondary flex items-center gap-2 text-sm"
-        >
-          <Download className="w-4 h-4" />
-          Historial de Comercios
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={async () => {
+              const token = localStorage.getItem('token');
+              try {
+                const response = await fetch(
+                  `${import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL + '/api/v1' : '/api/v1'}/transactions/gateway-changes-export`,
+                  { headers: { Authorization: `Bearer ${token}` } }
+                );
+                if (!response.ok) throw new Error('Error');
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `cambios_pasarelas_${new Date().toISOString().slice(0,10)}.xlsx`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+              } catch { toast.error('Error al descargar'); }
+            }}
+            className="btn-secondary flex items-center gap-2 text-sm"
+          >
+            <Download className="w-4 h-4" />
+            Cambios Pasarelas
+          </button>
+          <button
+            onClick={async () => {
+              const token = localStorage.getItem('token');
+              try {
+                const response = await fetch(
+                  `${import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL + '/api/v1' : '/api/v1'}/transactions/history-export`,
+                  { headers: { Authorization: `Bearer ${token}` } }
+                );
+                if (!response.ok) throw new Error('Error');
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `historial_comercios_${new Date().toISOString().slice(0,10)}.xlsx`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+              } catch { toast.error('Error al descargar'); }
+            }}
+            className="btn-secondary flex items-center gap-2 text-sm"
+          >
+            <Download className="w-4 h-4" />
+            Historial de Comercios
+          </button>
+        </div>
       </div>
 
       {/* Filtros */}
