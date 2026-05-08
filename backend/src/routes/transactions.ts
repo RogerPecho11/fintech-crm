@@ -318,7 +318,6 @@ router.get('/gateway-changes-export', async (_req: AuthenticatedRequest, res: Re
       { header: 'Flujo', key: 'flow_type', width: 10 },
       { header: 'Pasarela', key: 'gateway_name', width: 25 },
       { header: 'Tipo de Cambio', key: 'change_type', width: 20 },
-      { header: 'Descripción', key: 'description', width: 50 },
       { header: 'Modificado por', key: 'modified_by', width: 20 },
       { header: 'Fecha Modificación', key: 'modified_at', width: 20 },
     ];
@@ -335,7 +334,6 @@ router.get('/gateway-changes-export', async (_req: AuthenticatedRequest, res: Re
         flow_type: row.flow_type,
         gateway_name: row.gateway_name || '—',
         change_type: row.change_type || '—',
-        description: row.description || '—',
         modified_by: row.modified_by || '—',
         modified_at: row.modified_at ? new Date(row.modified_at).toLocaleString('es-PE') : '—',
       });
