@@ -154,18 +154,18 @@ router.get('/history-export', async (_req: AuthenticatedRequest, res: Response) 
 
     // Obtener monedas configuradas por comercio (de commerce_currency)
     const configuredCurrencies = await mysqlQuery(
-      `SELECT cc.commerce_id, cur.code as currency_code
+      `SELECT cc.commerce_id, cur.isocode as currency_code
        FROM commerce_currency cc
        JOIN currency cur ON cur.id = cc.currency_id`
     );
 
     // Obtener monedas usadas en transacciones por comercio
     const usedCurrencies = await mysqlQuery(
-      `SELECT p.commerce_id, cur.code as currency_code
+      `SELECT p.commerce_id, cur.isocode as currency_code
        FROM payment p
        JOIN currency cur ON cur.id = p.currency_id
        WHERE p.deleted_at IS NULL
-       GROUP BY p.commerce_id, cur.code`
+       GROUP BY p.commerce_id, cur.isocode`
     );
 
     // Mapear monedas configuradas por commerce_id
