@@ -12,7 +12,7 @@ router.get('/commerces', async (_req: AuthenticatedRequest, res: Response) => {
     const commerces = await mysqlQuery(
       `SELECT id, name, slug, rut, country, enabled, created_at
        FROM commerce
-       WHERE is_deleted = 0
+       WHERE (is_deleted IS NULL OR is_deleted = 0)
        ORDER BY name ASC
        LIMIT 200`
     );
