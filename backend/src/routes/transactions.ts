@@ -170,12 +170,12 @@ router.get('/history-export', async (_req: AuthenticatedRequest, res: Response) 
     const sheet = workbook.addWorksheet('Historial de Comercios');
 
     sheet.columns = [
-      { header: 'ID', key: 'id', width: 8 },
-      { header: 'Nombre del Comercio', key: 'name', width: 35 },
-      { header: 'País de Origen', key: 'country', width: 15 },
-      { header: 'Estado', key: 'status', width: 15 },
+      { header: 'ID Comercio', key: 'id', width: 12 },
+      { header: 'Comercio', key: 'name', width: 35 },
+      { header: 'País', key: 'country', width: 15 },
+      { header: 'Estado del Comercio', key: 'status', width: 18 },
       { header: 'Monedas Configuradas', key: 'currencies', width: 25 },
-      { header: 'Moneda que Ejecuta Transacción', key: 'tx_currencies', width: 30 },
+      { header: 'Monedas Utilizadas en Transacciones', key: 'tx_currencies', width: 35 },
     ];
 
     sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
