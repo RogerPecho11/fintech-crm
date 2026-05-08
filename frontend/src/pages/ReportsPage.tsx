@@ -7,6 +7,7 @@ import {
 import { Download, FileSpreadsheet, Filter, Loader2, CheckSquare, Users } from 'lucide-react';
 import api from '../lib/api';
 import { STATUS_LABELS } from '../types';
+import { getStatuses, useConfigRefresh } from '../lib/config';
 import { scoreColor } from '../lib/utils';
 import toast from 'react-hot-toast';
 
@@ -30,6 +31,8 @@ const PRIORITY_COLORS: Record<string, string> = {
 };
 
 export default function ReportsPage() {
+  useConfigRefresh();
+  const statuses = getStatuses();
   const [filters, setFilters] = useState({
     status: '', risk_level: '', date_from: '', date_to: '', onboarding_assigned_to: '',
   });
@@ -165,7 +168,7 @@ export default function ReportsPage() {
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={summary.statusSummary}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="status" tickFormatter={(v) => STATUS_LABELS[v as keyof typeof STATUS_LABELS] || v} tick={{ fill: '#9ca3af', fontSize: 10 }} />
+                <XAxis dataKey="status" tickFormatter={(v) => statuses.find(s => s.value === v)?.label || v} tick={{ fill: '#9ca3af', fontSize: 10 }} />
                 <YAxis tick={{ fill: '#9ca3af', fontSize: 11 }} />
                 <Tooltip
                   contentStyle={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
@@ -259,8 +262,8 @@ export default function ReportsPage() {
           <Filter className="w-4 h-4 text-gray-400 mt-2" />
           <select className="input w-auto text-sm" value={filters.status} onChange={e => set('status', e.target.value)}>
             <option value="">Todos los estados</option>
-            {Object.entries(STATUS_LABELS).map(([val, label]) => (
-              <option key={val} value={val}>{label}</option>
+            {statuses.map(s => (
+              <option key={s.value} value={s.value}>{s.label}</option>
             ))}
           </select>
           <select className="input w-auto text-sm" value={filters.risk_level} onChange={e => set('risk_level', e.target.value)}>
@@ -301,7 +304,7 @@ export default function ReportsPage() {
                 <tr key={m.id} className="border-b border-gray-100">
                   <td className="table-cell font-medium text-gray-900">{m.legal_name}</td>
                   <td className="table-cell font-mono text-xs">{m.tax_id}</td>
-                  <td className="table-cell">{STATUS_LABELS[m.status as keyof typeof STATUS_LABELS] || m.status}</td>
+                  <td className="table-cell">{statuses.find(s => s.value === m.status)?.label || m.status}</td>
                   <td className="table-cell font-mono text-xs">{m.mcc_code}</td>
                   <td className="table-cell">{m.score}</td>
                   <td className="table-cell">{m.country}</td>
