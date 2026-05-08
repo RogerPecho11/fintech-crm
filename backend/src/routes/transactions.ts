@@ -103,8 +103,8 @@ router.get('/movements/:commerceId', async (req: AuthenticatedRequest, res: Resp
        FROM commerce_movement cm
        WHERE cm.commerce_id = ? ${dateFilter}
        ORDER BY cm.created_at DESC
-       LIMIT ? OFFSET ?`,
-      [...params, limitNum, offset]
+       LIMIT ${limitNum} OFFSET ${offset}`,
+      [...params]
     );
 
     const countResult = await mysqlQuery(
