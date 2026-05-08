@@ -613,6 +613,69 @@ export default function ReportsPage() {
           </>
         )}
       </div>
+
+      {/* ── Monitoreo de Transacciones ─────────────────────────────────────────── */}
+      <MonitoringSection />
+    </div>
+  );
+}
+
+function MonitoringSection() {
+  const { data, isLoading } = useQuery({
+    queryKey: ['merchants-finalized'],
+    queryFn: () => api.get('/merchants', { params: { status: 'finalizado', limit: 100 } }).then(r => r.data),
+  });
+
+  const merchants = data?.data || [];
+
+  return (
+    <div className="card p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">Monitoreo de Transacciones</h2>
+          <p className="text-sm text-gray-500">Comercios con estado Finalizado</p>
+        </div>
+        <span className="text-xs bg-teal-50 text-teal-700 border border-teal-200 px-2.5 py-1 rounded-full font-medium">
+          {merchants.length} comercios
+        </span>
+      </div>
+
+      {isLoading ? (
+        <div className="text-center py-8 text-gray-400">Cargando...</div>
+      ) : merchants.length === 0 ? (
+        <div className="text-center py-8 text-gray-400">No hay comercios finalizados</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-100">
+                <th className="table-header">Comercio</th>
+                <th className="table-header">Razón Social</th>
+                <th className="table-header">País</th>
+                <th className="table-header">MCC</th>
+                <th className="table-header">Riesgo</th>
+                <th className="table-header">Score</th>
+                <th className="table-header">KAM</th>
+              </tr>
+            </thead>
+            <tbody>
+              {merchants.map((m: any) => (
+                <tr key={m.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                  <td className="table-cell font-medium text-gray-900">{m.trade_name || m.legal_name}</td>
+                  <td className="table-cell text-xs text-gray-600">{m.legal_name}</td>
+                  <td className="table-cell text-xs">{m.country || '—'}</td>
+                  <td className="table-cell font-mono text-xs">{m.mcc_code || '—'}</td>
+                  <td className="table-cell text-xs">{m.risk_level}</td>
+                  <td className="table-cell">
+                    <span className="text-xs font-semibold" style={{ color: scoreColor(m.score) }}>{m.score}/100</span>
+                  </td>
+                  <td className="table-cell text-xs text-gray-500">{m.assigned_to_name || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
