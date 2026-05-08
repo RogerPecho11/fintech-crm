@@ -67,15 +67,16 @@ router.get('/summary/:commerceId', async (req: AuthenticatedRequest, res: Respon
 
     // Obtener moneda del comercio
     const commerceInfo = await mysqlQuery(
-      `SELECT c.country, cc.code as currency_code
-       FROM commerce c
-       LEFT JOIN commerce_currency cc ON cc.commerce_id = c.id
-       WHERE c.id = ?
-       LIMIT 1`,
+      `SELECT c.country FROM commerce c WHERE c.id = ? LIMIT 1`,
       [commerceId]
     );
 
-    const currency = commerceInfo[0]?.currency_code || null;
+    // Mapear país a moneda
+    const countryToCurrency: Record<string, string> = {
+      'PE': 'PEN', 'CL': 'CLP', 'EC': 'USD', 'BR': 'BRL', 'MX': 'MXN', 'CO': 'COP', 'AR': 'ARS',
+    };
+    const country = commerceInfo[0]?.country || '';
+    const currency = countryToCurrency[country?.toUpperCase()] || 'USD';
     const totalCount = Number(totals[0]?.total_transactions || 0);
 
     // Agregar porcentaje a cada fila del summary
