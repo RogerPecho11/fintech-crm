@@ -869,6 +869,11 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* Panel de Correos para Reporte de Pasarelas — solo admin */}
+      {user?.role === 'admin' && (
+        <GatewayEmailsPanel />
+      )}
+
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard icon={Building2}  label="Total Comercios"    value={metrics?.totalMerchants || 0}        sub={`${metrics?.activeThisWeek || 0} activos esta semana`} accent />        <StatCard icon={TrendingUp} label="Tasa de Conversión" value={`${metrics?.conversionRate || 0}%`}  sub="Comercios certificados" />
@@ -1140,6 +1145,85 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function GatewayEmailsPanel() {
+  const [emails, setEmails] = useState<string[]>([]);
+  const [newEmail, setNewEmail] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get('/config/gateway_report_emails')
+      .then(res => setEmails(res.data || []))
+      .catch(() => setEmails([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const save = async (list: string[]) => {
+    try {
+      await api.put('/config/gateway_report_emails', list);
+      setEmails(list);
+      toast.success('Correos actualizados');
+    } catch {
+      toast.error('Error al guardar');
+    }
+  };
+
+  const addEmail = () => {
+    const email = newEmail.trim().toLowerCase();
+    if (!email || !email.includes('@')) { toast.error('Email inválido'); return; }
+    if (emails.includes(email)) { toast.error('Ya existe'); return; }
+    save([...emails, email]);
+    setNewEmail('');
+  };
+
+  const removeEmail = (email: string) => {
+    save(emails.filter(e => e !== email));
+  };
+
+  return (
+    <div className="card p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <Activity className="w-4 h-4" style={{ color: '#FC2B5F' }} />
+        <h3 className="font-semibold text-gray-900 text-sm">Reporte Diario de Pasarelas</h3>
+        <span className="badge bg-rose-50 text-rose-600 text-xs ml-1">Admin</span>
+      </div>
+      <p className="text-xs text-gray-500 mb-3">
+        Los cambios de pasarelas del día anterior se enviarán a estos correos todos los días a las 9:00 AM.
+      </p>
+
+      {loading ? (
+        <p className="text-xs text-gray-400">Cargando...</p>
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-2 mb-3">
+            {emails.map(email => (
+              <div key={email} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-200 bg-white text-sm">
+                <span className="text-gray-700">{email}</span>
+                <button onClick={() => removeEmail(email)} className="text-gray-400 hover:text-red-500">
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+            {emails.length === 0 && <p className="text-xs text-gray-400">No hay correos configurados</p>}
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="email"
+              className="input flex-1 text-sm"
+              value={newEmail}
+              onChange={e => setNewEmail(e.target.value)}
+              placeholder="correo@ejemplo.com"
+              onKeyDown={e => e.key === 'Enter' && addEmail()}
+            />
+            <button onClick={addEmail} disabled={!newEmail.trim()} className="btn-primary text-sm flex items-center gap-1 disabled:opacity-40">
+              <Plus className="w-3.5 h-3.5" /> Agregar
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

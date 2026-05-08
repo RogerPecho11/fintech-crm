@@ -4,6 +4,7 @@ import { getInactiveMerchants, recalculateAllScores } from './scoringService';
 import { createNotification } from './notificationService';
 import { query } from '../database/connection';
 import { evaluateMerchantsSla, evaluateTasksSla } from './slaService';
+import { sendDailyGatewayReport } from './gatewayReportService';
 
 export function startCronJobs(io: SocketServer): void {
   // Check for inactive merchants every hour
@@ -21,6 +22,16 @@ export function startCronJobs(io: SocketServer): void {
   // Check overdue tasks every 30 minutes
   cron.schedule('*/30 * * * *', async () => {
     await checkOverdueTasks(io);
+  });
+
+  // ── Reporte diario de cambios de pasarelas — 9 AM todos los días ──────────
+  cron.schedule('0 9 * * *', async () => {
+    console.log('⏰ Enviando reporte diario de cambios de pasarelas...');
+    try {
+      await sendDailyGatewayReport();
+    } catch (err) {
+      console.error('❌ Error en reporte de pasarelas:', err);
+    }
   });
 
   // ── SLA evaluation — merchants every hour ──────────────────────────────────

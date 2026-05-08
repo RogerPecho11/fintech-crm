@@ -38,6 +38,11 @@ services:
       MYSQL_USER: roger.pecho
       MYSQL_PASSWORD: "T9x#vB7q!LmZ2rWdXf6A"
       MYSQL_DATABASE: prontopaga_com
+      SMTP_HOST: gtxm1326.siteground.biz
+      SMTP_PORT: "465"
+      SMTP_USER: gestion@certificaciones.prontopaga.com
+      SMTP_PASS: "uf146%4J^9~1"
+      EMAIL_FROM: gestion@certificaciones.prontopaga.com
     ports:
       - "127.0.0.1:3001:3001"
     volumes:

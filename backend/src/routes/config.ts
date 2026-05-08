@@ -31,7 +31,7 @@ router.put('/:key', authorize('admin', 'onboarding'), async (req: AuthenticatedR
   const value = req.body;
   const user = req.user!;
 
-  const validKeys = ['statuses', 'risk_levels', 'payment_methods', 'mcc_codes', 'business_types', 'industries', 'categories', 'countries'];
+  const validKeys = ['statuses', 'risk_levels', 'payment_methods', 'mcc_codes', 'business_types', 'industries', 'categories', 'countries', 'gateway_report_emails'];
   if (!validKeys.includes(key)) {
     return res.status(400).json({ error: `Clave inválida: ${key}. Claves válidas: ${validKeys.join(', ')}` });
   }
@@ -56,7 +56,7 @@ router.put('/', authorize('admin', 'onboarding'), async (req: AuthenticatedReque
   const updates: Record<string, any> = req.body;
   const user = req.user!;
 
-  const validKeys = ['statuses', 'risk_levels', 'payment_methods', 'mcc_codes', 'business_types', 'industries', 'categories', 'countries'];
+  const validKeys = ['statuses', 'risk_levels', 'payment_methods', 'mcc_codes', 'business_types', 'industries', 'categories', 'countries', 'gateway_report_emails'];
 
   for (const [key, value] of Object.entries(updates)) {
     if (!validKeys.includes(key)) continue;
