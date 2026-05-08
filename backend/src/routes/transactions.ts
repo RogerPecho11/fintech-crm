@@ -268,36 +268,43 @@ router.get('/gateway-changes-export', async (_req: AuthenticatedRequest, res: Re
   try {
     const data = await mysqlQuery(
       `SELECT 
+        h.id,
         c.id as commerce_id,
         c.name as commerce_name,
         c.country as commerce_country,
-        'Pay In' as type,
+        'Pay In' as flow_type,
         gp.name as gateway_name,
-        cg.status as gateway_status,
-        cg.updated_at as last_modified,
-        cg.created_at
-       FROM commerce_gateway cg
+        h.type as change_type,
+        h.description,
+        h.created_by as modified_by,
+        h.created_at as modified_at
+       FROM history_update_commerce_gateway h
+       JOIN commerce_gateway cg ON cg.id = h.commerce_gateway_id
        JOIN commerce c ON c.id = cg.commerce_id
        LEFT JOIN gateway_payment gp ON gp.id = cg.gateway_payment_id
-       WHERE cg.deleted_at IS NULL AND (c.is_deleted IS NULL OR c.is_deleted = 0)
+       WHERE h.deleted_at IS NULL
        
        UNION ALL
        
        SELECT 
+        hw.id,
         c.id as commerce_id,
         c.name as commerce_name,
         c.country as commerce_country,
-        'Pay Out' as type,
+        'Pay Out' as flow_type,
         gw.name as gateway_name,
-        cgw.status as gateway_status,
-        cgw.updated_at as last_modified,
-        cgw.created_at
-       FROM commerce_gateway_withdrawal cgw
+        hw.type as change_type,
+        hw.description,
+        hw.created_by as modified_by,
+        hw.created_at as modified_at
+       FROM history_update_commerce_gwithdrawal hw
+       JOIN commerce_gateway_withdrawal cgw ON cgw.id = hw.commerce_gateway_withdrawal_id
        JOIN commerce c ON c.id = cgw.commerce_id
        LEFT JOIN gateway_withdrawal gw ON gw.id = cgw.gateway_withdrawal_id
-       WHERE cgw.deleted_at IS NULL AND (c.is_deleted IS NULL OR c.is_deleted = 0)
+       WHERE hw.deleted_at IS NULL
        
-       ORDER BY last_modified DESC`
+       ORDER BY modified_at DESC
+       LIMIT 2000`
     );
 
     const ExcelJS = require('exceljs');
@@ -308,11 +315,12 @@ router.get('/gateway-changes-export', async (_req: AuthenticatedRequest, res: Re
       { header: 'ID Comercio', key: 'commerce_id', width: 12 },
       { header: 'Comercio', key: 'commerce_name', width: 30 },
       { header: 'País', key: 'commerce_country', width: 12 },
-      { header: 'Tipo', key: 'type', width: 10 },
+      { header: 'Flujo', key: 'flow_type', width: 10 },
       { header: 'Pasarela', key: 'gateway_name', width: 25 },
-      { header: 'Estado', key: 'gateway_status', width: 12 },
-      { header: 'Última Modificación', key: 'last_modified', width: 20 },
-      { header: 'Fecha Creación', key: 'created_at', width: 20 },
+      { header: 'Tipo de Cambio', key: 'change_type', width: 20 },
+      { header: 'Descripción', key: 'description', width: 50 },
+      { header: 'Modificado por', key: 'modified_by', width: 20 },
+      { header: 'Fecha Modificación', key: 'modified_at', width: 20 },
     ];
 
     sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -324,20 +332,30 @@ router.get('/gateway-changes-export', async (_req: AuthenticatedRequest, res: Re
         commerce_id: row.commerce_id,
         commerce_name: row.commerce_name,
         commerce_country: row.commerce_country || '—',
-        type: row.type,
+        flow_type: row.flow_type,
         gateway_name: row.gateway_name || '—',
-        gateway_status: row.gateway_status ? 'Activo' : 'Inactivo',
-        last_modified: row.last_modified ? new Date(row.last_modified).toLocaleString('es-PE') : '—',
-        created_at: row.created_at ? new Date(row.created_at).toLocaleString('es-PE') : '—',
+        change_type: row.change_type || '—',
+        description: row.description || '—',
+        modified_by: row.modified_by || '—',
+        modified_at: row.modified_at ? new Date(row.modified_at).toLocaleString('es-PE') : '—',
       });
       if (r.number % 2 === 0) {
         r.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } };
       }
-      const statusCell = r.getCell('gateway_status');
-      statusCell.font = { color: { argb: row.gateway_status ? 'FF16A34A' : 'FFDC2626' }, bold: true };
-      const typeCell = r.getCell('type');
-      typeCell.font = { color: { argb: row.type === 'Pay In' ? 'FF3B82F6' : 'FF8B5CF6' }, bold: true };
+      const typeCell = r.getCell('flow_type');
+      typeCell.font = { color: { argb: row.flow_type === 'Pay In' ? 'FF3B82F6' : 'FF8B5CF6' }, bold: true };
     }
+
+    sheet.eachRow((row: any) => {
+      row.eachCell((cell: any) => {
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+          bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+          left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+          right: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        };
+      });
+    });
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename=cambios_pasarelas_${new Date().toISOString().slice(0,10)}.xlsx`);
