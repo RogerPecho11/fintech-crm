@@ -759,6 +759,7 @@ function MonitoringSection() {
                       <th className="table-header">Método</th>
                       <th className="table-header">Monto</th>
                       <th className="table-header">Estado</th>
+                      <th className="table-header">UID</th>
                       <th className="table-header">Referencia</th>
                     </tr>
                   </thead>
@@ -774,6 +775,7 @@ function MonitoringSection() {
                             {m.status || '—'}
                           </span>
                         </td>
+                        <td className="table-cell text-xs font-mono text-gray-500">{m.uid || '—'}</td>
                         <td className="table-cell text-xs font-mono text-gray-500">{m.reference || '—'}</td>
                       </tr>
                     ))}
