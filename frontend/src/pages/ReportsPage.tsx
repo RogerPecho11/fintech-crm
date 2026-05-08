@@ -715,15 +715,19 @@ function MonitoringSection() {
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-100">
                       <th className="table-header">Tipo</th>
+                      <th className="table-header">Estado</th>
                       <th className="table-header">Cantidad</th>
                       <th className="table-header">Monto Total</th>
                       <th className="table-header">Promedio</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {summary.summary.map((s: any) => (
-                      <tr key={s.transaction_type} className="border-b border-gray-50">
-                        <td className="table-cell font-medium">{s.transaction_type || '—'}</td>
+                    {summary.summary.map((s: any, i: number) => (
+                      <tr key={i} className="border-b border-gray-50">
+                        <td className="table-cell font-medium">{s.type || '—'}</td>
+                        <td className="table-cell">
+                          <span className={`text-xs font-medium ${s.status === 'success' ? 'text-emerald-600' : s.status === 'pending' ? 'text-yellow-600' : 'text-red-500'}`}>{s.status || '—'}</span>
+                        </td>
                         <td className="table-cell">{Number(s.total_transactions).toLocaleString()}</td>
                         <td className="table-cell font-mono">${Number(s.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                         <td className="table-cell font-mono">${Number(s.avg_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
@@ -738,28 +742,32 @@ function MonitoringSection() {
           {/* Últimos movimientos */}
           {movements?.data?.length > 0 && (
             <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">Últimos Movimientos</h4>
+              <h4 className="text-sm font-semibold text-gray-700 mb-2">Últimos Pagos</h4>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-100">
                       <th className="table-header">Fecha</th>
                       <th className="table-header">Tipo</th>
+                      <th className="table-header">Método</th>
                       <th className="table-header">Monto</th>
                       <th className="table-header">Estado</th>
+                      <th className="table-header">Referencia</th>
                     </tr>
                   </thead>
                   <tbody>
                     {movements.data.map((m: any) => (
                       <tr key={m.id} className="border-b border-gray-50">
                         <td className="table-cell text-xs">{new Date(m.created_at).toLocaleString('es-PE')}</td>
-                        <td className="table-cell">{m.transaction_type || '—'}</td>
+                        <td className="table-cell">{m.type || '—'}</td>
+                        <td className="table-cell text-xs">{m.method || '—'}</td>
                         <td className="table-cell font-mono">${Number(m.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                         <td className="table-cell">
-                          <span className={`text-xs font-medium ${m.validation_status === 'validated' ? 'text-emerald-600' : 'text-orange-500'}`}>
-                            {m.validation_status || '—'}
+                          <span className={`text-xs font-medium ${m.status === 'success' ? 'text-emerald-600' : m.status === 'pending' ? 'text-yellow-600' : 'text-red-500'}`}>
+                            {m.status || '—'}
                           </span>
                         </td>
+                        <td className="table-cell text-xs font-mono text-gray-500">{m.reference || '—'}</td>
                       </tr>
                     ))}
                   </tbody>

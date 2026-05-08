@@ -23,7 +23,7 @@ router.get('/commerces', async (_req: AuthenticatedRequest, res: Response) => {
   }
 });
 
-// ─── GET /api/v1/transactions/summary/:commerceId — resumen de movimientos
+// ─── GET /api/v1/transactions/summary/:commerceId — resumen de pagos
 router.get('/summary/:commerceId', async (req: AuthenticatedRequest, res: Response) => {
   const { commerceId } = req.params;
   const { date_from, date_to } = req.query as Record<string, string>;
@@ -33,25 +33,24 @@ router.get('/summary/:commerceId', async (req: AuthenticatedRequest, res: Respon
     const params: any[] = [commerceId];
 
     if (date_from) {
-      dateFilter += ' AND cm.period_origin >= ?';
+      dateFilter += ' AND p.created_at >= ?';
       params.push(date_from);
     }
     if (date_to) {
-      dateFilter += ' AND cm.period_origin <= ?';
-      params.push(date_to);
+      dateFilter += ' AND p.created_at <= ?';
+      params.push(date_to + ' 23:59:59');
     }
 
     const summary = await mysqlQuery(
       `SELECT 
-        cm.transaction_type,
+        p.type,
+        p.status,
         COUNT(*) as total_transactions,
-        SUM(cm.amount) as total_amount,
-        AVG(cm.amount) as avg_amount,
-        MIN(cm.period_origin) as first_date,
-        MAX(cm.period_origin) as last_date
-       FROM commerce_movement cm
-       WHERE cm.commerce_id = ? AND cm.is_reverse = 0 ${dateFilter}
-       GROUP BY cm.transaction_type
+        SUM(p.amount) as total_amount,
+        AVG(p.amount) as avg_amount
+       FROM payment p
+       WHERE p.commerce_id = ? AND p.deleted_at IS NULL ${dateFilter}
+       GROUP BY p.type, p.status
        ORDER BY total_amount DESC`,
       params
     );
@@ -59,11 +58,11 @@ router.get('/summary/:commerceId', async (req: AuthenticatedRequest, res: Respon
     const totals = await mysqlQuery(
       `SELECT 
         COUNT(*) as total_transactions,
-        SUM(cm.amount) as total_amount,
-        MIN(cm.period_origin) as first_date,
-        MAX(cm.period_origin) as last_date
-       FROM commerce_movement cm
-       WHERE cm.commerce_id = ? AND cm.is_reverse = 0 ${dateFilter}`,
+        SUM(p.amount) as total_amount,
+        MIN(p.created_at) as first_date,
+        MAX(p.created_at) as last_date
+       FROM payment p
+       WHERE p.commerce_id = ? AND p.deleted_at IS NULL ${dateFilter}`,
       params
     );
 
@@ -74,7 +73,7 @@ router.get('/summary/:commerceId', async (req: AuthenticatedRequest, res: Respon
   }
 });
 
-// ─── GET /api/v1/transactions/movements/:commerceId — movimientos detallados
+// ─── GET /api/v1/transactions/movements/:commerceId — pagos detallados
 router.get('/movements/:commerceId', async (req: AuthenticatedRequest, res: Response) => {
   const { commerceId } = req.params;
   const { date_from, date_to, page = '1', limit = '50' } = req.query as Record<string, string>;
@@ -84,12 +83,12 @@ router.get('/movements/:commerceId', async (req: AuthenticatedRequest, res: Resp
     const params: any[] = [commerceId];
 
     if (date_from) {
-      dateFilter += ' AND cm.period_origin >= ?';
+      dateFilter += ' AND p.created_at >= ?';
       params.push(date_from);
     }
     if (date_to) {
-      dateFilter += ' AND cm.period_origin <= ?';
-      params.push(date_to);
+      dateFilter += ' AND p.created_at <= ?';
+      params.push(date_to + ' 23:59:59');
     }
 
     const pageNum = parseInt(page);
@@ -97,18 +96,17 @@ router.get('/movements/:commerceId', async (req: AuthenticatedRequest, res: Resp
     const offset = (pageNum - 1) * limitNum;
 
     const movements = await mysqlQuery(
-      `SELECT cm.id, cm.commerce_id, cm.amount, cm.transaction_type, cm.amount_type,
-              cm.period_origin, cm.period_apply, cm.validation_status, cm.is_reverse,
-              cm.comment, cm.created_at
-       FROM commerce_movement cm
-       WHERE cm.commerce_id = ? ${dateFilter}
-       ORDER BY cm.created_at DESC
+      `SELECT p.id, p.commerce_id, p.amount, p.type, p.method, p.status,
+              p.reference, p.uid, p.country, p.created_at, p.internal_state
+       FROM payment p
+       WHERE p.commerce_id = ? AND p.deleted_at IS NULL ${dateFilter}
+       ORDER BY p.created_at DESC
        LIMIT ${limitNum} OFFSET ${offset}`,
-      [...params]
+      params
     );
 
     const countResult = await mysqlQuery(
-      `SELECT COUNT(*) as total FROM commerce_movement cm WHERE cm.commerce_id = ? ${dateFilter}`,
+      `SELECT COUNT(*) as total FROM payment p WHERE p.commerce_id = ? AND p.deleted_at IS NULL ${dateFilter}`,
       params
     );
 
