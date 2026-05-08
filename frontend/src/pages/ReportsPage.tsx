@@ -648,9 +648,32 @@ function MonitoringSection() {
 
   return (
     <div className="card p-6">
-      <div className="mb-4">
-        <h2 className="text-lg font-bold text-gray-900">Monitoreo de Transacciones</h2>
-        <p className="text-sm text-gray-500">Datos en tiempo real de la base de producción</p>
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">Monitoreo de Transacciones</h2>
+          <p className="text-sm text-gray-500">Datos en tiempo real de la base de producción</p>
+        </div>
+        <button
+          onClick={async () => {
+            try {
+              const response = await api.get('/transactions/history-export', { responseType: 'blob' });
+              const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.href = url;
+              link.download = `historial_comercios_${new Date().toISOString().slice(0,10)}.xlsx`;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              URL.revokeObjectURL(url);
+              toast.success('Excel descargado');
+            } catch { toast.error('Error al descargar'); }
+          }}
+          className="btn-secondary flex items-center gap-2 text-sm"
+        >
+          <Download className="w-4 h-4" />
+          Historial de Comercios
+        </button>
       </div>
 
       {/* Filtros */}

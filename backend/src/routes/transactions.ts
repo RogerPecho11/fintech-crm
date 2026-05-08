@@ -141,4 +141,87 @@ router.get('/movements/:commerceId', async (req: AuthenticatedRequest, res: Resp
   }
 });
 
+// ─── GET /api/v1/transactions/history-export — Excel con historial de comercios
+router.get('/history-export', async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    // Obtener todos los comercios con su estado
+    const commerces = await mysqlQuery(
+      `SELECT c.id, c.name, c.country, c.enabled
+       FROM commerce c
+       WHERE (c.is_deleted IS NULL OR c.is_deleted = 0)
+       ORDER BY c.name ASC`
+    );
+
+    // Obtener monedas configuradas por comercio (de commerce_currency)
+    const configuredCurrencies = await mysqlQuery(
+      `SELECT cc.commerce_id, cur.code as currency_code
+       FROM commerce_currency cc
+       JOIN currency cur ON cur.id = cc.currency_id`
+    );
+
+    // Obtener monedas usadas en transacciones por comercio
+    const usedCurrencies = await mysqlQuery(
+      `SELECT p.commerce_id, cur.code as currency_code
+       FROM payment p
+       JOIN currency cur ON cur.id = p.currency_id
+       WHERE p.deleted_at IS NULL
+       GROUP BY p.commerce_id, cur.code`
+    );
+
+    // Mapear monedas configuradas por commerce_id
+    const configMap: Record<number, Set<string>> = {};
+    for (const row of configuredCurrencies as any[]) {
+      if (!configMap[row.commerce_id]) configMap[row.commerce_id] = new Set();
+      configMap[row.commerce_id].add(row.currency_code);
+    }
+
+    // Mapear monedas usadas por commerce_id
+    const usedMap: Record<number, Set<string>> = {};
+    for (const row of usedCurrencies as any[]) {
+      if (!usedMap[row.commerce_id]) usedMap[row.commerce_id] = new Set();
+      usedMap[row.commerce_id].add(row.currency_code);
+    }
+
+    // Generar Excel
+    const ExcelJS = require('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Historial de Comercios');
+
+    // Headers
+    sheet.columns = [
+      { header: 'ID', key: 'id', width: 8 },
+      { header: 'Nombre del Comercio', key: 'name', width: 35 },
+      { header: 'País de Origen', key: 'country', width: 15 },
+      { header: 'Estado', key: 'status', width: 15 },
+      { header: 'Monedas Configuradas', key: 'configured_currencies', width: 25 },
+      { header: 'Monedas en Transacciones', key: 'used_currencies', width: 25 },
+    ];
+
+    // Style headers
+    sheet.getRow(1).font = { bold: true };
+    sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E7EB' } };
+
+    // Data rows
+    for (const c of commerces as any[]) {
+      sheet.addRow({
+        id: c.id,
+        name: c.name,
+        country: c.country || '—',
+        status: c.enabled ? 'Habilitado' : 'Deshabilitado',
+        configured_currencies: configMap[c.id] ? Array.from(configMap[c.id]).join(', ') : '—',
+        used_currencies: usedMap[c.id] ? Array.from(usedMap[c.id]).join(', ') : '—',
+      });
+    }
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=historial_comercios_${new Date().toISOString().slice(0,10)}.xlsx`);
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err: any) {
+    console.error('[Transactions] Error generating history export:', err.message);
+    res.status(500).json({ error: 'Error al generar el reporte.' });
+  }
+});
+
 export default router;
