@@ -156,6 +156,20 @@ router.get('/history-export', async (_req: AuthenticatedRequest, res: Response) 
        ORDER BY c.name ASC`
     );
 
+    // Obtener monedas usadas en transacciones por comercio (subquery agrupada)
+    const usedCurrencies = await mysqlQuery(
+      `SELECT p.commerce_id, GROUP_CONCAT(DISTINCT cur.isocode SEPARATOR ', ') as tx_currencies
+       FROM payment p
+       JOIN currency cur ON cur.id = p.currency_id
+       WHERE p.deleted_at IS NULL
+       GROUP BY p.commerce_id`
+    );
+
+    const txCurrencyMap: Record<number, string> = {};
+    for (const row of usedCurrencies as any[]) {
+      txCurrencyMap[row.commerce_id] = row.tx_currencies;
+    }
+
     // Generar Excel
     const ExcelJS = require('exceljs');
     const workbook = new ExcelJS.Workbook();
@@ -166,7 +180,8 @@ router.get('/history-export', async (_req: AuthenticatedRequest, res: Response) 
       { header: 'Nombre del Comercio', key: 'name', width: 35 },
       { header: 'País de Origen', key: 'country', width: 15 },
       { header: 'Estado', key: 'status', width: 15 },
-      { header: 'Monedas Configuradas', key: 'currencies', width: 30 },
+      { header: 'Monedas Configuradas', key: 'currencies', width: 25 },
+      { header: 'Moneda que Ejecuta Transacción', key: 'tx_currencies', width: 30 },
     ];
 
     sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -181,6 +196,7 @@ router.get('/history-export', async (_req: AuthenticatedRequest, res: Response) 
         country: c.country || '—',
         status: c.enabled ? 'Habilitado' : 'Deshabilitado',
         currencies: c.currencies || '—',
+        tx_currencies: txCurrencyMap[c.id] || '—',
       });
       // Color alterno en filas
       if (row.number % 2 === 0) {
