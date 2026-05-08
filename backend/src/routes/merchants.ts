@@ -212,7 +212,7 @@ router.put('/:id', authorize('admin', 'onboarding'), async (req: AuthenticatedRe
     'payment_methods_detail','monthly_volume','average_ticket','max_transaction',
     'min_transaction','currency','integration_type','api_endpoint','webhook_url',
     'ip_whitelist','technical_contact_email','technical_contact_phone',
-    'risk_level','assigned_to','onboarding_assigned_to','notes','tags',
+    'risk_level','assigned_to','onboarding_assigned_to','notes','tags','merchant_id',
   ];
 
   const sets: string[]  = [];

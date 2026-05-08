@@ -531,6 +531,12 @@ function getMigrations() {
         CREATE INDEX IF NOT EXISTS idx_mexico_submissions_status ON mexico_submissions(status);
         CREATE INDEX IF NOT EXISTS idx_mexico_submissions_created ON mexico_submissions(created_at DESC);
       `
+    },
+    {
+      name: '018_add_merchant_id_field',
+      sql: `
+        ALTER TABLE merchants ADD COLUMN IF NOT EXISTS merchant_id VARCHAR(100);
+      `
     }
   ];
 }
