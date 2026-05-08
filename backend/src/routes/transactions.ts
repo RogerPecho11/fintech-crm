@@ -156,12 +156,12 @@ router.get('/history-export', async (_req: AuthenticatedRequest, res: Response) 
        ORDER BY c.name ASC`
     );
 
-    // Obtener monedas usadas en transacciones por comercio (subquery agrupada)
+    // Obtener monedas usadas en transacciones por comercio (últimos 3 meses para performance)
     const usedCurrencies = await mysqlQuery(
       `SELECT p.commerce_id, GROUP_CONCAT(DISTINCT cur.isocode SEPARATOR ', ') as tx_currencies
        FROM payment p
        JOIN currency cur ON cur.id = p.currency_id
-       WHERE p.deleted_at IS NULL
+       WHERE p.deleted_at IS NULL AND p.created_at >= DATE_SUB(NOW(), INTERVAL 3 MONTH)
        GROUP BY p.commerce_id`
     );
 
