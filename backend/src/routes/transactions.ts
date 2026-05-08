@@ -169,17 +169,43 @@ router.get('/history-export', async (_req: AuthenticatedRequest, res: Response) 
       { header: 'Monedas Configuradas', key: 'currencies', width: 30 },
     ];
 
-    sheet.getRow(1).font = { bold: true };
+    sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFC2B5F' } };
+    sheet.getRow(1).alignment = { vertical: 'middle', horizontal: 'center' };
+    sheet.getRow(1).height = 22;
 
     for (const c of data as any[]) {
-      sheet.addRow({
+      const row = sheet.addRow({
         id: c.id,
         name: c.name,
         country: c.country || '—',
         status: c.enabled ? 'Habilitado' : 'Deshabilitado',
         currencies: c.currencies || '—',
       });
+      // Color alterno en filas
+      if (row.number % 2 === 0) {
+        row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } };
+      }
+      // Color estado
+      const statusCell = row.getCell('status');
+      if (c.enabled) {
+        statusCell.font = { color: { argb: 'FF16A34A' }, bold: true };
+      } else {
+        statusCell.font = { color: { argb: 'FFDC2626' }, bold: true };
+      }
     }
+
+    // Bordes
+    sheet.eachRow((row: any) => {
+      row.eachCell((cell: any) => {
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+          bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+          left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+          right: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        };
+      });
+    });
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename=historial_comercios_${new Date().toISOString().slice(0,10)}.xlsx`);
