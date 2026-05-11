@@ -22,6 +22,8 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: fintech_crm_backend
+    extra_hosts:
+      - "replica-produccion-brasil.chm5clze4j9i.us-east-1.rds.amazonaws.com:10.200.15.96"
     environment:
       NODE_ENV: production
       PORT: 3001
