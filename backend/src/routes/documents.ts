@@ -35,15 +35,6 @@ router.post('/upload', upload.single('file'), async (req: AuthenticatedRequest, 
 
   const user = req.user!;
 
-  // ── Regla: rol commercial no puede subir documentos ───────────────────────
-  if (user.role === 'commercial') {
-    fs.unlinkSync(req.file.path);
-    return res.status(403).json({
-      error: 'El rol Comercial no tiene permisos para subir documentos.',
-      code: 'ROLE_FORBIDDEN',
-    });
-  }
-
   const { merchant_id, document_type = 'other', description, name } = req.body;
 
   if (!merchant_id) {
