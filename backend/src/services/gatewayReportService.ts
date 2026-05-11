@@ -56,7 +56,34 @@ export async function sendDailyGatewayReport(): Promise<void> {
     );
 
     if (!changes.length) {
-      console.log(`[GatewayReport] No hay cambios para ${dateStr}, saltando envío.`);
+      // En vez de saltar, enviar email informando que no hubo cambios
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST || 'gtxm1326.siteground.biz',
+        port: parseInt(process.env.SMTP_PORT || '465'),
+        secure: true,
+        auth: {
+          user: process.env.SMTP_USER || 'gestion@certificaciones.prontopaga.com',
+          pass: process.env.SMTP_PASS || 'uf146%4J^9~1',
+        },
+      });
+
+      await transporter.sendMail({
+        from: process.env.EMAIL_FROM || 'gestion@certificaciones.prontopaga.com',
+        to: emails.join(', '),
+        subject: `[ProntoPaga] Cambios de Pasarelas — ${dateStr} (Sin cambios)`,
+        html: `
+          <div style="font-family:'Inter',sans-serif;max-width:600px;margin:0 auto;">
+            <div style="background:#FC2B5F;padding:16px 24px;border-radius:8px 8px 0 0;">
+              <h2 style="color:white;margin:0;font-size:18px;">ProntoPaga — Reporte Diario de Pasarelas</h2>
+            </div>
+            <div style="background:#fff;padding:24px;border:1px solid #E5E7EB;border-radius:0 0 8px 8px;">
+              <p>No se registraron cambios en pasarelas el día <strong>${dateStr}</strong>.</p>
+            </div>
+          </div>
+        `,
+      });
+
+      console.log(`[GatewayReport] Sin cambios para ${dateStr}, email informativo enviado.`);
       return;
     }
 
