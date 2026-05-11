@@ -65,6 +65,9 @@ export async function sendDailyGatewayReport(): Promise<void> {
           user: process.env.SMTP_USER || 'gestion@certificaciones.prontopaga.com',
           pass: process.env.SMTP_PASS || 'uf146%4J^9~1',
         },
+        connectionTimeout: 30000,
+        greetingTimeout: 30000,
+        socketTimeout: 60000,
       });
 
       await transporter.sendMail({
@@ -140,6 +143,9 @@ export async function sendDailyGatewayReport(): Promise<void> {
         user: process.env.SMTP_USER || 'gestion@certificaciones.prontopaga.com',
         pass: process.env.SMTP_PASS || 'uf146%4J^9~1',
       },
+      connectionTimeout: 30000,
+      greetingTimeout: 30000,
+      socketTimeout: 60000,
     });
 
     await transporter.sendMail({
