@@ -748,7 +748,7 @@ function MonitoringSection() {
           <select
             className="input text-sm w-32"
             value={countryFilter}
-            onChange={e => { setCountryFilter(e.target.value); }}
+            onChange={e => { setCountryFilter(e.target.value); setSelectedIds([]); }}
           >
             <option value="">Todos</option>
             {countries.map((c: string) => (
@@ -798,7 +798,7 @@ function MonitoringSection() {
       {multiLoading && <div className="text-center py-4 text-gray-400">Consultando transacciones...</div>}
 
       {/* Gráfico comparativo (múltiples comercios) */}
-      {selectedIds.length > 1 && multiSummary?.data?.length > 0 && (
+      {selectedIds.length >= 1 && multiSummary?.data?.length > 0 && (
         <div className="space-y-4">
           <div>
             <h4 className="text-sm font-semibold text-gray-700 mb-3">Comparativo de Transacciones</h4>
