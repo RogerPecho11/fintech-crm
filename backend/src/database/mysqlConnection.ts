@@ -7,9 +7,11 @@ const pool = mysql.createPool({
   password: process.env.MYSQL_PASSWORD || 'T9x#vB7q!LmZ2rWdXf6A',
   database: process.env.MYSQL_DATABASE || 'prontopaga_com',
   waitForConnections: true,
-  connectionLimit: 5,
+  connectionLimit: 3,
   queueLimit: 0,
-  connectTimeout: 30000,
+  connectTimeout: 60000,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 10000,
 });
 
 export async function mysqlQuery<T = any>(sql: string, params?: any[]): Promise<T[]> {
