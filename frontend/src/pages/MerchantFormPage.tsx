@@ -17,6 +17,9 @@ interface PaymentMethodEntry {
   fee: string;
   min_fee: string;
   currency: string;
+  tarifa_td?: string;
+  tarifa_tc?: string;
+  tarifa_tf?: string;
 }
 
 interface Pay4UConfig {
@@ -735,6 +738,22 @@ function PaySection({ title, entries, available, onAdd, onRemove, onUpdate, ic }
               <label className="text-xs text-gray-500 mb-0.5 block">Tarifa fija/mín</label>
               <input type="number" className={ic} value={entry.min_fee} onChange={e => onUpdate(entry.method_id, 'min_fee', e.target.value)} placeholder="0.00" />
             </div>
+            {entry.method_name.toLowerCase().includes('tarjeta') && (
+              <>
+                <div>
+                  <label className="text-xs text-gray-500 mb-0.5 block">Tarifa TD</label>
+                  <input type="number" className={ic} value={entry.tarifa_td || ''} onChange={e => onUpdate(entry.method_id, 'tarifa_td', e.target.value)} placeholder="0.00" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-0.5 block">Tarifa TC</label>
+                  <input type="number" className={ic} value={entry.tarifa_tc || ''} onChange={e => onUpdate(entry.method_id, 'tarifa_tc', e.target.value)} placeholder="0.00" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-0.5 block">Tarifa TF</label>
+                  <input type="number" className={ic} value={entry.tarifa_tf || ''} onChange={e => onUpdate(entry.method_id, 'tarifa_tf', e.target.value)} placeholder="0.00" />
+                </div>
+              </>
+            )}
             <div className="col-span-2">
               <label className="text-xs text-gray-500 mb-0.5 block">Moneda</label>
               <select className={ic} value={entry.currency} onChange={e => onUpdate(entry.method_id, 'currency', e.target.value)}>
