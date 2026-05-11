@@ -2,6 +2,8 @@ import { Router, Response } from 'express';
 import { authenticate } from '../middleware/auth';
 import { AuthenticatedRequest } from '../types';
 import { mysqlQuery } from '../database/mysqlConnection';
+import { query } from '../database/connection';
+import nodemailer from 'nodemailer';
 
 const router = Router();
 router.use(authenticate);
@@ -396,6 +398,56 @@ router.get('/gateway-changes-export', async (req: AuthenticatedRequest, res: Res
     res.setHeader('Content-Disposition', `attachment; filename=cambios_pasarelas_${new Date().toISOString().slice(0,10)}.xlsx`);
     await workbook.xlsx.write(res);
     res.end();
+
+    // Enviar el mismo Excel por correo al equipo de onboarding (async, no bloquea la respuesta)
+    setImmediate(async () => {
+      try {
+        const configRow = await query('SELECT value FROM app_config WHERE key = $1', ['gateway_report_emails']);
+        const emails: string[] = configRow[0]?.value || [];
+        if (!emails.length) return;
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        const dateLabel = date_from && date_to ? `${date_from} a ${date_to}` : date_from ? `desde ${date_from}` : date_to ? `hasta ${date_to}` : new Date().toISOString().slice(0, 10);
+
+        const transporter = nodemailer.createTransport({
+          host: process.env.SMTP_HOST || 'gtxm1326.siteground.biz',
+          port: parseInt(process.env.SMTP_PORT || '465'),
+          secure: true,
+          auth: {
+            user: process.env.SMTP_USER || 'gestion@certificaciones.prontopaga.com',
+            pass: process.env.SMTP_PASS || 'uf146%4J^9~1',
+          },
+          connectionTimeout: 60000,
+          greetingTimeout: 30000,
+          socketTimeout: 60000,
+        });
+
+        await transporter.sendMail({
+          from: process.env.EMAIL_FROM || 'gestion@certificaciones.prontopaga.com',
+          to: emails.join(', '),
+          subject: `[ProntoPaga] Reporte Cambios de Pasarelas — ${dateLabel}`,
+          html: `
+            <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+              <div style="background:#FC2B5F;padding:16px 24px;border-radius:8px 8px 0 0;">
+                <h2 style="color:white;margin:0;font-size:16px;">ProntoPaga — Cambios de Pasarelas</h2>
+              </div>
+              <div style="background:#fff;padding:24px;border:1px solid #E5E7EB;border-radius:0 0 8px 8px;">
+                <p>Se adjunta el reporte de cambios de pasarelas (${data.length} registros).</p>
+                <p style="color:#6B7280;font-size:12px;">Período: ${dateLabel}</p>
+              </div>
+            </div>`,
+          attachments: [{
+            filename: `cambios_pasarelas_${new Date().toISOString().slice(0, 10)}.xlsx`,
+            content: buffer as Buffer,
+            contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          }],
+        });
+
+        console.log(`[GatewayExport] Email enviado a ${emails.join(', ')}`);
+      } catch (emailErr: any) {
+        console.error('[GatewayExport] Error enviando email:', emailErr.message);
+      }
+    });
   } catch (err: any) {
     console.error('[Transactions] Error generating gateway export:', err.message);
     res.status(500).json({ error: 'Error al generar reporte: ' + err.message });
