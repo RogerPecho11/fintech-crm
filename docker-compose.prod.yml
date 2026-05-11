@@ -41,7 +41,7 @@ services:
       SMTP_HOST: gtxm1326.siteground.biz
       SMTP_PORT: "465"
       SMTP_USER: gestion@certificaciones.prontopaga.com
-      SMTP_PASS: "uf146%4J^9~1"
+      SMTP_PASS: 'uf146%4J^9~1'
       EMAIL_FROM: gestion@certificaciones.prontopaga.com
     ports:
       - "127.0.0.1:3001:3001"
