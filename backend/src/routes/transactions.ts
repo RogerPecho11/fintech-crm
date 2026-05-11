@@ -25,6 +25,86 @@ router.get('/commerces', async (_req: AuthenticatedRequest, res: Response) => {
   }
 });
 
+// ─── GET /api/v1/transactions/summary-all — resumen de TODOS los comercios (con filtro por país)
+router.get('/summary-all', async (req: AuthenticatedRequest, res: Response) => {
+  const { date_from, date_to, country } = req.query as Record<string, string>;
+
+  try {
+    let dateFilter = '';
+    let countryFilter = '';
+    const params: any[] = [];
+
+    if (date_from) {
+      dateFilter += ' AND p.created_at >= ?';
+      params.push(date_from);
+    }
+    if (date_to) {
+      dateFilter += ' AND p.created_at <= ?';
+      params.push(date_to + ' 23:59:59');
+    }
+    if (country) {
+      countryFilter = ' AND c.country = ?';
+      params.push(country);
+    }
+
+    // Resumen por comercio
+    const byCommerce = await mysqlQuery(
+      `SELECT c.id, c.name, c.country,
+              COUNT(p.id) as total_transactions,
+              SUM(p.amount) as total_amount
+       FROM commerce c
+       JOIN payment p ON p.commerce_id = c.id AND p.deleted_at IS NULL ${dateFilter}
+       WHERE (c.is_deleted IS NULL OR c.is_deleted = 0) ${countryFilter}
+       GROUP BY c.id, c.name, c.country
+       HAVING COUNT(p.id) > 0
+       ORDER BY total_transactions DESC
+       LIMIT 50`,
+      params
+    );
+
+    // Totales generales
+    const paramsTotal: any[] = [];
+    let dateFilterTotal = '';
+    let countryFilterTotal = '';
+    if (date_from) { dateFilterTotal += ' AND p.created_at >= ?'; paramsTotal.push(date_from); }
+    if (date_to) { dateFilterTotal += ' AND p.created_at <= ?'; paramsTotal.push(date_to + ' 23:59:59'); }
+    if (country) { countryFilterTotal = ' AND c.country = ?'; paramsTotal.push(country); }
+
+    const totals = await mysqlQuery(
+      `SELECT COUNT(p.id) as total_transactions, SUM(p.amount) as total_amount
+       FROM payment p
+       JOIN commerce c ON c.id = p.commerce_id
+       WHERE p.deleted_at IS NULL ${dateFilterTotal}
+       AND (c.is_deleted IS NULL OR c.is_deleted = 0) ${countryFilterTotal}`,
+      paramsTotal
+    );
+
+    // Por status
+    const paramsStatus: any[] = [];
+    let dateFilterStatus = '';
+    let countryFilterStatus = '';
+    if (date_from) { dateFilterStatus += ' AND p.created_at >= ?'; paramsStatus.push(date_from); }
+    if (date_to) { dateFilterStatus += ' AND p.created_at <= ?'; paramsStatus.push(date_to + ' 23:59:59'); }
+    if (country) { countryFilterStatus = ' AND c.country = ?'; paramsStatus.push(country); }
+
+    const byStatus = await mysqlQuery(
+      `SELECT p.status, COUNT(p.id) as count, SUM(p.amount) as amount
+       FROM payment p
+       JOIN commerce c ON c.id = p.commerce_id
+       WHERE p.deleted_at IS NULL ${dateFilterStatus}
+       AND (c.is_deleted IS NULL OR c.is_deleted = 0) ${countryFilterStatus}
+       GROUP BY p.status
+       ORDER BY count DESC`,
+      paramsStatus
+    );
+
+    res.json({ byCommerce, totals: totals[0] || {}, byStatus });
+  } catch (err: any) {
+    console.error('[Transactions] Error fetching summary-all:', err.message);
+    res.status(500).json({ error: 'Error al consultar resumen general.' });
+  }
+});
+
 // ─── GET /api/v1/transactions/summary/:commerceId — resumen de pagos
 router.get('/summary/:commerceId', async (req: AuthenticatedRequest, res: Response) => {
   const { commerceId } = req.params;
