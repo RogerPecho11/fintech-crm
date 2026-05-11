@@ -25,83 +25,42 @@ router.get('/commerces', async (_req: AuthenticatedRequest, res: Response) => {
   }
 });
 
-// ─── GET /api/v1/transactions/summary-all — resumen de TODOS los comercios (con filtro por país)
-router.get('/summary-all', async (req: AuthenticatedRequest, res: Response) => {
-  const { date_from, date_to, country } = req.query as Record<string, string>;
+// ─── GET /api/v1/transactions/summary-multi — resumen de múltiples comercios seleccionados
+router.get('/summary-multi', async (req: AuthenticatedRequest, res: Response) => {
+  const { ids, date_from, date_to } = req.query as Record<string, string>;
+
+  if (!ids) return res.status(400).json({ error: 'ids es requerido' });
 
   try {
+    const idList = ids.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+    if (idList.length === 0) return res.json({ data: [] });
+
+    const placeholders = idList.map(() => '?').join(',');
+    const params: any[] = [...idList];
+
     let dateFilter = '';
-    let countryFilter = '';
-    const params: any[] = [];
+    if (date_from) { dateFilter += ' AND p.created_at >= ?'; params.push(date_from); }
+    if (date_to) { dateFilter += ' AND p.created_at <= ?'; params.push(date_to + ' 23:59:59'); }
 
-    if (date_from) {
-      dateFilter += ' AND p.created_at >= ?';
-      params.push(date_from);
-    }
-    if (date_to) {
-      dateFilter += ' AND p.created_at <= ?';
-      params.push(date_to + ' 23:59:59');
-    }
-    if (country) {
-      countryFilter = ' AND c.country = ?';
-      params.push(country);
-    }
-
-    // Resumen por comercio
-    const byCommerce = await mysqlQuery(
+    const data = await mysqlQuery(
       `SELECT c.id, c.name, c.country,
               COUNT(p.id) as total_transactions,
-              SUM(p.amount) as total_amount
+              SUM(p.amount) as total_amount,
+              SUM(CASE WHEN p.status = 'success' THEN 1 ELSE 0 END) as success_count,
+              SUM(CASE WHEN p.status = 'pending' THEN 1 ELSE 0 END) as pending_count,
+              SUM(CASE WHEN p.status NOT IN ('success','pending') THEN 1 ELSE 0 END) as failed_count
        FROM commerce c
-       JOIN payment p ON p.commerce_id = c.id AND p.deleted_at IS NULL ${dateFilter}
-       WHERE (c.is_deleted IS NULL OR c.is_deleted = 0) ${countryFilter}
+       LEFT JOIN payment p ON p.commerce_id = c.id AND p.deleted_at IS NULL ${dateFilter}
+       WHERE c.id IN (${placeholders}) AND (c.is_deleted IS NULL OR c.is_deleted = 0)
        GROUP BY c.id, c.name, c.country
-       HAVING COUNT(p.id) > 0
-       ORDER BY total_transactions DESC
-       LIMIT 50`,
+       ORDER BY total_transactions DESC`,
       params
     );
 
-    // Totales generales
-    const paramsTotal: any[] = [];
-    let dateFilterTotal = '';
-    let countryFilterTotal = '';
-    if (date_from) { dateFilterTotal += ' AND p.created_at >= ?'; paramsTotal.push(date_from); }
-    if (date_to) { dateFilterTotal += ' AND p.created_at <= ?'; paramsTotal.push(date_to + ' 23:59:59'); }
-    if (country) { countryFilterTotal = ' AND c.country = ?'; paramsTotal.push(country); }
-
-    const totals = await mysqlQuery(
-      `SELECT COUNT(p.id) as total_transactions, SUM(p.amount) as total_amount
-       FROM payment p
-       JOIN commerce c ON c.id = p.commerce_id
-       WHERE p.deleted_at IS NULL ${dateFilterTotal}
-       AND (c.is_deleted IS NULL OR c.is_deleted = 0) ${countryFilterTotal}`,
-      paramsTotal
-    );
-
-    // Por status
-    const paramsStatus: any[] = [];
-    let dateFilterStatus = '';
-    let countryFilterStatus = '';
-    if (date_from) { dateFilterStatus += ' AND p.created_at >= ?'; paramsStatus.push(date_from); }
-    if (date_to) { dateFilterStatus += ' AND p.created_at <= ?'; paramsStatus.push(date_to + ' 23:59:59'); }
-    if (country) { countryFilterStatus = ' AND c.country = ?'; paramsStatus.push(country); }
-
-    const byStatus = await mysqlQuery(
-      `SELECT p.status, COUNT(p.id) as count, SUM(p.amount) as amount
-       FROM payment p
-       JOIN commerce c ON c.id = p.commerce_id
-       WHERE p.deleted_at IS NULL ${dateFilterStatus}
-       AND (c.is_deleted IS NULL OR c.is_deleted = 0) ${countryFilterStatus}
-       GROUP BY p.status
-       ORDER BY count DESC`,
-      paramsStatus
-    );
-
-    res.json({ byCommerce, totals: totals[0] || {}, byStatus });
+    res.json({ data });
   } catch (err: any) {
-    console.error('[Transactions] Error fetching summary-all:', err.message);
-    res.status(500).json({ error: 'Error al consultar resumen general.' });
+    console.error('[Transactions] Error fetching summary-multi:', err.message);
+    res.status(500).json({ error: 'Error al consultar resumen múltiple.' });
   }
 });
 

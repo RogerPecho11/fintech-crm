@@ -621,8 +621,7 @@ export default function ReportsPage() {
 }
 
 function MonitoringSection() {
-  const [selectedCommerce, setSelectedCommerce] = useState<any>(null);
-  const [selectAll, setSelectAll] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [countryFilter, setCountryFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -632,7 +631,7 @@ function MonitoringSection() {
     queryFn: () => api.get('/transactions/commerces').then(r => r.data),
   });
 
-  // Países únicos de los comercios
+  // Países únicos
   const countries = Array.from(new Set((commerces || []).map((c: any) => c.country).filter(Boolean))).sort() as string[];
 
   // Comercios filtrados por país
@@ -640,29 +639,42 @@ function MonitoringSection() {
     ? (commerces || []).filter((c: any) => c.country === countryFilter)
     : (commerces || []);
 
-  const { data: summary } = useQuery({
-    queryKey: ['tx-summary', selectedCommerce?.id, dateFrom, dateTo],
-    queryFn: () => api.get(`/transactions/summary/${selectedCommerce.id}`, {
-      params: { date_from: dateFrom || undefined, date_to: dateTo || undefined }
+  // Query multi-comercio
+  const { data: multiSummary, isLoading: multiLoading } = useQuery({
+    queryKey: ['tx-summary-multi', selectedIds.join(','), dateFrom, dateTo],
+    queryFn: () => api.get('/transactions/summary-multi', {
+      params: { ids: selectedIds.join(','), date_from: dateFrom || undefined, date_to: dateTo || undefined }
     }).then(r => r.data),
-    enabled: !!selectedCommerce && !selectAll,
+    enabled: selectedIds.length > 0,
   });
 
-  const { data: summaryAll } = useQuery({
-    queryKey: ['tx-summary-all', countryFilter, dateFrom, dateTo],
-    queryFn: () => api.get('/transactions/summary-all', {
-      params: { date_from: dateFrom || undefined, date_to: dateTo || undefined, country: countryFilter || undefined }
+  // Query individual (para detalle cuando solo hay 1 seleccionado)
+  const { data: summary } = useQuery({
+    queryKey: ['tx-summary', selectedIds[0], dateFrom, dateTo],
+    queryFn: () => api.get(`/transactions/summary/${selectedIds[0]}`, {
+      params: { date_from: dateFrom || undefined, date_to: dateTo || undefined }
     }).then(r => r.data),
-    enabled: selectAll,
+    enabled: selectedIds.length === 1,
   });
 
   const { data: movements } = useQuery({
-    queryKey: ['tx-movements', selectedCommerce?.id, dateFrom, dateTo],
-    queryFn: () => api.get(`/transactions/movements/${selectedCommerce.id}`, {
+    queryKey: ['tx-movements', selectedIds[0], dateFrom, dateTo],
+    queryFn: () => api.get(`/transactions/movements/${selectedIds[0]}`, {
       params: { date_from: dateFrom || undefined, date_to: dateTo || undefined, limit: 20 }
     }).then(r => r.data),
-    enabled: !!selectedCommerce && !selectAll,
+    enabled: selectedIds.length === 1,
   });
+
+  const toggleCommerce = (id: number) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const selectAllFiltered = () => {
+    const ids = filteredCommerces.map((c: any) => c.id);
+    setSelectedIds(ids);
+  };
+
+  const clearSelection = () => setSelectedIds([]);
 
   return (
     <div className="card p-6">
@@ -736,7 +748,7 @@ function MonitoringSection() {
           <select
             className="input text-sm w-32"
             value={countryFilter}
-            onChange={e => { setCountryFilter(e.target.value); if (!selectAll) setSelectedCommerce(null); }}
+            onChange={e => { setCountryFilter(e.target.value); }}
           >
             <option value="">Todos</option>
             {countries.map((c: string) => (
@@ -745,27 +757,11 @@ function MonitoringSection() {
           </select>
         </div>
         <div>
-          <label className="text-xs text-gray-500 block mb-1">Comercio</label>
-          <select
-            className="input text-sm w-64"
-            value={selectAll ? '__all__' : (selectedCommerce?.id || '')}
-            onChange={e => {
-              if (e.target.value === '__all__') {
-                setSelectAll(true);
-                setSelectedCommerce(null);
-              } else {
-                setSelectAll(false);
-                const c = (filteredCommerces || []).find((c: any) => c.id == e.target.value);
-                setSelectedCommerce(c || null);
-              }
-            }}
-          >
-            <option value="">Seleccionar comercio</option>
-            <option value="__all__">📊 Todos los comercios</option>
-            {(filteredCommerces || []).map((c: any) => (
-              <option key={c.id} value={c.id}>{c.name} ({c.country || '—'})</option>
-            ))}
-          </select>
+          <label className="text-xs text-gray-500 block mb-1">Comercios ({selectedIds.length} seleccionados)</label>
+          <div className="flex gap-1">
+            <button onClick={selectAllFiltered} className="btn-secondary text-xs px-2 py-1">Seleccionar todos</button>
+            <button onClick={clearSelection} className="btn-secondary text-xs px-2 py-1">Limpiar</button>
+          </div>
         </div>
         <div>
           <label className="text-xs text-gray-500 block mb-1">Desde</label>
@@ -777,95 +773,86 @@ function MonitoringSection() {
         </div>
       </div>
 
+      {/* Lista de comercios con checkboxes */}
+      {!isLoading && (
+        <div className="mb-4 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1">
+            {filteredCommerces.map((c: any) => (
+              <label key={c.id} className={`flex items-center gap-1.5 text-xs p-1.5 rounded cursor-pointer hover:bg-gray-50 ${selectedIds.includes(c.id) ? 'bg-pink-50 border border-pink-200' : ''}`}>
+                <input
+                  type="checkbox"
+                  checked={selectedIds.includes(c.id)}
+                  onChange={() => toggleCommerce(c.id)}
+                  className="w-3 h-3 rounded border-gray-300 text-pink-500 focus:ring-pink-500"
+                />
+                <span className="truncate">{c.name}</span>
+                <span className="text-gray-400 flex-shrink-0">({c.country || '—'})</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
       {isLoading && <div className="text-center py-8 text-gray-400">Cargando comercios...</div>}
 
-      {/* Vista "Todos" con gráfico */}
-      {selectAll && summaryAll && (
+      {multiLoading && <div className="text-center py-4 text-gray-400">Consultando transacciones...</div>}
+
+      {/* Gráfico comparativo (múltiples comercios) */}
+      {selectedIds.length > 1 && multiSummary?.data?.length > 0 && (
         <div className="space-y-4">
-          {/* Totales generales */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-            <div className="bg-gray-50 rounded-lg p-3">
-              <p className="text-xs text-gray-500">Total Transacciones</p>
-              <p className="text-xl font-bold text-gray-900">{Number(summaryAll.totals?.total_transactions || 0).toLocaleString()}</p>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-3">
-              <p className="text-xs text-gray-500">Monto Total</p>
-              <p className="text-xl font-bold text-gray-900">${Number(summaryAll.totals?.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-3">
-              <p className="text-xs text-gray-500">Comercios Activos</p>
-              <p className="text-xl font-bold text-gray-900">{summaryAll.byCommerce?.length || 0}</p>
-            </div>
+          <div>
+            <h4 className="text-sm font-semibold text-gray-700 mb-3">Comparativo de Transacciones</h4>
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={multiSummary.data} margin={{ left: 10, bottom: 60 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="name" tick={{ fill: '#9ca3af', fontSize: 9 }} angle={-30} textAnchor="end" height={70} />
+                <YAxis tick={{ fill: '#9ca3af', fontSize: 11 }} />
+                <Tooltip
+                  contentStyle={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
+                  formatter={(v: any, name: string) => [Number(v).toLocaleString(), name === 'total_transactions' ? 'Total' : name === 'success_count' ? 'Exitosas' : name === 'pending_count' ? 'Pendientes' : 'Fallidas']}
+                />
+                <Legend />
+                <Bar dataKey="success_count" name="Exitosas" fill="#10B981" stackId="a" />
+                <Bar dataKey="pending_count" name="Pendientes" fill="#F59E0B" stackId="a" />
+                <Bar dataKey="failed_count" name="Fallidas" fill="#EF4444" stackId="a" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
 
-          {/* Gráfico por comercio */}
-          {summaryAll.byCommerce?.length > 0 && (
-            <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-3">Transacciones por Comercio (Top 15)</h4>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={summaryAll.byCommerce.slice(0, 15)} margin={{ left: 10, bottom: 60 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="name" tick={{ fill: '#9ca3af', fontSize: 9 }} angle={-35} textAnchor="end" height={80} />
-                  <YAxis tick={{ fill: '#9ca3af', fontSize: 11 }} />
-                  <Tooltip
-                    contentStyle={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
-                    formatter={(v: any) => [Number(v).toLocaleString(), 'Transacciones']}
-                  />
-                  <Bar dataKey="total_transactions" name="Transacciones" fill="#FC2B5F" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-
-          {/* Por status */}
-          {summaryAll.byStatus?.length > 0 && (
-            <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">Por Estado</h4>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-                {summaryAll.byStatus.map((s: any) => (
-                  <div key={s.status} className="bg-gray-50 rounded-lg p-3">
-                    <p className="text-xs text-gray-500">{s.status || 'N/A'}</p>
-                    <p className="text-lg font-bold text-gray-900">{Number(s.count).toLocaleString()}</p>
-                    <p className="text-xs text-gray-400">${Number(s.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                  </div>
+          {/* Tabla resumen */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100">
+                  <th className="table-header">Comercio</th>
+                  <th className="table-header">País</th>
+                  <th className="table-header text-right">Total</th>
+                  <th className="table-header text-right">Exitosas</th>
+                  <th className="table-header text-right">Pendientes</th>
+                  <th className="table-header text-right">Fallidas</th>
+                  <th className="table-header text-right">Monto</th>
+                </tr>
+              </thead>
+              <tbody>
+                {multiSummary.data.map((c: any) => (
+                  <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50">
+                    <td className="table-cell font-medium text-gray-900">{c.name}</td>
+                    <td className="table-cell text-gray-500">{c.country || '—'}</td>
+                    <td className="table-cell text-right font-semibold">{Number(c.total_transactions).toLocaleString()}</td>
+                    <td className="table-cell text-right text-emerald-600">{Number(c.success_count || 0).toLocaleString()}</td>
+                    <td className="table-cell text-right text-yellow-600">{Number(c.pending_count || 0).toLocaleString()}</td>
+                    <td className="table-cell text-right text-red-500">{Number(c.failed_count || 0).toLocaleString()}</td>
+                    <td className="table-cell text-right font-mono">${Number(c.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                  </tr>
                 ))}
-              </div>
-            </div>
-          )}
-
-          {/* Tabla detalle por comercio */}
-          {summaryAll.byCommerce?.length > 0 && (
-            <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">Detalle por Comercio</h4>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-100">
-                      <th className="table-header">Comercio</th>
-                      <th className="table-header">País</th>
-                      <th className="table-header text-right">Transacciones</th>
-                      <th className="table-header text-right">Monto Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {summaryAll.byCommerce.map((c: any) => (
-                      <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50">
-                        <td className="table-cell font-medium text-gray-900">{c.name}</td>
-                        <td className="table-cell text-gray-500">{c.country || '—'}</td>
-                        <td className="table-cell text-right">{Number(c.total_transactions).toLocaleString()}</td>
-                        <td className="table-cell text-right font-mono">${Number(c.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
       {/* Resumen individual */}
-      {selectedCommerce && summary && !selectAll && (
+      {selectedIds.length === 1 && summary && (
         <div className="space-y-4">
           {/* Totales */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -969,8 +956,8 @@ function MonitoringSection() {
         </div>
       )}
 
-      {!selectedCommerce && !selectAll && !isLoading && (
-        <div className="text-center py-8 text-gray-400">Selecciona un comercio o "Todos" para ver las transacciones</div>
+      {selectedIds.length === 0 && !isLoading && (
+        <div className="text-center py-8 text-gray-400">Selecciona uno o más comercios para ver sus transacciones</div>
       )}
     </div>
   );
