@@ -658,8 +658,12 @@ function MonitoringSection() {
             onClick={async () => {
               const token = localStorage.getItem('token');
               try {
+                const params = new URLSearchParams();
+                if (dateFrom) params.set('date_from', dateFrom);
+                if (dateTo) params.set('date_to', dateTo);
+                const qs = params.toString() ? `?${params.toString()}` : '';
                 const response = await fetch(
-                  `${import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL + '/api/v1' : '/api/v1'}/transactions/gateway-changes-export`,
+                  `${import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL + '/api/v1' : '/api/v1'}/transactions/gateway-changes-export${qs}`,
                   { headers: { Authorization: `Bearer ${token}` } }
                 );
                 if (!response.ok) throw new Error('Error');

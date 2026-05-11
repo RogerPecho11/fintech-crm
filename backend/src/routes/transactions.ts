@@ -274,9 +274,29 @@ router.get('/gateway-changes', async (_req: AuthenticatedRequest, res: Response)
 });
 
 // ─── GET /api/v1/transactions/gateway-changes-export — Excel de cambios en pasarelas
-router.get('/gateway-changes-export', async (_req: AuthenticatedRequest, res: Response) => {
+router.get('/gateway-changes-export', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const data = await mysqlQuery(
+    const { date_from, date_to } = req.query as Record<string, string>;
+
+    let dateFilterPayIn = '';
+    let dateFilterPayOut = '';
+    const paramsPayIn: any[] = [];
+    const paramsPayOut: any[] = [];
+
+    if (date_from) {
+      dateFilterPayIn += ' AND h.created_at >= ?';
+      dateFilterPayOut += ' AND hw.created_at >= ?';
+      paramsPayIn.push(date_from);
+      paramsPayOut.push(date_from);
+    }
+    if (date_to) {
+      dateFilterPayIn += ' AND h.created_at <= ?';
+      dateFilterPayOut += ' AND hw.created_at <= ?';
+      paramsPayIn.push(date_to + ' 23:59:59');
+      paramsPayOut.push(date_to + ' 23:59:59');
+    }
+
+    const payInData = await mysqlQuery(
       `SELECT 
         h.id,
         c.id as commerce_id,
@@ -292,11 +312,14 @@ router.get('/gateway-changes-export', async (_req: AuthenticatedRequest, res: Re
        JOIN commerce_gateway cg ON cg.id = h.commerce_gateway_id
        JOIN commerce c ON c.id = cg.commerce_id
        LEFT JOIN gateway_payment gp ON gp.id = cg.gateway_payment_id
-       WHERE h.deleted_at IS NULL
-       
-       UNION ALL
-       
-       SELECT 
+       WHERE h.deleted_at IS NULL${dateFilterPayIn}
+       ORDER BY h.created_at DESC
+       LIMIT 2000`,
+      paramsPayIn
+    );
+
+    const payOutData = await mysqlQuery(
+      `SELECT 
         hw.id,
         c.id as commerce_id,
         c.name as commerce_name,
@@ -311,10 +334,14 @@ router.get('/gateway-changes-export', async (_req: AuthenticatedRequest, res: Re
        JOIN commerce_gateway_withdrawal cgw ON cgw.id = hw.commerce_gateway_withdrawal_id
        JOIN commerce c ON c.id = cgw.commerce_id
        LEFT JOIN gateway_withdrawal gw ON gw.id = cgw.gateway_withdrawal_id
-       WHERE hw.deleted_at IS NULL
-       
-       ORDER BY modified_at DESC
-       LIMIT 2000`
+       WHERE hw.deleted_at IS NULL${dateFilterPayOut}
+       ORDER BY hw.created_at DESC
+       LIMIT 2000`,
+      paramsPayOut
+    );
+
+    const data = [...payInData, ...payOutData].sort((a: any, b: any) => 
+      new Date(b.modified_at).getTime() - new Date(a.modified_at).getTime()
     );
 
     const ExcelJS = require('exceljs');
