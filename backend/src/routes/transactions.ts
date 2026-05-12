@@ -8,6 +8,26 @@ import nodemailer from 'nodemailer';
 const router = Router();
 router.use(authenticate);
 
+// ─── Cache en memoria para reducir consultas a MySQL ─────────────────────────
+const cache = new Map<string, { data: any; expires: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+
+function getCached(key: string): any | null {
+  const entry = cache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expires) { cache.delete(key); return null; }
+  return entry.data;
+}
+
+function setCache(key: string, data: any, ttl: number = CACHE_TTL): void {
+  cache.set(key, { data, expires: Date.now() + ttl });
+  // Limpiar entradas viejas cada 100 inserciones
+  if (cache.size > 200) {
+    const now = Date.now();
+    for (const [k, v] of cache) { if (now > v.expires) cache.delete(k); }
+  }
+}
+
 // Helper: si date_to no tiene hora (solo fecha), agregar 23:59:59
 function formatDateTo(val: string): string {
   if (!val) return val;
@@ -24,6 +44,10 @@ function formatDateFrom(val: string): string {
 // ─── GET /api/v1/transactions/commerces — lista comercios de la BD de transacciones
 router.get('/commerces', async (_req: AuthenticatedRequest, res: Response) => {
   try {
+    const cacheKey = 'commerces';
+    const cached = getCached(cacheKey);
+    if (cached) return res.json(cached);
+
     const commerces = await mysqlQuery(
       `SELECT id, name, slug, rut, country, enabled, created_at
        FROM commerce
@@ -31,6 +55,7 @@ router.get('/commerces', async (_req: AuthenticatedRequest, res: Response) => {
        ORDER BY name ASC
        LIMIT 200`
     );
+    setCache(cacheKey, commerces, 10 * 60 * 1000); // 10 min
     res.json(commerces);
   } catch (err: any) {
     console.error('[Transactions] Error fetching commerces:', err.message);
@@ -41,10 +66,16 @@ router.get('/commerces', async (_req: AuthenticatedRequest, res: Response) => {
 // ─── GET /api/v1/transactions/methods — lista métodos/pasarelas disponibles
 router.get('/methods', async (_req: AuthenticatedRequest, res: Response) => {
   try {
+    const cacheKey = 'methods';
+    const cached = getCached(cacheKey);
+    if (cached) return res.json(cached);
+
     const methods = await mysqlQuery(
       `SELECT DISTINCT method FROM payment WHERE method IS NOT NULL AND method != '' ORDER BY method ASC LIMIT 50`
     );
-    res.json(methods.map((m: any) => m.method));
+    const result = methods.map((m: any) => m.method);
+    setCache(cacheKey, result, 30 * 60 * 1000); // 30 min
+    res.json(result);
   } catch (err: any) {
     console.error('[Transactions] Error fetching methods:', err.message);
     res.status(500).json({ error: 'Error al consultar métodos.' });
@@ -58,6 +89,10 @@ router.get('/daily-trend', async (req: AuthenticatedRequest, res: Response) => {
   if (!ids) return res.status(400).json({ error: 'ids es requerido' });
 
   try {
+    const cacheKey = `trend:${ids}:${date_from}:${date_to}:${method}`;
+    const cached = getCached(cacheKey);
+    if (cached) return res.json(cached);
+
     const idList = ids.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
     if (idList.length === 0) return res.json({ data: [] });
 
@@ -84,7 +119,9 @@ router.get('/daily-trend', async (req: AuthenticatedRequest, res: Response) => {
       params
     );
 
-    res.json({ data });
+    const result = { data };
+    setCache(cacheKey, result);
+    res.json(result);
   } catch (err: any) {
     console.error('[Transactions] Error fetching daily-trend:', err.message);
     res.status(500).json({ error: 'Error al consultar tendencia diaria.' });
@@ -97,6 +134,10 @@ router.get('/quick-summary/:commerceId', async (req: AuthenticatedRequest, res: 
   const { date_from, date_to } = req.query as Record<string, string>;
 
   try {
+    const cacheKey = `qs:${commerceId}:${date_from}:${date_to}`;
+    const cached = getCached(cacheKey);
+    if (cached) return res.json(cached);
+
     const params: any[] = [commerceId];
     let dateFilter = '';
 
@@ -168,7 +209,7 @@ router.get('/quick-summary/:commerceId', async (req: AuthenticatedRequest, res: 
     const pendingCount = byStatus.filter((s: any) => s.status === 'pending').reduce((acc: number, s: any) => acc + Number(s.total_transactions), 0);
     const failedCount = totalCount - successCount - pendingCount;
 
-    res.json({
+    const result = {
       name: commerceInfo[0]?.name || '',
       country,
       currency,
@@ -180,7 +221,9 @@ router.get('/quick-summary/:commerceId', async (req: AuthenticatedRequest, res: 
       pending_count: pendingCount,
       failed_count: failedCount,
       summary,
-    });
+    };
+    setCache(cacheKey, result);
+    res.json(result);
   } catch (err: any) {
     console.error('[Transactions] Error fetching quick-summary:', err.message);
     res.status(500).json({ error: 'Error al consultar resumen.' });
@@ -194,6 +237,10 @@ router.get('/summary-multi', async (req: AuthenticatedRequest, res: Response) =>
   if (!ids) return res.status(400).json({ error: 'ids es requerido' });
 
   try {
+    const cacheKey = `multi:${ids}:${date_from}:${date_to}:${method}`;
+    const cached = getCached(cacheKey);
+    if (cached) return res.json(cached);
+
     const idList = ids.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
     if (idList.length === 0) return res.json({ data: [] });
 
@@ -220,7 +267,9 @@ router.get('/summary-multi', async (req: AuthenticatedRequest, res: Response) =>
       params
     );
 
-    res.json({ data });
+    const result = { data };
+    setCache(cacheKey, result);
+    res.json(result);
   } catch (err: any) {
     console.error('[Transactions] Error fetching summary-multi:', err.message);
     res.status(500).json({ error: 'Error al consultar resumen múltiple.' });

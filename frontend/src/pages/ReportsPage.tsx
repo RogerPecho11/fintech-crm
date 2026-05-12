@@ -844,6 +844,7 @@ function MonitoringSection() {
       params: { ids: selectedIds.join(','), date_from: dateFrom || undefined, date_to: dateTo || undefined, method: methodFilter || undefined }
     }).then(r => r.data),
     enabled: selectedIds.length > 0,
+    staleTime: 5 * 60 * 1000, // 5 min cache
   });
 
   // Query individual (para detalle cuando solo hay 1 seleccionado)
@@ -870,6 +871,7 @@ function MonitoringSection() {
       params: { ids: selectedIds.join(','), date_from: dateFrom || undefined, date_to: dateTo || undefined, method: methodFilter || undefined }
     }).then(r => r.data),
     enabled: selectedIds.length > 0,
+    staleTime: 5 * 60 * 1000, // 5 min cache
   });
 
   const toggleCommerce = (id: number) => {
