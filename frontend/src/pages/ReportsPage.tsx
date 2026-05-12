@@ -848,6 +848,46 @@ function MonitoringSection() {
               </tbody>
             </table>
           </div>
+
+          {/* Gráficos circulares por comercio */}
+          {multiSummary.data.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">Distribución por Comercio</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {multiSummary.data.filter((c: any) => Number(c.total_transactions) > 0).map((c: any) => {
+                  const pieData = [
+                    { name: 'Exitosas', value: Number(c.success_count || 0), fill: '#10B981' },
+                    { name: 'Pendientes', value: Number(c.pending_count || 0), fill: '#F59E0B' },
+                    { name: 'Fallidas', value: Number(c.failed_count || 0), fill: '#EF4444' },
+                  ].filter(d => d.value > 0);
+                  return (
+                    <div key={c.id} className="border border-gray-100 rounded-lg p-3">
+                      <p className="text-xs font-semibold text-gray-700 mb-1 truncate">{c.name}</p>
+                      <p className="text-xs text-gray-400 mb-2">{Number(c.total_transactions).toLocaleString()} transacciones</p>
+                      <ResponsiveContainer width="100%" height={120}>
+                        <PieChart>
+                          <Pie data={pieData} cx="50%" cy="50%" innerRadius={25} outerRadius={45} dataKey="value" paddingAngle={2}>
+                            {pieData.map((entry, i) => (
+                              <Cell key={i} fill={entry.fill} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(v: any, name: string) => [Number(v).toLocaleString(), name]} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="flex justify-center gap-3 mt-1">
+                        {pieData.map(d => (
+                          <span key={d.name} className="flex items-center gap-1 text-[10px] text-gray-500">
+                            <span className="w-2 h-2 rounded-full" style={{ background: d.fill }} />
+                            {d.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

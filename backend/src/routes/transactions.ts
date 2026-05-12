@@ -45,13 +45,13 @@ router.get('/summary-multi', async (req: AuthenticatedRequest, res: Response) =>
     const data = await mysqlQuery(
       `SELECT c.id, c.name, c.country,
               COUNT(p.id) as total_transactions,
-              SUM(p.amount) as total_amount,
+              COALESCE(SUM(p.amount), 0) as total_amount,
               SUM(CASE WHEN p.status = 'success' THEN 1 ELSE 0 END) as success_count,
               SUM(CASE WHEN p.status = 'pending' THEN 1 ELSE 0 END) as pending_count,
               SUM(CASE WHEN p.status NOT IN ('success','pending') THEN 1 ELSE 0 END) as failed_count
        FROM commerce c
-       LEFT JOIN payment p ON p.commerce_id = c.id AND p.deleted_at IS NULL ${dateFilter}
-       WHERE c.id IN (${placeholders}) AND (c.is_deleted IS NULL OR c.is_deleted = 0)
+       LEFT JOIN payment p ON p.commerce_id = c.id AND p.deleted_at IS NULL
+       WHERE c.id IN (${placeholders}) AND (c.is_deleted IS NULL OR c.is_deleted = 0) ${dateFilter}
        GROUP BY c.id, c.name, c.country
        ORDER BY total_transactions DESC`,
       params
