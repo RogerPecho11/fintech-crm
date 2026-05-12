@@ -8,6 +8,19 @@ import nodemailer from 'nodemailer';
 const router = Router();
 router.use(authenticate);
 
+// Helper: si date_to no tiene hora (solo fecha), agregar 23:59:59
+function formatDateTo(val: string): string {
+  if (!val) return val;
+  // datetime-local format: 2026-05-11T14:30
+  if (val.includes('T')) return val.replace('T', ' ') + ':59';
+  return val + ' 23:59:59';
+}
+function formatDateFrom(val: string): string {
+  if (!val) return val;
+  if (val.includes('T')) return val.replace('T', ' ') + ':00';
+  return val;
+}
+
 // ─── GET /api/v1/transactions/commerces — lista comercios de la BD de transacciones
 router.get('/commerces', async (_req: AuthenticatedRequest, res: Response) => {
   try {
@@ -42,7 +55,7 @@ router.get('/daily-trend', async (req: AuthenticatedRequest, res: Response) => {
     let dateFilter = '';
     if (date_from) { dateFilter += ' AND p.created_at >= ?'; params.push(date_from); }
     else { dateFilter += ' AND p.created_at >= ?'; const d = new Date(); d.setDate(d.getDate() - 30); params.push(d.toISOString().slice(0, 10)); }
-    if (date_to) { dateFilter += ' AND p.created_at <= ?'; params.push(date_to + ' 23:59:59'); }
+    if (date_to) { dateFilter += ' AND p.created_at <= ?'; params.push(formatDateTo(date_to)); }
 
     const data = await mysqlQuery(
       `SELECT 
@@ -74,7 +87,7 @@ router.get('/quick-summary/:commerceId', async (req: AuthenticatedRequest, res: 
     let dateFilter = '';
 
     if (date_from) { dateFilter += ' AND p.created_at >= ?'; params.push(date_from); }
-    if (date_to) { dateFilter += ' AND p.created_at <= ?'; params.push(date_to + ' 23:59:59'); }
+    if (date_to) { dateFilter += ' AND p.created_at <= ?'; params.push(formatDateTo(date_to)); }
 
     // Si no hay filtro de fecha, limitar a últimos 30 días por defecto
     if (!date_from && !date_to) {
@@ -98,7 +111,7 @@ router.get('/quick-summary/:commerceId', async (req: AuthenticatedRequest, res: 
     const params2: any[] = [commerceId];
     let dateFilter2 = '';
     if (date_from) { dateFilter2 += ' AND p.created_at >= ?'; params2.push(date_from); }
-    if (date_to) { dateFilter2 += ' AND p.created_at <= ?'; params2.push(date_to + ' 23:59:59'); }
+    if (date_to) { dateFilter2 += ' AND p.created_at <= ?'; params2.push(formatDateTo(date_to)); }
     if (!date_from && !date_to) {
       dateFilter2 += ' AND p.created_at >= ?';
       const thirtyDaysAgo = new Date();
@@ -175,7 +188,7 @@ router.get('/summary-multi', async (req: AuthenticatedRequest, res: Response) =>
 
     let dateFilter = '';
     if (date_from) { dateFilter += ' AND p.created_at >= ?'; params.push(date_from); }
-    if (date_to) { dateFilter += ' AND p.created_at <= ?'; params.push(date_to + ' 23:59:59'); }
+    if (date_to) { dateFilter += ' AND p.created_at <= ?'; params.push(formatDateTo(date_to)); }
 
     const data = await mysqlQuery(
       `SELECT c.id, c.name, c.country,
@@ -214,7 +227,7 @@ router.get('/summary/:commerceId', async (req: AuthenticatedRequest, res: Respon
     }
     if (date_to) {
       dateFilter += ' AND p.created_at <= ?';
-      params.push(date_to + ' 23:59:59');
+      params.push(formatDateTo(date_to));
     }
 
     const summary = await mysqlQuery(
@@ -283,7 +296,7 @@ router.get('/movements/:commerceId', async (req: AuthenticatedRequest, res: Resp
     }
     if (date_to) {
       dateFilter += ' AND p.created_at <= ?';
-      params.push(date_to + ' 23:59:59');
+      params.push(formatDateTo(date_to));
     }
 
     const pageNum = parseInt(page);
@@ -468,8 +481,8 @@ router.get('/gateway-changes-export', async (req: AuthenticatedRequest, res: Res
     if (date_to) {
       dateFilterPayIn += ' AND h.created_at <= ?';
       dateFilterPayOut += ' AND hw.created_at <= ?';
-      paramsPayIn.push(date_to + ' 23:59:59');
-      paramsPayOut.push(date_to + ' 23:59:59');
+      paramsPayIn.push(formatDateTo(date_to));
+      paramsPayOut.push(formatDateTo(date_to));
     }
 
     const payInData = await mysqlQuery(

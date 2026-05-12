@@ -684,11 +684,11 @@ function MerchantHoverCell({ name, merchantId }: { name: string; merchantId: str
             <div className="flex gap-3 mb-4 p-2 bg-gray-50 rounded-lg items-end">
               <div>
                 <label className="text-xs text-gray-500 block mb-1">Desde</label>
-                <input type="date" className="input text-sm" value={modalDateFrom} onChange={e => setModalDateFrom(e.target.value)} />
+                <input type="datetime-local" className="input text-sm" value={modalDateFrom} onChange={e => setModalDateFrom(e.target.value)} />
               </div>
               <div>
                 <label className="text-xs text-gray-500 block mb-1">Hasta</label>
-                <input type="date" className="input text-sm" value={modalDateTo} onChange={e => setModalDateTo(e.target.value)} />
+                <input type="datetime-local" className="input text-sm" value={modalDateTo} onChange={e => setModalDateTo(e.target.value)} />
               </div>
               {(modalDateFrom || modalDateTo) && (
                 <button onClick={() => { setModalDateFrom(''); setModalDateTo(''); }} className="text-xs text-gray-400 hover:text-gray-600 pb-2">Limpiar</button>
@@ -966,11 +966,11 @@ function MonitoringSection() {
         </div>
         <div>
           <label className="text-xs text-gray-500 block mb-1">Desde</label>
-          <input type="date" className="input text-sm" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+          <input type="datetime-local" className="input text-sm" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
         </div>
         <div>
           <label className="text-xs text-gray-500 block mb-1">Hasta</label>
-          <input type="date" className="input text-sm" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+          <input type="datetime-local" className="input text-sm" value={dateTo} onChange={e => setDateTo(e.target.value)} />
         </div>
       </div>
 
