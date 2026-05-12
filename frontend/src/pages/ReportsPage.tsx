@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  Cell, PieChart, Pie, Legend, RadialBarChart, RadialBar
+  Cell, PieChart, Pie, Legend, RadialBarChart, RadialBar, LineChart, Line
 } from 'recharts';
 import { Download, FileSpreadsheet, Filter, Loader2, CheckSquare, Users } from 'lucide-react';
 import api from '../lib/api';
@@ -643,6 +643,15 @@ function MerchantHoverCell({ name, merchantId }: { name: string; merchantId: str
     staleTime: 30000,
   });
 
+  const { data: modalTrend } = useQuery({
+    queryKey: ['modal-trend', merchantId, modalDateFrom, modalDateTo],
+    queryFn: () => api.get('/transactions/daily-trend', {
+      params: { ids: merchantId, date_from: modalDateFrom || undefined, date_to: modalDateTo || undefined }
+    }).then(r => r.data),
+    enabled: open,
+    staleTime: 30000,
+  });
+
   const total = Number(data?.total_transactions || 0);
   const pieData = data ? [
     { name: 'Exitosas', value: Number(data.success_count || 0), fill: '#10B981' },
@@ -737,6 +746,24 @@ function MerchantHoverCell({ name, merchantId }: { name: string; merchantId: str
                   </div>
                 </div>
 
+                {/* Gráfico lineal de tendencia */}
+                {modalTrend?.data?.length > 1 && (
+                  <div className="mb-4">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-2">Tendencia Diaria</h4>
+                    <ResponsiveContainer width="100%" height={160}>
+                      <LineChart data={modalTrend.data.map((d: any) => ({ ...d, date: new Date(d.date).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit' }) }))}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis dataKey="date" tick={{ fill: '#9ca3af', fontSize: 9 }} />
+                        <YAxis tick={{ fill: '#9ca3af', fontSize: 10 }} />
+                        <Tooltip contentStyle={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '12px' }} />
+                        <Line type="monotone" dataKey="total" name="Total" stroke="#3B82F6" strokeWidth={2} dot={false} />
+                        <Line type="monotone" dataKey="success_count" name="Exitosas" stroke="#10B981" strokeWidth={1.5} dot={false} />
+                        <Line type="monotone" dataKey="failed_count" name="Fallidas" stroke="#EF4444" strokeWidth={1.5} dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+
                 {/* Tabla por tipo */}
                 {data?.summary?.length > 0 && (
                   <div>
@@ -828,6 +855,15 @@ function MonitoringSection() {
       params: { date_from: dateFrom || undefined, date_to: dateTo || undefined, limit: 20 }
     }).then(r => r.data),
     enabled: selectedIds.length === 1,
+  });
+
+  // Query tendencia diaria (gráfico lineal)
+  const { data: dailyTrend } = useQuery({
+    queryKey: ['tx-daily-trend', selectedIds.join(','), dateFrom, dateTo],
+    queryFn: () => api.get('/transactions/daily-trend', {
+      params: { ids: selectedIds.join(','), date_from: dateFrom || undefined, date_to: dateTo || undefined }
+    }).then(r => r.data),
+    enabled: selectedIds.length > 0,
   });
 
   const toggleCommerce = (id: number) => {
@@ -961,6 +997,25 @@ function MonitoringSection() {
       {isLoading && <div className="text-center py-8 text-gray-400">Cargando comercios...</div>}
 
       {multiLoading && <div className="text-center py-4 text-gray-400">Consultando transacciones...</div>}
+
+      {/* Gráfico lineal de tendencia diaria */}
+      {selectedIds.length >= 1 && dailyTrend?.data?.length > 0 && (
+        <div className="mb-4">
+          <h4 className="text-sm font-semibold text-gray-700 mb-3">Tendencia Diaria de Transacciones</h4>
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={dailyTrend.data.map((d: any) => ({ ...d, date: new Date(d.date).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit' }) }))}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="date" tick={{ fill: '#9ca3af', fontSize: 10 }} />
+              <YAxis tick={{ fill: '#9ca3af', fontSize: 11 }} />
+              <Tooltip contentStyle={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
+              <Legend />
+              <Line type="monotone" dataKey="total" name="Total" stroke="#3B82F6" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="success_count" name="Exitosas" stroke="#10B981" strokeWidth={1.5} dot={false} />
+              <Line type="monotone" dataKey="failed_count" name="Fallidas" stroke="#EF4444" strokeWidth={1.5} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       {/* Gráfico comparativo (múltiples comercios) */}
       {selectedIds.length >= 1 && multiSummary?.data?.length > 0 && (

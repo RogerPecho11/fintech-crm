@@ -25,6 +25,45 @@ router.get('/commerces', async (_req: AuthenticatedRequest, res: Response) => {
   }
 });
 
+// ─── GET /api/v1/transactions/daily-trend — tendencia diaria para gráfico lineal
+router.get('/daily-trend', async (req: AuthenticatedRequest, res: Response) => {
+  const { ids, date_from, date_to } = req.query as Record<string, string>;
+
+  if (!ids) return res.status(400).json({ error: 'ids es requerido' });
+
+  try {
+    const idList = ids.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+    if (idList.length === 0) return res.json({ data: [] });
+
+    const placeholders = idList.map(() => '?').join(',');
+    const params: any[] = [...idList];
+
+    // Por defecto últimos 30 días
+    let dateFilter = '';
+    if (date_from) { dateFilter += ' AND p.created_at >= ?'; params.push(date_from); }
+    else { dateFilter += ' AND p.created_at >= ?'; const d = new Date(); d.setDate(d.getDate() - 30); params.push(d.toISOString().slice(0, 10)); }
+    if (date_to) { dateFilter += ' AND p.created_at <= ?'; params.push(date_to + ' 23:59:59'); }
+
+    const data = await mysqlQuery(
+      `SELECT 
+        DATE(p.created_at) as date,
+        COUNT(*) as total,
+        SUM(CASE WHEN p.status = 'success' THEN 1 ELSE 0 END) as success_count,
+        SUM(CASE WHEN p.status != 'success' THEN 1 ELSE 0 END) as failed_count
+       FROM payment p
+       WHERE p.commerce_id IN (${placeholders}) AND p.deleted_at IS NULL ${dateFilter}
+       GROUP BY DATE(p.created_at)
+       ORDER BY date ASC`,
+      params
+    );
+
+    res.json({ data });
+  } catch (err: any) {
+    console.error('[Transactions] Error fetching daily-trend:', err.message);
+    res.status(500).json({ error: 'Error al consultar tendencia diaria.' });
+  }
+});
+
 // ─── GET /api/v1/transactions/quick-summary/:commerceId — resumen rápido para popup hover
 router.get('/quick-summary/:commerceId', async (req: AuthenticatedRequest, res: Response) => {
   const { commerceId } = req.params;
