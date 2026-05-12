@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -300,9 +300,17 @@ export default function ReportsPage() {
             <tbody>
               {isLoading ? (
                 <tr><td colSpan={7} className="text-center py-8 text-gray-400">Cargando...</td></tr>
-              ) : (merchants?.data || []).slice(0, 10).map((m: any) => (
+              ) : (merchants?.data || []).slice(0, 10).map((m: any) => {
+                const statusLabel = statuses.find(s => s.value === m.status)?.label || m.status || '';
+                const showPopup = m.merchant_id && statusLabel.toLowerCase().includes('acta');
+                return (
                 <tr key={m.id} className="border-b border-gray-100">
-                  <td className="table-cell font-medium text-gray-900">{m.legal_name}</td>
+                  <td className="table-cell font-medium text-gray-900">
+                    {showPopup
+                      ? <MerchantHoverCell name={m.legal_name} merchantId={m.merchant_id} />
+                      : m.legal_name
+                    }
+                  </td>
                   <td className="table-cell font-mono text-xs">{m.tax_id}</td>
                   <td className="table-cell">{statuses.find(s => s.value === m.status)?.label || m.status}</td>
                   <td className="table-cell font-mono text-xs">{m.mcc_code}</td>
@@ -310,7 +318,7 @@ export default function ReportsPage() {
                   <td className="table-cell">{m.country}</td>
                   <td className="table-cell text-xs text-gray-500">{m.onboarding_assigned_to_name || '—'}</td>
                 </tr>
-              ))}
+              ); })}
             </tbody>
           </table>
           {merchants?.total > 10 && (
@@ -617,6 +625,71 @@ export default function ReportsPage() {
       {/* ── Monitoreo de Transacciones ─────────────────────────────────────────── */}
       <MonitoringSection />
     </div>
+  );
+}
+
+// ─── Hover popup para comercios con "Acta de entrega" ─────────────────────────
+function MerchantHoverCell({ name, merchantId }: { name: string; merchantId: string }) {
+  const [show, setShow] = useState(false);
+  const timeoutRef = useRef<any>(null);
+
+  const { data } = useQuery({
+    queryKey: ['quick-summary', merchantId],
+    queryFn: () => api.get(`/transactions/quick-summary/${merchantId}`).then(r => r.data),
+    enabled: show,
+    staleTime: 60000,
+  });
+
+  const handleEnter = () => {
+    timeoutRef.current = setTimeout(() => setShow(true), 300);
+  };
+  const handleLeave = () => {
+    clearTimeout(timeoutRef.current);
+    setShow(false);
+  };
+
+  const total = Number(data?.total_transactions || 0);
+  const pieData = data ? [
+    { name: 'Exitosas', value: Number(data.success_count || 0), fill: '#10B981' },
+    { name: 'Pendientes', value: Number(data.pending_count || 0), fill: '#F59E0B' },
+    { name: 'Fallidas', value: Number(data.failed_count || 0), fill: '#EF4444' },
+  ].filter(d => d.value > 0) : [];
+
+  return (
+    <span className="relative inline-block" onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
+      <span className="cursor-pointer underline decoration-dotted underline-offset-2 text-gray-900">{name}</span>
+      {show && (
+        <div className="absolute z-50 left-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl p-4 w-64" onMouseEnter={() => clearTimeout(timeoutRef.current)} onMouseLeave={handleLeave}>
+          {!data ? (
+            <div className="text-center py-4 text-gray-400 text-xs">Cargando...</div>
+          ) : total === 0 ? (
+            <div className="text-center py-4 text-gray-400 text-xs">Sin transacciones</div>
+          ) : (
+            <>
+              <p className="text-sm font-semibold text-gray-800 truncate">{data.name || name}</p>
+              <p className="text-xs text-gray-500 mb-2">{total.toLocaleString()} transacciones</p>
+              <ResponsiveContainer width="100%" height={120}>
+                <PieChart>
+                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={25} outerRadius={45} dataKey="value" paddingAngle={2}>
+                    {pieData.map((entry, i) => (
+                      <Cell key={i} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="flex justify-center gap-3 mt-1">
+                {pieData.map(d => (
+                  <span key={d.name} className="flex items-center gap-1 text-[10px] text-gray-500">
+                    <span className="w-2 h-2 rounded-full" style={{ background: d.fill }} />
+                    {d.name} ({total > 0 ? Math.round((d.value / total) * 100) : 0}%)
+                  </span>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </span>
   );
 }
 

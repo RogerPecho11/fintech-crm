@@ -25,6 +25,34 @@ router.get('/commerces', async (_req: AuthenticatedRequest, res: Response) => {
   }
 });
 
+// ─── GET /api/v1/transactions/quick-summary/:commerceId — resumen rápido para popup hover
+router.get('/quick-summary/:commerceId', async (req: AuthenticatedRequest, res: Response) => {
+  const { commerceId } = req.params;
+
+  try {
+    const data = await mysqlQuery(
+      `SELECT 
+        c.name,
+        COUNT(p.id) as total_transactions,
+        SUM(CASE WHEN p.status = 'success' THEN 1 ELSE 0 END) as success_count,
+        SUM(CASE WHEN p.status = 'pending' THEN 1 ELSE 0 END) as pending_count,
+        SUM(CASE WHEN p.status NOT IN ('success','pending') THEN 1 ELSE 0 END) as failed_count,
+        COALESCE(SUM(p.amount), 0) as total_amount
+       FROM commerce c
+       LEFT JOIN payment p ON p.commerce_id = c.id AND p.deleted_at IS NULL
+       WHERE c.id = ?
+       GROUP BY c.id, c.name`,
+      [commerceId]
+    );
+
+    if (!data.length) return res.json({ name: '', total_transactions: 0, success_count: 0, pending_count: 0, failed_count: 0, total_amount: 0 });
+    res.json(data[0]);
+  } catch (err: any) {
+    console.error('[Transactions] Error fetching quick-summary:', err.message);
+    res.status(500).json({ error: 'Error al consultar resumen.' });
+  }
+});
+
 // ─── GET /api/v1/transactions/summary-multi — resumen de múltiples comercios seleccionados
 router.get('/summary-multi', async (req: AuthenticatedRequest, res: Response) => {
   const { ids, date_from, date_to } = req.query as Record<string, string>;
