@@ -38,9 +38,22 @@ router.get('/commerces', async (_req: AuthenticatedRequest, res: Response) => {
   }
 });
 
+// ─── GET /api/v1/transactions/methods — lista métodos/pasarelas disponibles
+router.get('/methods', async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    const methods = await mysqlQuery(
+      `SELECT DISTINCT method FROM payment WHERE method IS NOT NULL AND method != '' ORDER BY method ASC LIMIT 50`
+    );
+    res.json(methods.map((m: any) => m.method));
+  } catch (err: any) {
+    console.error('[Transactions] Error fetching methods:', err.message);
+    res.status(500).json({ error: 'Error al consultar métodos.' });
+  }
+});
+
 // ─── GET /api/v1/transactions/daily-trend — tendencia diaria para gráfico lineal
 router.get('/daily-trend', async (req: AuthenticatedRequest, res: Response) => {
-  const { ids, date_from, date_to } = req.query as Record<string, string>;
+  const { ids, date_from, date_to, method } = req.query as Record<string, string>;
 
   if (!ids) return res.status(400).json({ error: 'ids es requerido' });
 
@@ -56,6 +69,7 @@ router.get('/daily-trend', async (req: AuthenticatedRequest, res: Response) => {
     if (date_from) { dateFilter += ' AND p.created_at >= ?'; params.push(date_from); }
     else { dateFilter += ' AND p.created_at >= ?'; const d = new Date(); d.setDate(d.getDate() - 30); params.push(d.toISOString().slice(0, 10)); }
     if (date_to) { dateFilter += ' AND p.created_at <= ?'; params.push(formatDateTo(date_to)); }
+    if (method) { dateFilter += ' AND p.method = ?'; params.push(method); }
 
     const data = await mysqlQuery(
       `SELECT 
@@ -175,7 +189,7 @@ router.get('/quick-summary/:commerceId', async (req: AuthenticatedRequest, res: 
 
 // ─── GET /api/v1/transactions/summary-multi — resumen de múltiples comercios seleccionados
 router.get('/summary-multi', async (req: AuthenticatedRequest, res: Response) => {
-  const { ids, date_from, date_to } = req.query as Record<string, string>;
+  const { ids, date_from, date_to, method } = req.query as Record<string, string>;
 
   if (!ids) return res.status(400).json({ error: 'ids es requerido' });
 
@@ -189,6 +203,7 @@ router.get('/summary-multi', async (req: AuthenticatedRequest, res: Response) =>
     let dateFilter = '';
     if (date_from) { dateFilter += ' AND p.created_at >= ?'; params.push(date_from); }
     if (date_to) { dateFilter += ' AND p.created_at <= ?'; params.push(formatDateTo(date_to)); }
+    if (method) { dateFilter += ' AND p.method = ?'; params.push(method); }
 
     const data = await mysqlQuery(
       `SELECT c.id, c.name, c.country,

@@ -815,12 +815,18 @@ function MerchantHoverCell({ name, merchantId }: { name: string; merchantId: str
 function MonitoringSection() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [countryFilter, setCountryFilter] = useState('');
+  const [methodFilter, setMethodFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
   const { data: commerces, isLoading } = useQuery({
     queryKey: ['tx-commerces'],
     queryFn: () => api.get('/transactions/commerces').then(r => r.data),
+  });
+
+  const { data: methods } = useQuery({
+    queryKey: ['tx-methods'],
+    queryFn: () => api.get('/transactions/methods').then(r => r.data),
   });
 
   // Países únicos
@@ -833,9 +839,9 @@ function MonitoringSection() {
 
   // Query multi-comercio
   const { data: multiSummary, isLoading: multiLoading } = useQuery({
-    queryKey: ['tx-summary-multi', selectedIds.join(','), dateFrom, dateTo],
+    queryKey: ['tx-summary-multi', selectedIds.join(','), dateFrom, dateTo, methodFilter],
     queryFn: () => api.get('/transactions/summary-multi', {
-      params: { ids: selectedIds.join(','), date_from: dateFrom || undefined, date_to: dateTo || undefined }
+      params: { ids: selectedIds.join(','), date_from: dateFrom || undefined, date_to: dateTo || undefined, method: methodFilter || undefined }
     }).then(r => r.data),
     enabled: selectedIds.length > 0,
   });
@@ -859,9 +865,9 @@ function MonitoringSection() {
 
   // Query tendencia diaria (gráfico lineal)
   const { data: dailyTrend } = useQuery({
-    queryKey: ['tx-daily-trend', selectedIds.join(','), dateFrom, dateTo],
+    queryKey: ['tx-daily-trend', selectedIds.join(','), dateFrom, dateTo, methodFilter],
     queryFn: () => api.get('/transactions/daily-trend', {
-      params: { ids: selectedIds.join(','), date_from: dateFrom || undefined, date_to: dateTo || undefined }
+      params: { ids: selectedIds.join(','), date_from: dateFrom || undefined, date_to: dateTo || undefined, method: methodFilter || undefined }
     }).then(r => r.data),
     enabled: selectedIds.length > 0,
   });
@@ -954,6 +960,19 @@ function MonitoringSection() {
             <option value="">Todos</option>
             {countries.map((c: string) => (
               <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Pasarela</label>
+          <select
+            className="input text-sm w-40"
+            value={methodFilter}
+            onChange={e => setMethodFilter(e.target.value)}
+          >
+            <option value="">Todas</option>
+            {(methods || []).map((m: string) => (
+              <option key={m} value={m}>{m}</option>
             ))}
           </select>
         </div>
