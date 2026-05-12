@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -628,25 +628,16 @@ export default function ReportsPage() {
   );
 }
 
-// ─── Hover popup para comercios con "Acta de entrega" ─────────────────────────
+// ─── Modal popup para comercios con "Acta de entrega" / "Finalizado" ──────────
 function MerchantHoverCell({ name, merchantId }: { name: string; merchantId: string }) {
-  const [show, setShow] = useState(false);
-  const timeoutRef = useRef<any>(null);
+  const [open, setOpen] = useState(false);
 
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['quick-summary', merchantId],
     queryFn: () => api.get(`/transactions/quick-summary/${merchantId}`).then(r => r.data),
-    enabled: show,
+    enabled: open,
     staleTime: 60000,
   });
-
-  const handleEnter = () => {
-    timeoutRef.current = setTimeout(() => setShow(true), 300);
-  };
-  const handleLeave = () => {
-    clearTimeout(timeoutRef.current);
-    setShow(false);
-  };
 
   const total = Number(data?.total_transactions || 0);
   const pieData = data ? [
@@ -656,40 +647,119 @@ function MerchantHoverCell({ name, merchantId }: { name: string; merchantId: str
   ].filter(d => d.value > 0) : [];
 
   return (
-    <span className="relative inline-block" onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
-      <span className="cursor-pointer underline decoration-dotted underline-offset-2 text-gray-900">{name}</span>
-      {show && (
-        <div className="absolute z-50 left-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl p-4 w-64" onMouseEnter={() => clearTimeout(timeoutRef.current)} onMouseLeave={handleLeave}>
-          {!data ? (
-            <div className="text-center py-4 text-gray-400 text-xs">Cargando...</div>
-          ) : total === 0 ? (
-            <div className="text-center py-4 text-gray-400 text-xs">Sin transacciones</div>
-          ) : (
-            <>
-              <p className="text-sm font-semibold text-gray-800 truncate">{data.name || name}</p>
-              <p className="text-xs text-gray-500 mb-2">{total.toLocaleString()} transacciones</p>
-              <ResponsiveContainer width="100%" height={120}>
-                <PieChart>
-                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={25} outerRadius={45} dataKey="value" paddingAngle={2}>
-                    {pieData.map((entry, i) => (
-                      <Cell key={i} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="flex justify-center gap-3 mt-1">
-                {pieData.map(d => (
-                  <span key={d.name} className="flex items-center gap-1 text-[10px] text-gray-500">
-                    <span className="w-2 h-2 rounded-full" style={{ background: d.fill }} />
-                    {d.name} ({total > 0 ? Math.round((d.value / total) * 100) : 0}%)
-                  </span>
-                ))}
+    <>
+      <span
+        className="cursor-pointer underline decoration-dotted underline-offset-2 text-blue-600 hover:text-blue-800"
+        onClick={() => setOpen(true)}
+      >
+        {name}
+      </span>
+
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setOpen(false)}>
+          <div className="bg-white rounded-xl shadow-2xl w-[600px] max-h-[80vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">{data?.name || name}</h3>
+                <p className="text-sm text-gray-500">{data?.country || ''} — ID: {merchantId}</p>
               </div>
-            </>
-          )}
+              <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold">✕</button>
+            </div>
+
+            {isLoading ? (
+              <div className="text-center py-8 text-gray-400">Cargando transacciones...</div>
+            ) : total === 0 ? (
+              <div className="text-center py-8 text-gray-400">Sin transacciones registradas</div>
+            ) : (
+              <>
+                {/* Gráfico circular */}
+                <div className="flex items-center justify-center mb-4">
+                  <ResponsiveContainer width={180} height={180}>
+                    <PieChart>
+                      <Pie data={pieData} cx="50%" cy="50%" innerRadius={40} outerRadius={70} dataKey="value" paddingAngle={2}>
+                        {pieData.map((entry, i) => (
+                          <Cell key={i} fill={entry.fill} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="ml-4 space-y-1">
+                    {pieData.map(d => (
+                      <div key={d.name} className="flex items-center gap-2 text-sm">
+                        <span className="w-3 h-3 rounded-full" style={{ background: d.fill }} />
+                        <span className="text-gray-600">{d.name}</span>
+                        <span className="font-semibold text-gray-900">{total > 0 ? Math.round((d.value / total) * 100) : 0}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Totales */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <p className="text-xs text-gray-500">Total Transacciones</p>
+                    <p className="text-lg font-bold text-gray-900">{total.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <p className="text-xs text-gray-500">Monto Total</p>
+                    <p className="text-lg font-bold text-gray-900">{data?.currency || '$'} {Number(data?.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <p className="text-xs text-gray-500">Primera Transacción</p>
+                    <p className="text-sm font-medium text-gray-700">{data?.first_date ? new Date(data.first_date).toLocaleDateString('es-PE') : '—'}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <p className="text-xs text-gray-500">Última Transacción</p>
+                    <p className="text-sm font-medium text-gray-700">{data?.last_date ? new Date(data.last_date).toLocaleDateString('es-PE') : '—'}</p>
+                  </div>
+                </div>
+
+                {/* Tabla por tipo */}
+                {data?.summary?.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-700 mb-2">Por Tipo de Transacción</h4>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-100">
+                            <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">Tipo</th>
+                            <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">Estado</th>
+                            <th className="text-right px-3 py-2 text-xs font-medium text-gray-500">Cantidad</th>
+                            <th className="text-right px-3 py-2 text-xs font-medium text-gray-500">Monto Total</th>
+                            <th className="text-right px-3 py-2 text-xs font-medium text-gray-500">% del Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {data.summary.map((s: any, i: number) => (
+                            <tr key={i} className="border-b border-gray-50">
+                              <td className="px-3 py-2 font-medium">{s.type || '—'}</td>
+                              <td className="px-3 py-2">
+                                <span className={`text-xs font-medium ${s.status === 'success' ? 'text-emerald-600' : s.status === 'pending' ? 'text-yellow-600' : 'text-red-500'}`}>{s.status || '—'}</span>
+                              </td>
+                              <td className="px-3 py-2 text-right">{Number(s.total_transactions).toLocaleString()}</td>
+                              <td className="px-3 py-2 text-right font-mono">{data.currency} {Number(s.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                              <td className="px-3 py-2 text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  <div className="w-16 bg-gray-100 rounded-full h-1.5">
+                                    <div className={`h-1.5 rounded-full ${s.status === 'success' ? 'bg-emerald-500' : s.status === 'pending' ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${Math.min(100, s.percentage)}%` }} />
+                                  </div>
+                                  <span className="text-xs font-semibold">{s.percentage}%</span>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
       )}
-    </span>
+    </>
   );
 }
 
