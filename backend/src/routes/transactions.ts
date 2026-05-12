@@ -28,8 +28,23 @@ router.get('/commerces', async (_req: AuthenticatedRequest, res: Response) => {
 // ─── GET /api/v1/transactions/quick-summary/:commerceId — resumen rápido para popup hover
 router.get('/quick-summary/:commerceId', async (req: AuthenticatedRequest, res: Response) => {
   const { commerceId } = req.params;
+  const { date_from, date_to } = req.query as Record<string, string>;
 
   try {
+    const params: any[] = [commerceId];
+    let dateFilter = '';
+
+    if (date_from) { dateFilter += ' AND p.created_at >= ?'; params.push(date_from); }
+    if (date_to) { dateFilter += ' AND p.created_at <= ?'; params.push(date_to + ' 23:59:59'); }
+
+    // Si no hay filtro de fecha, limitar a últimos 30 días por defecto
+    if (!date_from && !date_to) {
+      dateFilter += ' AND p.created_at >= ?';
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      params.push(thirtyDaysAgo.toISOString().slice(0, 10));
+    }
+
     const totals = await mysqlQuery(
       `SELECT 
         COUNT(p.id) as total_transactions,
@@ -37,9 +52,20 @@ router.get('/quick-summary/:commerceId', async (req: AuthenticatedRequest, res: 
         MIN(p.created_at) as first_date,
         MAX(p.created_at) as last_date
        FROM payment p
-       WHERE p.commerce_id = ? AND p.deleted_at IS NULL`,
-      [commerceId]
+       WHERE p.commerce_id = ? AND p.deleted_at IS NULL ${dateFilter}`,
+      params
     );
+
+    const params2: any[] = [commerceId];
+    let dateFilter2 = '';
+    if (date_from) { dateFilter2 += ' AND p.created_at >= ?'; params2.push(date_from); }
+    if (date_to) { dateFilter2 += ' AND p.created_at <= ?'; params2.push(date_to + ' 23:59:59'); }
+    if (!date_from && !date_to) {
+      dateFilter2 += ' AND p.created_at >= ?';
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      params2.push(thirtyDaysAgo.toISOString().slice(0, 10));
+    }
 
     const byStatus = await mysqlQuery(
       `SELECT 
@@ -48,10 +74,11 @@ router.get('/quick-summary/:commerceId', async (req: AuthenticatedRequest, res: 
         COUNT(*) as total_transactions,
         COALESCE(SUM(p.amount), 0) as total_amount
        FROM payment p
-       WHERE p.commerce_id = ? AND p.deleted_at IS NULL
+       WHERE p.commerce_id = ? AND p.deleted_at IS NULL ${dateFilter2}
        GROUP BY p.type, p.status
-       ORDER BY total_transactions DESC`,
-      [commerceId]
+       ORDER BY total_transactions DESC
+       LIMIT 20`,
+      params2
     );
 
     const commerceInfo = await mysqlQuery(

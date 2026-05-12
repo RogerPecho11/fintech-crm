@@ -631,12 +631,16 @@ export default function ReportsPage() {
 // ─── Modal popup para comercios con "Acta de entrega" / "Finalizado" ──────────
 function MerchantHoverCell({ name, merchantId }: { name: string; merchantId: string }) {
   const [open, setOpen] = useState(false);
+  const [modalDateFrom, setModalDateFrom] = useState('');
+  const [modalDateTo, setModalDateTo] = useState('');
 
   const { data, isLoading } = useQuery({
-    queryKey: ['quick-summary', merchantId],
-    queryFn: () => api.get(`/transactions/quick-summary/${merchantId}`).then(r => r.data),
+    queryKey: ['quick-summary', merchantId, modalDateFrom, modalDateTo],
+    queryFn: () => api.get(`/transactions/quick-summary/${merchantId}`, {
+      params: { date_from: modalDateFrom || undefined, date_to: modalDateTo || undefined }
+    }).then(r => r.data),
     enabled: open,
-    staleTime: 60000,
+    staleTime: 30000,
   });
 
   const total = Number(data?.total_transactions || 0);
@@ -657,9 +661,9 @@ function MerchantHoverCell({ name, merchantId }: { name: string; merchantId: str
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setOpen(false)}>
-          <div className="bg-white rounded-xl shadow-2xl w-[600px] max-h-[80vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-xl shadow-2xl w-[620px] max-h-[85vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
             {/* Header */}
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-3">
               <div>
                 <h3 className="text-lg font-bold text-gray-900">{data?.name || name}</h3>
                 <p className="text-sm text-gray-500">{data?.country || ''} — ID: {merchantId}</p>
@@ -667,17 +671,35 @@ function MerchantHoverCell({ name, merchantId }: { name: string; merchantId: str
               <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold">✕</button>
             </div>
 
+            {/* Filtros de fecha */}
+            <div className="flex gap-3 mb-4 p-2 bg-gray-50 rounded-lg items-end">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Desde</label>
+                <input type="date" className="input text-sm" value={modalDateFrom} onChange={e => setModalDateFrom(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Hasta</label>
+                <input type="date" className="input text-sm" value={modalDateTo} onChange={e => setModalDateTo(e.target.value)} />
+              </div>
+              {(modalDateFrom || modalDateTo) && (
+                <button onClick={() => { setModalDateFrom(''); setModalDateTo(''); }} className="text-xs text-gray-400 hover:text-gray-600 pb-2">Limpiar</button>
+              )}
+              {!modalDateFrom && !modalDateTo && (
+                <span className="text-xs text-gray-400 pb-2">Últimos 30 días por defecto</span>
+              )}
+            </div>
+
             {isLoading ? (
               <div className="text-center py-8 text-gray-400">Cargando transacciones...</div>
             ) : total === 0 ? (
-              <div className="text-center py-8 text-gray-400">Sin transacciones registradas</div>
+              <div className="text-center py-8 text-gray-400">Sin transacciones en este período</div>
             ) : (
               <>
                 {/* Gráfico circular */}
                 <div className="flex items-center justify-center mb-4">
-                  <ResponsiveContainer width={180} height={180}>
+                  <ResponsiveContainer width={160} height={160}>
                     <PieChart>
-                      <Pie data={pieData} cx="50%" cy="50%" innerRadius={40} outerRadius={70} dataKey="value" paddingAngle={2}>
+                      <Pie data={pieData} cx="50%" cy="50%" innerRadius={35} outerRadius={60} dataKey="value" paddingAngle={2}>
                         {pieData.map((entry, i) => (
                           <Cell key={i} fill={entry.fill} />
                         ))}
