@@ -302,7 +302,7 @@ export default function ReportsPage() {
                 <tr><td colSpan={7} className="text-center py-8 text-gray-400">Cargando...</td></tr>
               ) : (merchants?.data || []).slice(0, 10).map((m: any) => {
                 const statusLabel = statuses.find(s => s.value === m.status)?.label || m.status || '';
-                const showPopup = m.merchant_id && statusLabel.toLowerCase().includes('acta');
+                const showPopup = m.merchant_id && (statusLabel.toLowerCase().includes('acta') || m.status === 'finalizado' || statusLabel.toLowerCase().includes('finalizado'));
                 return (
                 <tr key={m.id} className="border-b border-gray-100">
                   <td className="table-cell font-medium text-gray-900">

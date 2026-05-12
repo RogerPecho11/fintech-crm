@@ -26,7 +26,7 @@ router.get('/merchants', async (req: AuthenticatedRequest, res: Response) => {
   const where = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
 
   const merchants = await query(
-    `SELECT m.legal_name, m.trade_name, m.tax_id, m.country, m.city, m.status,
+    `SELECT m.id, m.merchant_id, m.legal_name, m.trade_name, m.tax_id, m.country, m.city, m.status,
             m.risk_level, m.score, m.mcc_code, m.mcc_description,
             m.contact_name, m.contact_email, m.contact_phone,
             m.currency, m.monthly_volume, m.average_ticket,
