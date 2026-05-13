@@ -318,58 +318,76 @@ router.get('/report-pdf', async (req: AuthenticatedRequest, res: Response) => {
     res.setHeader('Content-Disposition', `attachment; filename=informe_monitoreo_${commerce.name.replace(/\s+/g, '_')}_${from}_${to}.pdf`);
     doc.pipe(res);
 
-    // Header
-    doc.fontSize(20).fillColor('#1E3A5F').text('Informe de Monitoreo', { align: 'center' });
-    doc.moveDown(0.5);
-    doc.fontSize(10).fillColor('#6B7280').text('ProntoPaga — Sistema de Gestión de Comercios', { align: 'center' });
-    doc.moveDown(1.5);
+    // Header con fondo de color
+    doc.rect(0, 0, 595, 80).fill('#1E3A5F');
+    doc.fontSize(22).fillColor('#FFFFFF').text('Informe de Monitoreo', 50, 25, { align: 'center' });
+    doc.fontSize(10).fillColor('#93C5FD').text('ProntoPaga — Sistema de Gestión de Comercios', 50, 52, { align: 'center' });
+    doc.y = 100;
 
     // Info comercio
-    doc.fontSize(12).fillColor('#111827').text(`Comercio: ${commerce.name}`);
-    doc.fontSize(10).fillColor('#6B7280').text(`País: ${commerce.country} | Moneda: ${currency}`);
-    doc.text(`Fecha inicio: ${from}`);
-    doc.text(`Fecha término: ${to}`);
-    doc.moveDown(1);
+    doc.fontSize(14).fillColor('#1E3A5F').text(commerce.name);
+    doc.fontSize(10).fillColor('#6B7280').text(`País: ${commerce.country} | Moneda: ${currency} | ID: ${commerce.id}`);
+    doc.moveDown(0.3);
+    doc.fontSize(10).fillColor('#374151').text(`Período: ${from}  →  ${to}`);
+    doc.moveDown(0.8);
 
-    doc.fontSize(10).fillColor('#374151').text(
+    // Línea separadora
+    doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor('#E5E7EB').lineWidth(1).stroke();
+    doc.moveDown(0.8);
+
+    doc.fontSize(9).fillColor('#374151').text(
       'El presente informe reúne información relevante sobre el comportamiento de las transacciones durante el período analizado, incluyendo métricas de Payins y Payouts, porcentajes de uso de métodos de pago y detalle de estados transaccionales.',
       { align: 'justify' }
     );
     doc.moveDown(1.5);
 
     // ─── Payins Totales ───
-    doc.fontSize(14).fillColor('#1E3A5F').text('Payins');
-    doc.moveDown(0.5);
+    doc.rect(50, doc.y, 495, 22).fill('#EFF6FF');
+    doc.fontSize(12).fillColor('#1E3A5F').text('  Payins', 50, doc.y + 5);
+    doc.y += 30;
 
     const payinTotal = payinTotals.reduce((acc: number, r: any) => acc + Number(r.cantidad), 0);
-    // Tabla
+
+    // Tabla con colores por status
+    const STATUS_COLORS: Record<string, string> = {
+      success: '#10B981', completed: '#10B981',
+      canceled: '#F59E0B', expired: '#F97316',
+      rejected: '#EF4444', error: '#EF4444',
+      bank_error: '#DC2626', authentication_error: '#B91C1C',
+      pending: '#6B7280', processing: '#3B82F6',
+    };
+
     const drawTable = (data: any[], total: number) => {
       const startX = 50;
       let y = doc.y;
-      // Header
-      doc.fontSize(9).fillColor('#6B7280');
-      doc.text('Estado', startX, y, { width: 180 });
-      doc.text('Cantidad', startX + 200, y, { width: 100, align: 'right' });
-      doc.text('Porcentaje', startX + 320, y, { width: 80, align: 'right' });
-      y += 18;
-      doc.moveTo(startX, y).lineTo(startX + 420, y).strokeColor('#E5E7EB').stroke();
-      y += 5;
+      // Header row
+      doc.rect(startX, y, 450, 16).fill('#F9FAFB');
+      doc.fontSize(8).fillColor('#6B7280');
+      doc.text('Estado', startX + 5, y + 4, { width: 170 });
+      doc.text('Cantidad', startX + 200, y + 4, { width: 100, align: 'right' });
+      doc.text('Porcentaje', startX + 320, y + 4, { width: 80, align: 'right' });
+      y += 20;
 
-      doc.fillColor('#111827').fontSize(9);
+      doc.fontSize(9);
       data.forEach((r: any) => {
         const pct = total > 0 ? (Number(r.cantidad) / total * 100).toFixed(1) : '0.0';
-        doc.text(r.status || 'N/A', startX, y, { width: 180 });
+        const color = STATUS_COLORS[r.status] || '#6B7280';
+        // Color dot
+        doc.circle(startX + 8, y + 6, 3).fill(color);
+        doc.fillColor('#111827').text(r.status || 'N/A', startX + 16, y, { width: 170 });
         doc.text(String(Number(r.cantidad).toLocaleString()), startX + 200, y, { width: 100, align: 'right' });
-        doc.text(pct + '%', startX + 320, y, { width: 80, align: 'right' });
+        doc.fillColor(color).text(pct + '%', startX + 320, y, { width: 80, align: 'right' });
+        // Mini bar
+        const barWidth = Math.max(1, Number(pct) * 0.4);
+        doc.rect(startX + 410, y + 3, barWidth, 7).fill(color);
         y += 16;
       });
-      // Total
-      doc.moveTo(startX, y).lineTo(startX + 420, y).strokeColor('#E5E7EB').stroke();
-      y += 5;
+      // Total row
+      doc.rect(startX, y, 450, 16).fill('#F0F9FF');
       doc.fontSize(9).fillColor('#1E3A5F').font('Helvetica-Bold');
-      doc.text('Total', startX, y, { width: 180 });
-      doc.text(String(total.toLocaleString()), startX + 200, y, { width: 100, align: 'right' });
-      doc.text('100%', startX + 320, y, { width: 80, align: 'right' });
+      doc.text('Total', startX + 5, y + 4, { width: 170 });
+      doc.text(String(total.toLocaleString()), startX + 200, y + 4, { width: 100, align: 'right' });
+      doc.text('100%', startX + 320, y + 4, { width: 80, align: 'right' });
       doc.font('Helvetica');
       doc.y = y + 25;
     };
@@ -383,38 +401,41 @@ router.get('/report-pdf', async (req: AuthenticatedRequest, res: Response) => {
     {
       const startX = 50;
       let y = doc.y;
-      doc.fontSize(8).fillColor('#6B7280');
-      doc.text('Método', startX, y, { width: 100 });
-      doc.text('Trx', startX + 110, y, { width: 50, align: 'right' });
-      doc.text('Monto', startX + 170, y, { width: 80, align: 'right' });
-      doc.text('Aprobadas', startX + 260, y, { width: 60, align: 'right' });
-      doc.text('Rechazadas', startX + 330, y, { width: 60, align: 'right' });
-      doc.text('Tasa', startX + 400, y, { width: 40, align: 'right' });
-      y += 16;
-      doc.moveTo(startX, y).lineTo(startX + 450, y).strokeColor('#E5E7EB').stroke();
-      y += 4;
+      doc.rect(startX, y, 450, 14).fill('#F9FAFB');
+      doc.fontSize(7).fillColor('#6B7280');
+      doc.text('Método', startX + 5, y + 3, { width: 90 });
+      doc.text('Trx', startX + 100, y + 3, { width: 50, align: 'right' });
+      doc.text('Monto', startX + 160, y + 3, { width: 80, align: 'right' });
+      doc.text('Aprobadas', startX + 250, y + 3, { width: 55, align: 'right' });
+      doc.text('Rechazadas', startX + 315, y + 3, { width: 55, align: 'right' });
+      doc.text('Tasa', startX + 385, y + 3, { width: 55, align: 'right' });
+      y += 18;
       doc.fillColor('#111827').fontSize(8);
-      (payinVol as any[]).forEach((r: any) => {
+      (payinVol as any[]).forEach((r: any, idx: number) => {
+        if (idx % 2 === 0) doc.rect(startX, y - 2, 450, 14).fill('#FAFAFA');
         const t = Number(r.aprobadas) + Number(r.rechazadas);
         const rate = t > 0 ? (Number(r.aprobadas) / t * 100).toFixed(1) + '%' : 'N/A';
         const monto = Number(r.monto);
         const montoStr = monto >= 1000000 ? sym + (monto / 1000000).toFixed(2) + 'M' : monto >= 1000 ? sym + (monto / 1000).toFixed(1) + 'K' : sym + monto.toFixed(0);
-        doc.text(r.method || 'N/A', startX, y, { width: 100 });
-        doc.text(String(Number(r.cantidad).toLocaleString()), startX + 110, y, { width: 50, align: 'right' });
-        doc.text(montoStr, startX + 170, y, { width: 80, align: 'right' });
-        doc.text(String(Number(r.aprobadas).toLocaleString()), startX + 260, y, { width: 60, align: 'right' });
-        doc.text(String(Number(r.rechazadas).toLocaleString()), startX + 330, y, { width: 60, align: 'right' });
-        doc.text(rate, startX + 400, y, { width: 40, align: 'right' });
+        doc.fillColor('#111827').text(r.method || 'N/A', startX + 5, y, { width: 90 });
+        doc.text(String(Number(r.cantidad).toLocaleString()), startX + 100, y, { width: 50, align: 'right' });
+        doc.text(montoStr, startX + 160, y, { width: 80, align: 'right' });
+        doc.fillColor('#10B981').text(String(Number(r.aprobadas).toLocaleString()), startX + 250, y, { width: 55, align: 'right' });
+        doc.fillColor('#EF4444').text(String(Number(r.rechazadas).toLocaleString()), startX + 315, y, { width: 55, align: 'right' });
+        const rateNum = parseFloat(rate);
+        const rateColor = rateNum >= 80 ? '#10B981' : rateNum >= 50 ? '#F59E0B' : '#EF4444';
+        doc.fillColor(rateColor).text(rate, startX + 385, y, { width: 55, align: 'right' });
         y += 14;
       });
       doc.y = y + 10;
     }
 
     // ─── Payouts ───
-    if (doc.y > 650) doc.addPage();
+    if (doc.y > 620) doc.addPage();
     doc.moveDown(1);
-    doc.fontSize(14).fillColor('#1E3A5F').text('Payouts');
-    doc.moveDown(0.5);
+    doc.rect(50, doc.y, 495, 22).fill('#F0FDF4');
+    doc.fontSize(12).fillColor('#166534').text('  Payouts', 50, doc.y + 5);
+    doc.y += 30;
 
     const payoutTotal = payoutTotals.reduce((acc: number, r: any) => acc + Number(r.cantidad), 0);
     drawTable(payoutTotals, payoutTotal);
@@ -426,38 +447,60 @@ router.get('/report-pdf', async (req: AuthenticatedRequest, res: Response) => {
     {
       const startX = 50;
       let y = doc.y;
-      doc.fontSize(8).fillColor('#6B7280');
-      doc.text('Método', startX, y, { width: 100 });
-      doc.text('Trx', startX + 110, y, { width: 50, align: 'right' });
-      doc.text('Monto', startX + 170, y, { width: 80, align: 'right' });
-      doc.text('Aprobadas', startX + 260, y, { width: 60, align: 'right' });
-      doc.text('Rechazadas', startX + 330, y, { width: 60, align: 'right' });
-      doc.text('Tasa', startX + 400, y, { width: 40, align: 'right' });
-      y += 16;
-      doc.moveTo(startX, y).lineTo(startX + 450, y).strokeColor('#E5E7EB').stroke();
-      y += 4;
+      doc.rect(startX, y, 450, 14).fill('#F9FAFB');
+      doc.fontSize(7).fillColor('#6B7280');
+      doc.text('Método', startX + 5, y + 3, { width: 90 });
+      doc.text('Trx', startX + 100, y + 3, { width: 50, align: 'right' });
+      doc.text('Monto', startX + 160, y + 3, { width: 80, align: 'right' });
+      doc.text('Aprobadas', startX + 250, y + 3, { width: 55, align: 'right' });
+      doc.text('Rechazadas', startX + 315, y + 3, { width: 55, align: 'right' });
+      doc.text('Tasa', startX + 385, y + 3, { width: 55, align: 'right' });
+      y += 18;
       doc.fillColor('#111827').fontSize(8);
-      (payoutVol as any[]).forEach((r: any) => {
+      (payoutVol as any[]).forEach((r: any, idx: number) => {
+        if (idx % 2 === 0) doc.rect(startX, y - 2, 450, 14).fill('#FAFAFA');
         const t = Number(r.aprobadas) + Number(r.rechazadas);
         const rate = t > 0 ? (Number(r.aprobadas) / t * 100).toFixed(1) + '%' : 'N/A';
         const monto = Number(r.monto);
         const montoStr = monto >= 1000000 ? sym + (monto / 1000000).toFixed(2) + 'M' : monto >= 1000 ? sym + (monto / 1000).toFixed(1) + 'K' : sym + monto.toFixed(0);
-        doc.text(r.method || 'N/A', startX, y, { width: 100 });
-        doc.text(String(Number(r.cantidad).toLocaleString()), startX + 110, y, { width: 50, align: 'right' });
-        doc.text(montoStr, startX + 170, y, { width: 80, align: 'right' });
-        doc.text(String(Number(r.aprobadas).toLocaleString()), startX + 260, y, { width: 60, align: 'right' });
-        doc.text(String(Number(r.rechazadas).toLocaleString()), startX + 330, y, { width: 60, align: 'right' });
-        doc.text(rate, startX + 400, y, { width: 40, align: 'right' });
+        doc.fillColor('#111827').text(r.method || 'N/A', startX + 5, y, { width: 90 });
+        doc.text(String(Number(r.cantidad).toLocaleString()), startX + 100, y, { width: 50, align: 'right' });
+        doc.text(montoStr, startX + 160, y, { width: 80, align: 'right' });
+        doc.fillColor('#10B981').text(String(Number(r.aprobadas).toLocaleString()), startX + 250, y, { width: 55, align: 'right' });
+        doc.fillColor('#EF4444').text(String(Number(r.rechazadas).toLocaleString()), startX + 315, y, { width: 55, align: 'right' });
+        const rateNum = parseFloat(rate);
+        const rateColor = rateNum >= 80 ? '#10B981' : rateNum >= 50 ? '#F59E0B' : '#EF4444';
+        doc.fillColor(rateColor).text(rate, startX + 385, y, { width: 55, align: 'right' });
         y += 14;
       });
       doc.y = y + 10;
     }
 
+    // ─── Gráfico de barras simulado — Tasa de aprobación ───
+    if (doc.y > 550) doc.addPage();
+    doc.moveDown(1.5);
+    doc.rect(50, doc.y, 495, 22).fill('#ECFDF5');
+    doc.fontSize(11).fillColor('#065F46').text('  Tasa de Aprobación por Método (Payin)', 50, doc.y + 5);
+    doc.y += 30;
+
+    (payinVol as any[]).forEach((r: any) => {
+      const t = Number(r.aprobadas) + Number(r.rechazadas);
+      const rate = t > 0 ? Number(r.aprobadas) / t * 100 : 0;
+      const barColor = rate >= 80 ? '#10B981' : rate >= 50 ? '#F59E0B' : '#EF4444';
+      const barWidth = Math.max(2, rate * 2.8);
+
+      doc.fontSize(8).fillColor('#374151').text(r.method || 'N/A', 55, doc.y, { width: 100 });
+      doc.rect(160, doc.y + 1, barWidth, 10).fill(barColor);
+      doc.fontSize(8).fillColor('#111827').text(rate.toFixed(1) + '%', 160 + barWidth + 5, doc.y);
+      doc.y += 16;
+    });
+
     // ─── Conclusiones ───
     if (doc.y > 600) doc.addPage();
     doc.moveDown(1.5);
-    doc.fontSize(14).fillColor('#1E3A5F').text('Conclusiones');
-    doc.moveDown(0.5);
+    doc.rect(50, doc.y, 495, 22).fill('#FEF3C7');
+    doc.fontSize(11).fillColor('#92400E').text('  Conclusiones', 50, doc.y + 5);
+    doc.y += 30;
     doc.fontSize(9).fillColor('#374151');
 
     const totalPayinApproved = (payinVol as any[]).reduce((a: number, r: any) => a + Number(r.aprobadas), 0);
