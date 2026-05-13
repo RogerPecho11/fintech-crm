@@ -4,6 +4,7 @@ import { AuthenticatedRequest } from '../types';
 import { mysqlQuery } from '../database/mysqlConnection';
 import { query } from '../database/connection';
 import nodemailer from 'nodemailer';
+import ExcelJS from 'exceljs';
 
 const router = Router();
 router.use(authenticate);
@@ -742,23 +743,77 @@ router.post('/gateway-report-test', async (_req: AuthenticatedRequest, res: Resp
   }
 });
 
-// ─── GET /api/v1/transactions/commerce-changes-export — Excel de cambios en configuración de comercios (MySQL producción)
+// ─── GET /api/v1/transactions/commerce-changes-export — Excel de cambios en configuración de comercios (MySQL réplica producción)
 router.get('/commerce-changes-export', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    // Primero ver la estructura de la tabla
-    const columns = await mysqlQuery(
-      `SELECT COLUMN_NAME, DATA_TYPE FROM information_schema.COLUMNS 
-       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'commerce_report_config'
-       ORDER BY ORDINAL_POSITION`
-    );
+    const { date_from, date_to } = req.query as { date_from?: string; date_to?: string };
 
-    const sample = await mysqlQuery(
-      `SELECT * FROM commerce_report_config ORDER BY updated_at DESC LIMIT 5`
-    );
+    let sql = `SELECT * FROM commerce_report_config`;
+    const params: any[] = [];
 
-    res.json({ columns, sample });
+    // Filtrar por rango de fechas si se proporcionan
+    if (date_from && date_to) {
+      sql += ` WHERE updated_at BETWEEN ? AND ?`;
+      params.push(date_from + ' 00:00:00', date_to + ' 23:59:59');
+    } else if (date_from) {
+      sql += ` WHERE updated_at >= ?`;
+      params.push(date_from + ' 00:00:00');
+    } else if (date_to) {
+      sql += ` WHERE updated_at <= ?`;
+      params.push(date_to + ' 23:59:59');
+    }
+
+    sql += ` ORDER BY updated_at DESC`;
+
+    const rows: any[] = await mysqlQuery(sql, params);
+
+    // Crear workbook de Excel
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'CRM ProntoPaga';
+    workbook.created = new Date();
+
+    const sheet = workbook.addWorksheet('Cambios Comercios');
+
+    if (rows.length > 0) {
+      // Usar las columnas del primer registro como headers
+      const columnKeys = Object.keys(rows[0]);
+      sheet.columns = columnKeys.map(key => ({
+        header: key.replace(/_/g, ' ').toUpperCase(),
+        key,
+        width: Math.max(key.length + 5, 15),
+      }));
+
+      // Estilo del header
+      sheet.getRow(1).font = { bold: true, size: 11 };
+      sheet.getRow(1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF1E3A5F' },
+      };
+      sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+
+      // Agregar filas
+      for (const row of rows) {
+        sheet.addRow(row);
+      }
+
+      // Auto-filtro
+      sheet.autoFilter = {
+        from: { row: 1, column: 1 },
+        to: { row: 1, column: columnKeys.length },
+      };
+    } else {
+      sheet.addRow(['No se encontraron registros para el rango seleccionado']);
+    }
+
+    // Enviar como descarga
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=cambios_comercios_${new Date().toISOString().slice(0, 10)}.xlsx`);
+
+    await workbook.xlsx.write(res);
+    res.end();
   } catch (err: any) {
-    console.error('[Transactions] Error:', err.message);
+    console.error('[Transactions] Error commerce-changes-export:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
