@@ -71,11 +71,14 @@ router.get('/methods', async (_req: AuthenticatedRequest, res: Response) => {
     if (cached) return res.json(cached);
 
     const methods = await mysqlQuery(
-      `SELECT DISTINCT method FROM payment WHERE method IS NOT NULL AND method != '' ORDER BY method ASC LIMIT 50`
+      `SELECT DISTINCT p.method, p.country 
+       FROM payment p 
+       WHERE p.method IS NOT NULL AND p.method != '' 
+       ORDER BY p.country ASC, p.method ASC 
+       LIMIT 200`
     );
-    const result = methods.map((m: any) => m.method);
-    setCache(cacheKey, result, 30 * 60 * 1000); // 30 min
-    res.json(result);
+    setCache(cacheKey, methods, 30 * 60 * 1000); // 30 min
+    res.json(methods);
   } catch (err: any) {
     console.error('[Transactions] Error fetching methods:', err.message);
     res.status(500).json({ error: 'Error al consultar métodos.' });
@@ -104,7 +107,11 @@ router.get('/daily-trend', async (req: AuthenticatedRequest, res: Response) => {
     if (date_from) { dateFilter += ' AND p.created_at >= ?'; params.push(date_from); }
     else { dateFilter += ' AND p.created_at >= ?'; const d = new Date(); d.setDate(d.getDate() - 30); params.push(d.toISOString().slice(0, 10)); }
     if (date_to) { dateFilter += ' AND p.created_at <= ?'; params.push(formatDateTo(date_to)); }
-    if (method) { dateFilter += ' AND p.method = ?'; params.push(method); }
+    if (method) {
+      const methods = method.split(',').map(m => m.trim()).filter(Boolean);
+      if (methods.length === 1) { dateFilter += ' AND p.method = ?'; params.push(methods[0]); }
+      else if (methods.length > 1) { dateFilter += ` AND p.method IN (${methods.map(() => '?').join(',')})`; params.push(...methods); }
+    }
 
     const data = await mysqlQuery(
       `SELECT 
@@ -250,7 +257,11 @@ router.get('/summary-multi', async (req: AuthenticatedRequest, res: Response) =>
     let dateFilter = '';
     if (date_from) { dateFilter += ' AND p.created_at >= ?'; params.push(date_from); }
     if (date_to) { dateFilter += ' AND p.created_at <= ?'; params.push(formatDateTo(date_to)); }
-    if (method) { dateFilter += ' AND p.method = ?'; params.push(method); }
+    if (method) {
+      const methods = method.split(',').map(m => m.trim()).filter(Boolean);
+      if (methods.length === 1) { dateFilter += ' AND p.method = ?'; params.push(methods[0]); }
+      else if (methods.length > 1) { dateFilter += ` AND p.method IN (${methods.map(() => '?').join(',')})`; params.push(...methods); }
+    }
 
     const data = await mysqlQuery(
       `SELECT c.id, c.name, c.country,

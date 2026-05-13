@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -98,7 +98,7 @@ export default function ReportsPage() {
 
   const set = (field: string, value: string) => setFilters(f => ({ ...f, [field]: value }));
 
-  // ── Task report ────────────────────────────────────────────────────────────
+  // â”€â”€ Task report â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const { data: taskReport, isLoading: taskLoading } = useQuery({
     queryKey: ['reports', 'tasks', taskFilters],
     queryFn: () => api.get('/reports/tasks', { params: taskFilters }).then(r => r.data),
@@ -157,7 +157,7 @@ export default function ReportsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Reportes</h1>
-        <p className="text-gray-500 text-sm mt-1">Análisis y exportación de datos</p>
+        <p className="text-gray-500 text-sm mt-1">AnÃ¡lisis y exportaciÃ³n de datos</p>
       </div>
 
       {/* Summary Charts */}
@@ -271,10 +271,10 @@ export default function ReportsPage() {
             <option value="low">Bajo</option>
             <option value="medium">Medio</option>
             <option value="high">Alto</option>
-            <option value="critical">Crítico</option>
+            <option value="critical">CrÃ­tico</option>
           </select>
           <select className="input w-auto text-sm" value={filters.onboarding_assigned_to} onChange={e => set('onboarding_assigned_to', e.target.value)}>
-            <option value="">Todos los técnicos Onboarding</option>
+            <option value="">Todos los tÃ©cnicos Onboarding</option>
             {(onboardingUsers || []).map((u: any) => (
               <option key={u.id} value={u.id}>{u.first_name} {u.last_name}</option>
             ))}
@@ -293,7 +293,7 @@ export default function ReportsPage() {
                 <th className="table-header">Estado</th>
                 <th className="table-header">MCC</th>
                 <th className="table-header">Score</th>
-                <th className="table-header">País</th>
+                <th className="table-header">PaÃ­s</th>
                 <th className="table-header">Resp. Onboarding</th>
               </tr>
             </thead>
@@ -316,7 +316,7 @@ export default function ReportsPage() {
                   <td className="table-cell font-mono text-xs">{m.mcc_code}</td>
                   <td className="table-cell">{m.score}</td>
                   <td className="table-cell">{m.country}</td>
-                  <td className="table-cell text-xs text-gray-500">{m.onboarding_assigned_to_name || '—'}</td>
+                  <td className="table-cell text-xs text-gray-500">{m.onboarding_assigned_to_name || 'â€”'}</td>
                 </tr>
               ); })}
             </tbody>
@@ -329,9 +329,9 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      {/* ══════════════════════════════════════════════════════════════════════
+      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           REPORTE DE TAREAS POR USUARIO
-      ══════════════════════════════════════════════════════════════════════ */}
+      â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
       <div className="card">
         {/* Header */}
         <div className="flex flex-wrap items-center gap-3 mb-5">
@@ -418,7 +418,7 @@ export default function ReportsPage() {
           </div>
         ) : (
           <>
-            {/* ── Gráficos ── */}
+            {/* â”€â”€ GrÃ¡ficos â”€â”€ */}
             {taskSummary.length > 0 && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
 
@@ -483,7 +483,7 @@ export default function ReportsPage() {
               </div>
             )}
 
-            {/* ── Tabla resumen ── */}
+            {/* â”€â”€ Tabla resumen â”€â”€ */}
             {taskSummary.length > 0 && (
               <div className="mb-6">
                 <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
@@ -497,10 +497,10 @@ export default function ReportsPage() {
                         <th className="table-header">Usuario</th>
                         <th className="table-header">Rol</th>
                         <th className="table-header text-right">Total</th>
-                        <th className="table-header text-right">✅ Completadas</th>
-                        <th className="table-header text-right">🔵 En Progreso</th>
-                        <th className="table-header text-right">🟡 Pendientes</th>
-                        <th className="table-header text-right">🔴 Canceladas</th>
+                        <th className="table-header text-right">âœ… Completadas</th>
+                        <th className="table-header text-right">ðŸ”µ En Progreso</th>
+                        <th className="table-header text-right">ðŸŸ¡ Pendientes</th>
+                        <th className="table-header text-right">ðŸ”´ Canceladas</th>
                         <th className="table-header text-right">% Completado</th>
                         <th className="table-header text-right">Hrs Prom.</th>
                       </tr>
@@ -535,7 +535,7 @@ export default function ReportsPage() {
                             </div>
                           </td>
                           <td className="table-cell text-right text-gray-500">
-                            {u.avg_hours_to_complete ? u.avg_hours_to_complete + 'h' : '—'}
+                            {u.avg_hours_to_complete ? u.avg_hours_to_complete + 'h' : 'â€”'}
                           </td>
                         </tr>
                       ))}
@@ -545,7 +545,7 @@ export default function ReportsPage() {
               </div>
             )}
 
-            {/* ── Detalle de tareas ── */}
+            {/* â”€â”€ Detalle de tareas â”€â”€ */}
             {taskReport?.tasks?.length > 0 && (
               <div>
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">
@@ -590,19 +590,19 @@ export default function ReportsPage() {
                             </span>
                           </td>
                           <td className="table-cell text-xs text-gray-500 truncate max-w-[120px]">
-                            {t.merchant_name || '—'}
+                            {t.merchant_name || 'â€”'}
                           </td>
                           <td className="table-cell text-xs text-gray-500">
-                            {t.created_at ? new Date(t.created_at).toLocaleDateString('es-PE') : '—'}
+                            {t.created_at ? new Date(t.created_at).toLocaleDateString('es-PE') : 'â€”'}
                           </td>
                           <td className="table-cell text-xs text-gray-500">
-                            {t.completed_at ? new Date(t.completed_at).toLocaleDateString('es-PE') : '—'}
+                            {t.completed_at ? new Date(t.completed_at).toLocaleDateString('es-PE') : 'â€”'}
                           </td>
                           <td className="table-cell text-xs">
-                            {t.timeliness === 'on_time'    && <span className="text-emerald-600 font-medium">✓ A tiempo</span>}
-                            {t.timeliness === 'late'       && <span className="text-red-500 font-medium">✗ Tarde</span>}
-                            {t.timeliness === 'overdue'    && <span className="text-orange-500 font-medium">⚠ Vencida</span>}
-                            {t.timeliness === 'no_deadline'&& <span className="text-gray-400">— Sin fecha</span>}
+                            {t.timeliness === 'on_time'    && <span className="text-emerald-600 font-medium">âœ“ A tiempo</span>}
+                            {t.timeliness === 'late'       && <span className="text-red-500 font-medium">âœ— Tarde</span>}
+                            {t.timeliness === 'overdue'    && <span className="text-orange-500 font-medium">âš  Vencida</span>}
+                            {t.timeliness === 'no_deadline'&& <span className="text-gray-400">â€” Sin fecha</span>}
                           </td>
                         </tr>
                       ))}
@@ -622,13 +622,13 @@ export default function ReportsPage() {
         )}
       </div>
 
-      {/* ── Monitoreo de Transacciones ─────────────────────────────────────────── */}
+      {/* â”€â”€ Monitoreo de Transacciones â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <MonitoringSection />
     </div>
   );
 }
 
-// ─── Modal popup para comercios con "Acta de entrega" / "Finalizado" ──────────
+// â”€â”€â”€ Modal popup para comercios con "Acta de entrega" / "Finalizado" â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function MerchantHoverCell({ name, merchantId }: { name: string; merchantId: string }) {
   const [open, setOpen] = useState(false);
   const [modalDateFrom, setModalDateFrom] = useState('');
@@ -675,9 +675,9 @@ function MerchantHoverCell({ name, merchantId }: { name: string; merchantId: str
             <div className="flex items-center justify-between mb-3">
               <div>
                 <h3 className="text-lg font-bold text-gray-900">{data?.name || name}</h3>
-                <p className="text-sm text-gray-500">{data?.country || ''} — ID: {merchantId}</p>
+                <p className="text-sm text-gray-500">{data?.country || ''} â€” ID: {merchantId}</p>
               </div>
-              <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold">✕</button>
+              <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold">âœ•</button>
             </div>
 
             {/* Filtros de fecha */}
@@ -694,17 +694,17 @@ function MerchantHoverCell({ name, merchantId }: { name: string; merchantId: str
                 <button onClick={() => { setModalDateFrom(''); setModalDateTo(''); }} className="text-xs text-gray-400 hover:text-gray-600 pb-2">Limpiar</button>
               )}
               {!modalDateFrom && !modalDateTo && (
-                <span className="text-xs text-gray-400 pb-2">Últimos 30 días por defecto</span>
+                <span className="text-xs text-gray-400 pb-2">Ãšltimos 30 dÃ­as por defecto</span>
               )}
             </div>
 
             {isLoading ? (
               <div className="text-center py-8 text-gray-400">Cargando transacciones...</div>
             ) : total === 0 ? (
-              <div className="text-center py-8 text-gray-400">Sin transacciones en este período</div>
+              <div className="text-center py-8 text-gray-400">Sin transacciones en este perÃ­odo</div>
             ) : (
               <>
-                {/* Gráfico circular */}
+                {/* GrÃ¡fico circular */}
                 <div className="flex items-center justify-center mb-4">
                   <ResponsiveContainer width={160} height={160}>
                     <PieChart>
@@ -737,16 +737,16 @@ function MerchantHoverCell({ name, merchantId }: { name: string; merchantId: str
                     <p className="text-lg font-bold text-gray-900">{data?.currency || '$'} {Number(data?.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                   </div>
                   <div className="bg-gray-50 rounded-lg p-3">
-                    <p className="text-xs text-gray-500">Primera Transacción</p>
-                    <p className="text-sm font-medium text-gray-700">{data?.first_date ? new Date(data.first_date).toLocaleDateString('es-PE') : '—'}</p>
+                    <p className="text-xs text-gray-500">Primera TransacciÃ³n</p>
+                    <p className="text-sm font-medium text-gray-700">{data?.first_date ? new Date(data.first_date).toLocaleDateString('es-PE') : 'â€”'}</p>
                   </div>
                   <div className="bg-gray-50 rounded-lg p-3">
-                    <p className="text-xs text-gray-500">Última Transacción</p>
-                    <p className="text-sm font-medium text-gray-700">{data?.last_date ? new Date(data.last_date).toLocaleDateString('es-PE') : '—'}</p>
+                    <p className="text-xs text-gray-500">Ãšltima TransacciÃ³n</p>
+                    <p className="text-sm font-medium text-gray-700">{data?.last_date ? new Date(data.last_date).toLocaleDateString('es-PE') : 'â€”'}</p>
                   </div>
                 </div>
 
-                {/* Gráfico lineal de tendencia */}
+                {/* GrÃ¡fico lineal de tendencia */}
                 {modalTrend?.data?.length > 1 && (
                   <div className="mb-4">
                     <h4 className="text-sm font-semibold text-gray-700 mb-2">Tendencia Diaria</h4>
@@ -767,7 +767,7 @@ function MerchantHoverCell({ name, merchantId }: { name: string; merchantId: str
                 {/* Tabla por tipo */}
                 {data?.summary?.length > 0 && (
                   <div>
-                    <h4 className="text-sm font-semibold text-gray-700 mb-2">Por Tipo de Transacción</h4>
+                    <h4 className="text-sm font-semibold text-gray-700 mb-2">Por Tipo de TransacciÃ³n</h4>
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
@@ -782,9 +782,9 @@ function MerchantHoverCell({ name, merchantId }: { name: string; merchantId: str
                         <tbody>
                           {data.summary.map((s: any, i: number) => (
                             <tr key={i} className="border-b border-gray-50">
-                              <td className="px-3 py-2 font-medium">{s.type || '—'}</td>
+                              <td className="px-3 py-2 font-medium">{s.type || 'â€”'}</td>
                               <td className="px-3 py-2">
-                                <span className={`text-xs font-medium ${s.status === 'success' ? 'text-emerald-600' : s.status === 'pending' ? 'text-yellow-600' : 'text-red-500'}`}>{s.status || '—'}</span>
+                                <span className={`text-xs font-medium ${s.status === 'success' ? 'text-emerald-600' : s.status === 'pending' ? 'text-yellow-600' : 'text-red-500'}`}>{s.status || 'â€”'}</span>
                               </td>
                               <td className="px-3 py-2 text-right">{Number(s.total_transactions).toLocaleString()}</td>
                               <td className="px-3 py-2 text-right font-mono">{data.currency} {Number(s.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
@@ -815,7 +815,7 @@ function MerchantHoverCell({ name, merchantId }: { name: string; merchantId: str
 function MonitoringSection() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [countryFilter, setCountryFilter] = useState('');
-  const [methodFilter, setMethodFilter] = useState('');
+  const [selectedMethods, setSelectedMethods] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
@@ -829,19 +829,19 @@ function MonitoringSection() {
     queryFn: () => api.get('/transactions/methods').then(r => r.data),
   });
 
-  // Países únicos
+  // PaÃ­ses Ãºnicos
   const countries = Array.from(new Set((commerces || []).map((c: any) => c.country).filter(Boolean))).sort() as string[];
 
-  // Comercios filtrados por país
+  // Comercios filtrados por paÃ­s
   const filteredCommerces = countryFilter
     ? (commerces || []).filter((c: any) => c.country === countryFilter)
     : (commerces || []);
 
   // Query multi-comercio
   const { data: multiSummary, isLoading: multiLoading } = useQuery({
-    queryKey: ['tx-summary-multi', selectedIds.join(','), dateFrom, dateTo, methodFilter],
+    queryKey: ['tx-summary-multi', selectedIds.join(','), dateFrom, dateTo, selectedMethods.join(',')],
     queryFn: () => api.get('/transactions/summary-multi', {
-      params: { ids: selectedIds.join(','), date_from: dateFrom || undefined, date_to: dateTo || undefined, method: methodFilter || undefined }
+      params: { ids: selectedIds.join(','), date_from: dateFrom || undefined, date_to: dateTo || undefined, method: selectedMethods.join(',') || undefined }
     }).then(r => r.data),
     enabled: selectedIds.length > 0,
     staleTime: 5 * 60 * 1000, // 5 min cache
@@ -864,11 +864,11 @@ function MonitoringSection() {
     enabled: selectedIds.length === 1,
   });
 
-  // Query tendencia diaria (gráfico lineal)
+  // Query tendencia diaria (grÃ¡fico lineal)
   const { data: dailyTrend } = useQuery({
-    queryKey: ['tx-daily-trend', selectedIds.join(','), dateFrom, dateTo, methodFilter],
+    queryKey: ['tx-daily-trend', selectedIds.join(','), dateFrom, dateTo, selectedMethods.join(',')],
     queryFn: () => api.get('/transactions/daily-trend', {
-      params: { ids: selectedIds.join(','), date_from: dateFrom || undefined, date_to: dateTo || undefined, method: methodFilter || undefined }
+      params: { ids: selectedIds.join(','), date_from: dateFrom || undefined, date_to: dateTo || undefined, method: selectedMethods.join(',') || undefined }
     }).then(r => r.data),
     enabled: selectedIds.length > 0,
     staleTime: 5 * 60 * 1000, // 5 min cache
@@ -890,7 +890,7 @@ function MonitoringSection() {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-lg font-bold text-gray-900">Monitoreo de Transacciones</h2>
-          <p className="text-sm text-gray-500">Datos en tiempo real de la base de producción</p>
+          <p className="text-sm text-gray-500">Datos en tiempo real de la base de producciÃ³n</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -953,7 +953,7 @@ function MonitoringSection() {
       {/* Filtros */}
       <div className="flex flex-wrap gap-3 mb-4 p-3 bg-gray-50 rounded-lg items-end">
         <div>
-          <label className="text-xs text-gray-500 block mb-1">País</label>
+          <label className="text-xs text-gray-500 block mb-1">PaÃ­s</label>
           <select
             className="input text-sm w-32"
             value={countryFilter}
@@ -966,17 +966,30 @@ function MonitoringSection() {
           </select>
         </div>
         <div>
-          <label className="text-xs text-gray-500 block mb-1">Pasarela</label>
-          <select
-            className="input text-sm w-40"
-            value={methodFilter}
-            onChange={e => setMethodFilter(e.target.value)}
-          >
-            <option value="">Todas</option>
-            {(methods || []).map((m: string) => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </select>
+          <label className="text-xs text-gray-500 block mb-1">Pasarelas {selectedMethods.length > 0 && `(${selectedMethods.length})`}</label>
+          <details className="relative">
+            <summary className="input text-sm w-44 cursor-pointer truncate">{selectedMethods.length === 0 ? 'Todas' : selectedMethods.join(', ')}</summary>
+            <div className="absolute z-40 top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-2 w-56 max-h-48 overflow-y-auto">
+              {selectedMethods.length > 0 && (
+                <button onClick={() => setSelectedMethods([])} className="text-xs text-gray-400 hover:text-gray-600 mb-1 block">Limpiar</button>
+              )}
+              {((methods || []) as any[])
+                .filter((m: any) => !countryFilter || m.country === countryFilter)
+                .map((m: any) => m.method)
+                .filter((v: string, i: number, a: string[]) => a.indexOf(v) === i)
+                .map((method: string) => (
+                <label key={method} className="flex items-center gap-1.5 text-xs p-1 rounded hover:bg-gray-50 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedMethods.includes(method)}
+                    onChange={() => setSelectedMethods(prev => prev.includes(method) ? prev.filter(x => x !== method) : [...prev, method])}
+                    className="w-3 h-3 rounded border-gray-300 text-pink-500 focus:ring-pink-500"
+                  />
+                  <span className="truncate">{method}</span>
+                </label>
+              ))}
+            </div>
+          </details>
         </div>
         <div>
           <label className="text-xs text-gray-500 block mb-1">Comercios ({selectedIds.length} seleccionados)</label>
@@ -1008,7 +1021,7 @@ function MonitoringSection() {
                   className="w-3 h-3 rounded border-gray-300 text-pink-500 focus:ring-pink-500"
                 />
                 <span className="truncate">{c.name}</span>
-                <span className="text-gray-400 flex-shrink-0">({c.country || '—'})</span>
+                <span className="text-gray-400 flex-shrink-0">({c.country || 'â€”'})</span>
               </label>
             ))}
           </div>
@@ -1019,7 +1032,7 @@ function MonitoringSection() {
 
       {multiLoading && <div className="text-center py-4 text-gray-400">Consultando transacciones...</div>}
 
-      {/* Gráfico lineal de tendencia diaria */}
+      {/* GrÃ¡fico lineal de tendencia diaria */}
       {selectedIds.length >= 1 && dailyTrend?.data?.length > 0 && (
         <div className="mb-4">
           <h4 className="text-sm font-semibold text-gray-700 mb-3">Tendencia Diaria de Transacciones</h4>
@@ -1038,7 +1051,7 @@ function MonitoringSection() {
         </div>
       )}
 
-      {/* Gráfico comparativo (múltiples comercios) */}
+      {/* GrÃ¡fico comparativo (mÃºltiples comercios) */}
       {selectedIds.length >= 1 && multiSummary?.data?.length > 0 && (
         <div className="space-y-4">
           <div>
@@ -1066,7 +1079,7 @@ function MonitoringSection() {
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
                   <th className="table-header">Comercio</th>
-                  <th className="table-header">País</th>
+                  <th className="table-header">PaÃ­s</th>
                   <th className="table-header text-right">Total</th>
                   <th className="table-header text-right">Exitosas</th>
                   <th className="table-header text-right">Pendientes</th>
@@ -1078,7 +1091,7 @@ function MonitoringSection() {
                 {multiSummary.data.map((c: any) => (
                   <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50">
                     <td className="table-cell font-medium text-gray-900">{c.name}</td>
-                    <td className="table-cell text-gray-500">{c.country || '—'}</td>
+                    <td className="table-cell text-gray-500">{c.country || 'â€”'}</td>
                     <td className="table-cell text-right font-semibold">{Number(c.total_transactions).toLocaleString()}</td>
                     <td className="table-cell text-right text-emerald-600">{Number(c.success_count || 0).toLocaleString()}</td>
                     <td className="table-cell text-right text-yellow-600">{Number(c.pending_count || 0).toLocaleString()}</td>
@@ -1090,10 +1103,10 @@ function MonitoringSection() {
             </table>
           </div>
 
-          {/* Gráficos circulares por comercio */}
+          {/* GrÃ¡ficos circulares por comercio */}
           {multiSummary.data.length > 0 && (
             <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-3">Distribución por Comercio</h4>
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">DistribuciÃ³n por Comercio</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {multiSummary.data.filter((c: any) => Number(c.total_transactions) > 0).map((c: any) => {
                   const pieData = [
@@ -1146,19 +1159,19 @@ function MonitoringSection() {
               <p className="text-xl font-bold text-gray-900">{summary.currency || '$'} {Number(summary.totals?.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
             </div>
             <div className="bg-gray-50 rounded-lg p-3">
-              <p className="text-xs text-gray-500">Primera Transacción</p>
-              <p className="text-sm font-medium text-gray-700">{summary.totals?.first_date ? new Date(summary.totals.first_date).toLocaleDateString('es-PE') : '—'}</p>
+              <p className="text-xs text-gray-500">Primera TransacciÃ³n</p>
+              <p className="text-sm font-medium text-gray-700">{summary.totals?.first_date ? new Date(summary.totals.first_date).toLocaleDateString('es-PE') : 'â€”'}</p>
             </div>
             <div className="bg-gray-50 rounded-lg p-3">
-              <p className="text-xs text-gray-500">Última Transacción</p>
-              <p className="text-sm font-medium text-gray-700">{summary.totals?.last_date ? new Date(summary.totals.last_date).toLocaleDateString('es-PE') : '—'}</p>
+              <p className="text-xs text-gray-500">Ãšltima TransacciÃ³n</p>
+              <p className="text-sm font-medium text-gray-700">{summary.totals?.last_date ? new Date(summary.totals.last_date).toLocaleDateString('es-PE') : 'â€”'}</p>
             </div>
           </div>
 
           {/* Por tipo */}
           {summary.summary?.length > 0 && (
             <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">Por Tipo de Transacción</h4>
+              <h4 className="text-sm font-semibold text-gray-700 mb-2">Por Tipo de TransacciÃ³n</h4>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -1173,9 +1186,9 @@ function MonitoringSection() {
                   <tbody>
                     {summary.summary.map((s: any, i: number) => (
                       <tr key={i} className="border-b border-gray-50">
-                        <td className="table-cell font-medium">{s.type || '—'}</td>
+                        <td className="table-cell font-medium">{s.type || 'â€”'}</td>
                         <td className="table-cell">
-                          <span className={`text-xs font-medium ${s.status === 'success' ? 'text-emerald-600' : s.status === 'pending' ? 'text-yellow-600' : 'text-red-500'}`}>{s.status || '—'}</span>
+                          <span className={`text-xs font-medium ${s.status === 'success' ? 'text-emerald-600' : s.status === 'pending' ? 'text-yellow-600' : 'text-red-500'}`}>{s.status || 'â€”'}</span>
                         </td>
                         <td className="table-cell">{Number(s.total_transactions).toLocaleString()}</td>
                         <td className="table-cell font-mono">{summary.currency || '$'} {Number(s.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
@@ -1195,17 +1208,17 @@ function MonitoringSection() {
             </div>
           )}
 
-          {/* Últimos movimientos */}
+          {/* Ãšltimos movimientos */}
           {movements?.data?.length > 0 && (
             <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">Últimos Pagos</h4>
+              <h4 className="text-sm font-semibold text-gray-700 mb-2">Ãšltimos Pagos</h4>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-100">
                       <th className="table-header">Fecha</th>
                       <th className="table-header">Tipo</th>
-                      <th className="table-header">Método</th>
+                      <th className="table-header">MÃ©todo</th>
                       <th className="table-header">Monto</th>
                       <th className="table-header">Estado</th>
                       <th className="table-header">UID</th>
@@ -1216,16 +1229,16 @@ function MonitoringSection() {
                     {movements.data.map((m: any) => (
                       <tr key={m.id} className="border-b border-gray-50">
                         <td className="table-cell text-xs">{new Date(m.created_at).toLocaleString('es-PE')}</td>
-                        <td className="table-cell">{m.type || '—'}</td>
-                        <td className="table-cell text-xs">{m.method || '—'}</td>
+                        <td className="table-cell">{m.type || 'â€”'}</td>
+                        <td className="table-cell text-xs">{m.method || 'â€”'}</td>
                         <td className="table-cell font-mono">{summary?.currency || '$'} {Number(m.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                         <td className="table-cell">
                           <span className={`text-xs font-medium ${m.status === 'success' ? 'text-emerald-600' : m.status === 'pending' ? 'text-yellow-600' : 'text-red-500'}`}>
-                            {m.status || '—'}
+                            {m.status || 'â€”'}
                           </span>
                         </td>
-                        <td className="table-cell text-xs font-mono text-gray-500">{m.uid || '—'}</td>
-                        <td className="table-cell text-xs font-mono text-gray-500">{m.reference || '—'}</td>
+                        <td className="table-cell text-xs font-mono text-gray-500">{m.uid || 'â€”'}</td>
+                        <td className="table-cell text-xs font-mono text-gray-500">{m.reference || 'â€”'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1238,7 +1251,7 @@ function MonitoringSection() {
       )}
 
       {selectedIds.length === 0 && !isLoading && (
-        <div className="text-center py-8 text-gray-400">Selecciona uno o más comercios para ver sus transacciones</div>
+        <div className="text-center py-8 text-gray-400">Selecciona uno o mÃ¡s comercios para ver sus transacciones</div>
       )}
     </div>
   );
