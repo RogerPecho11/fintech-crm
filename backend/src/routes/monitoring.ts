@@ -77,7 +77,7 @@ router.get('/daily-volume', async (req: AuthenticatedRequest, res: Response) => 
     res.json(result);
   } catch (err: any) {
     console.error('[Monitoring] daily-volume error:', err.message);
-    res.status(500).json({ error: err.message });
+    res.json({ payin: [], payout: [] });
   }
 });
 
@@ -114,7 +114,7 @@ router.get('/by-commerce', async (req: AuthenticatedRequest, res: Response) => {
     res.json(result);
   } catch (err: any) {
     console.error('[Monitoring] by-commerce error:', err.message);
-    res.status(500).json({ error: err.message });
+    res.json({ payin: [], payout: [] });
   }
 });
 
@@ -145,7 +145,7 @@ router.get('/by-method', async (req: AuthenticatedRequest, res: Response) => {
     res.json(results);
   } catch (err: any) {
     console.error('[Monitoring] by-method error:', err.message);
-    res.status(500).json({ error: err.message });
+    res.json([]);
   }
 });
 
@@ -180,7 +180,7 @@ router.get('/approval-rate', async (req: AuthenticatedRequest, res: Response) =>
     res.json(results);
   } catch (err: any) {
     console.error('[Monitoring] approval-rate error:', err.message);
-    res.status(500).json({ error: err.message });
+    res.json([]);
   }
 });
 
@@ -237,7 +237,7 @@ router.get('/alerts', async (req: AuthenticatedRequest, res: Response) => {
     res.json(result);
   } catch (err: any) {
     console.error('[Monitoring] alerts error:', err.message);
-    res.status(500).json({ error: err.message });
+    res.json({ inactivity: [], drops: [], payoutTime: [] });
   }
 });
 
@@ -269,7 +269,7 @@ router.get('/payout-time', async (req: AuthenticatedRequest, res: Response) => {
     res.json(results);
   } catch (err: any) {
     console.error('[Monitoring] payout-time error:', err.message);
-    res.status(500).json({ error: err.message });
+    res.json([]);
   }
 });
 
@@ -305,7 +305,7 @@ router.get('/methods-by-commerce', async (req: AuthenticatedRequest, res: Respon
     res.json(result);
   } catch (err: any) {
     console.error('[Monitoring] methods-by-commerce error:', err.message);
-    res.status(500).json({ error: err.message });
+    res.json({ payin: [], payout: [] });
   }
 });
 
