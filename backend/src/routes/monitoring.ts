@@ -29,9 +29,9 @@ const CACHE_5MIN = 5 * 60 * 1000;
 const CACHE_15MIN = 15 * 60 * 1000;
 const CACHE_30MIN = 30 * 60 * 1000;
 
-// Limitar rango de fechas a máximo 31 días para proteger la réplica
+// Limitar rango de fechas a máximo 14 días para proteger la réplica
 function limitDateRange(from: string, to: string): { from: string; to: string } {
-  const maxDays = 31;
+  const maxDays = 14;
   const toDate = new Date(to);
   const fromDate = new Date(from);
   const diffDays = (toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24);
@@ -46,7 +46,7 @@ function limitDateRange(from: string, to: string): { from: string; to: string } 
 router.get('/daily-volume', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { date_from, date_to, commerce_id, country } = req.query as any;
-    const rawFrom = date_from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const rawFrom = date_from || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const rawTo = date_to || new Date().toISOString().slice(0, 10);
     const { from, to } = limitDateRange(rawFrom, rawTo);
 

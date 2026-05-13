@@ -25,18 +25,11 @@ let queryQueue: Promise<any> = Promise.resolve();
 export async function mysqlQuery<T = any>(sql: string, params?: any[]): Promise<T[]> {
   const result = queryQueue.then(async () => {
     try {
-      const conn = await pool.getConnection();
-      try {
-        // Timeout de 20 segundos por query
-        await conn.query('SET SESSION MAX_EXECUTION_TIME=20000');
-        const [rows] = await conn.execute(sql, params);
-        return rows as T[];
-      } finally {
-        conn.release();
-      }
+      const [rows] = await pool.execute(sql, params);
+      return rows as T[];
     } catch (err: any) {
-      if (err.code === 'ETIMEDOUT' || err.code === 'ECONNRESET' || err.code === 'PROTOCOL_CONNECTION_LOST' || err.message?.includes('ETIMEDOUT')) {
-        console.log('[MySQL] Reconectando...');
+      if (err.code === 'ETIMEDOUT' || err.code === 'ECONNRESET' || err.code === 'PROTOCOL_CONNECTION_LOST' || err.message?.includes('ETIMEDOUT') || err.message?.includes('execution time')) {
+        console.log('[MySQL] Reconectando tras error:', err.code || err.message?.slice(0, 50));
         pool = createPool();
         const [rows] = await pool.execute(sql, params);
         return rows as T[];
@@ -44,7 +37,7 @@ export async function mysqlQuery<T = any>(sql: string, params?: any[]): Promise<
       throw err;
     }
   });
-  queryQueue = result.catch(() => {}); // mantener la cola aunque falle
+  queryQueue = result.catch(() => {});
   return result;
 }
 
