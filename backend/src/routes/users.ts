@@ -28,8 +28,8 @@ router.get('/:id', async (req: AuthenticatedRequest, res: Response) => {
   res.json(user);
 });
 
-// POST /api/v1/users (admin only)
-router.post('/', authorize('admin'), [
+// POST /api/v1/users (admin + onboarding)
+router.post('/', authorize('admin', 'onboarding'), [
   body('email').isEmail().normalizeEmail(),
   body('password').isLength({ min: 8 }),
   body('first_name').notEmpty().trim(),
@@ -54,9 +54,9 @@ router.post('/', authorize('admin'), [
   res.status(201).json(user);
 });
 
-// PUT /api/v1/users/:id (admin only)
+// PUT /api/v1/users/:id (admin + onboarding)
 // Supports: first_name, last_name, email, role, phone, is_active, password
-router.put('/:id', authorize('admin'), async (req: AuthenticatedRequest, res: Response) => {
+router.put('/:id', authorize('admin', 'onboarding'), async (req: AuthenticatedRequest, res: Response) => {
   const { first_name, last_name, email, role, phone, is_active, password } = req.body;
 
   const updates: string[] = [];
@@ -94,8 +94,8 @@ router.put('/:id', authorize('admin'), async (req: AuthenticatedRequest, res: Re
   res.json(updated);
 });
 
-// DELETE /api/v1/users/:id (admin only)
-router.delete('/:id', authorize('admin'), async (req: AuthenticatedRequest, res: Response) => {
+// DELETE /api/v1/users/:id (admin + onboarding)
+router.delete('/:id', authorize('admin', 'onboarding'), async (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   const user = req.user!;
 

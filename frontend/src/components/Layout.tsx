@@ -16,7 +16,7 @@ const navItems = [
   { to: '/tasks', icon: CheckSquare, label: 'Tareas',          roles: ['admin', 'onboarding'] },
   { to: '/calendar', icon: Calendar, label: 'Calendario',      roles: ['admin', 'onboarding'] },
   { to: '/reports', icon: BarChart3, label: 'Reportes',        roles: ['admin', 'commercial', 'onboarding'] },
-  { to: '/monitoring', icon: Activity, label: 'Monitoreo',    roles: ['admin'] },
+  { to: '/monitoring', icon: Activity, label: 'Monitoreo',    roles: ['admin', 'onboarding'] },
   { to: '/notifications', icon: Bell, label: 'Notificaciones', roles: ['admin', 'commercial', 'onboarding'] },
 ];
 
@@ -98,7 +98,7 @@ export default function Layout() {
             </NavLink>
           ))}
 
-          {user?.role === 'admin' && (
+          {(user?.role === 'admin' || user?.role === 'onboarding') && (
             <>
               <div className="pt-4 pb-1.5">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-3">
