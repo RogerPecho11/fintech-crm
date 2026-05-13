@@ -726,20 +726,28 @@ function PaySection({ title, entries, available, onAdd, onRemove, onUpdate, ic }
             </button>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-xs text-gray-500 mb-0.5 block">Comisión %</label>
-              <input type="number" className={ic} value={entry.commission} onChange={e => onUpdate(entry.method_id, 'commission', e.target.value)} placeholder="0.00" />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 mb-0.5 block">Tarifa</label>
-              <input type="number" className={ic} value={entry.fee} onChange={e => onUpdate(entry.method_id, 'fee', e.target.value)} placeholder="0.00" />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 mb-0.5 block">Tarifa fija/mín</label>
-              <input type="number" className={ic} value={entry.min_fee} onChange={e => onUpdate(entry.method_id, 'min_fee', e.target.value)} placeholder="0.00" />
-            </div>
+            {!entry.method_name.toLowerCase().includes('tarjeta') && (
+              <>
+                <div>
+                  <label className="text-xs text-gray-500 mb-0.5 block">Comisión %</label>
+                  <input type="number" className={ic} value={entry.commission} onChange={e => onUpdate(entry.method_id, 'commission', e.target.value)} placeholder="0.00" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-0.5 block">Tarifa</label>
+                  <input type="number" className={ic} value={entry.fee} onChange={e => onUpdate(entry.method_id, 'fee', e.target.value)} placeholder="0.00" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-0.5 block">Tarifa fija/mín</label>
+                  <input type="number" className={ic} value={entry.min_fee} onChange={e => onUpdate(entry.method_id, 'min_fee', e.target.value)} placeholder="0.00" />
+                </div>
+              </>
+            )}
             {entry.method_name.toLowerCase().includes('tarjeta') && (
               <>
+                <div>
+                  <label className="text-xs text-gray-500 mb-0.5 block">Tarifa fija/mín</label>
+                  <input type="number" className={ic} value={entry.min_fee} onChange={e => onUpdate(entry.method_id, 'min_fee', e.target.value)} placeholder="0.00" />
+                </div>
                 <div>
                   <label className="text-xs text-gray-500 mb-0.5 block">Tarifa TD</label>
                   <input type="number" className={ic} value={entry.tarifa_td || ''} onChange={e => onUpdate(entry.method_id, 'tarifa_td', e.target.value)} placeholder="0.00" />

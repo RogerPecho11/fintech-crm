@@ -318,32 +318,32 @@ router.get('/report-pdf', async (req: AuthenticatedRequest, res: Response) => {
     res.setHeader('Content-Disposition', `attachment; filename=informe_monitoreo_${commerce.name.replace(/\s+/g, '_')}_${from}_${to}.pdf`);
     doc.pipe(res);
 
-    // Header con fondo de color
-    doc.rect(0, 0, 595, 80).fill('#1E3A5F');
+    // Header con fondo de color ProntoPaga
+    doc.rect(0, 0, 595, 80).fill('#FC2B5F');
     doc.fontSize(22).fillColor('#FFFFFF').text('Informe de Monitoreo', 50, 25, { align: 'center' });
-    doc.fontSize(10).fillColor('#93C5FD').text('ProntoPaga — Sistema de Gestión de Comercios', 50, 52, { align: 'center' });
+    doc.fontSize(10).fillColor('#FFFFFF').text('ProntoPaga — Sistema de Gestión de Comercios', 50, 52, { align: 'center' });
     doc.y = 100;
 
     // Info comercio
-    doc.fontSize(14).fillColor('#1E3A5F').text(commerce.name);
-    doc.fontSize(10).fillColor('#6B7280').text(`País: ${commerce.country} | Moneda: ${currency} | ID: ${commerce.id}`);
+    doc.fontSize(14).fillColor('#111111').text(commerce.name);
+    doc.fontSize(10).fillColor('#A0A0A0').text(`País: ${commerce.country} | Moneda: ${currency} | ID: ${commerce.id}`);
     doc.moveDown(0.3);
-    doc.fontSize(10).fillColor('#374151').text(`Período: ${from}  →  ${to}`);
+    doc.fontSize(10).fillColor('#333333').text(`Período: ${from}  →  ${to}`);
     doc.moveDown(0.8);
 
     // Línea separadora
-    doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor('#E5E7EB').lineWidth(1).stroke();
+    doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor('#A0A0A0').lineWidth(1).stroke();
     doc.moveDown(0.8);
 
-    doc.fontSize(9).fillColor('#374151').text(
+    doc.fontSize(9).fillColor('#333333').text(
       'El presente informe reúne información relevante sobre el comportamiento de las transacciones durante el período analizado, incluyendo métricas de Payins y Payouts, porcentajes de uso de métodos de pago y detalle de estados transaccionales.',
       { align: 'justify' }
     );
     doc.moveDown(1.5);
 
     // ─── Payins Totales ───
-    doc.rect(50, doc.y, 495, 22).fill('#EFF6FF');
-    doc.fontSize(12).fillColor('#1E3A5F').text('  Payins', 50, doc.y + 5);
+    doc.rect(50, doc.y, 495, 22).fill('#FC2B5F');
+    doc.fontSize(12).fillColor('#FFFFFF').text('  Payins', 50, doc.y + 5);
     doc.y += 30;
 
     const payinTotal = payinTotals.reduce((acc: number, r: any) => acc + Number(r.cantidad), 0);
@@ -383,8 +383,8 @@ router.get('/report-pdf', async (req: AuthenticatedRequest, res: Response) => {
         y += 16;
       });
       // Total row
-      doc.rect(startX, y, 450, 16).fill('#F0F9FF');
-      doc.fontSize(9).fillColor('#1E3A5F').font('Helvetica-Bold');
+      doc.rect(startX, y, 450, 16).fill('#F2F2F2');
+      doc.fontSize(9).fillColor('#111111').font('Helvetica-Bold');
       doc.text('Total', startX + 5, y + 4, { width: 170 });
       doc.text(String(total.toLocaleString()), startX + 200, y + 4, { width: 100, align: 'right' });
       doc.text('100%', startX + 320, y + 4, { width: 80, align: 'right' });
@@ -396,7 +396,7 @@ router.get('/report-pdf', async (req: AuthenticatedRequest, res: Response) => {
     doc.moveDown(0.5);
 
     // Volumen por método payin
-    doc.fontSize(11).fillColor('#1E3A5F').text('Volumen por Método de Pago (Payin)');
+    doc.fontSize(11).fillColor('#111111').text('Volumen por Método de Pago (Payin)');
     doc.moveDown(0.3);
     {
       const startX = 50;
@@ -433,8 +433,8 @@ router.get('/report-pdf', async (req: AuthenticatedRequest, res: Response) => {
     // ─── Payouts ───
     if (doc.y > 620) doc.addPage();
     doc.moveDown(1);
-    doc.rect(50, doc.y, 495, 22).fill('#F0FDF4');
-    doc.fontSize(12).fillColor('#166534').text('  Payouts', 50, doc.y + 5);
+    doc.rect(50, doc.y, 495, 22).fill('#2B2B2B');
+    doc.fontSize(12).fillColor('#FFFFFF').text('  Payouts', 50, doc.y + 5);
     doc.y += 30;
 
     const payoutTotal = payoutTotals.reduce((acc: number, r: any) => acc + Number(r.cantidad), 0);
@@ -442,7 +442,7 @@ router.get('/report-pdf', async (req: AuthenticatedRequest, res: Response) => {
     doc.moveDown(0.5);
 
     // Volumen por método payout
-    doc.fontSize(11).fillColor('#1E3A5F').text('Volumen por Método de Pago (Payout)');
+    doc.fontSize(11).fillColor('#111111').text('Volumen por Método de Pago (Payout)');
     doc.moveDown(0.3);
     {
       const startX = 50;
@@ -479,8 +479,8 @@ router.get('/report-pdf', async (req: AuthenticatedRequest, res: Response) => {
     // ─── Gráfico de barras simulado — Tasa de aprobación ───
     if (doc.y > 550) doc.addPage();
     doc.moveDown(1.5);
-    doc.rect(50, doc.y, 495, 22).fill('#ECFDF5');
-    doc.fontSize(11).fillColor('#065F46').text('  Tasa de Aprobación por Método (Payin)', 50, doc.y + 5);
+    doc.rect(50, doc.y, 495, 22).fill('#F2F2F2');
+    doc.fontSize(11).fillColor('#111111').text('  Tasa de Aprobación por Método (Payin)', 50, doc.y + 5);
     doc.y += 30;
 
     (payinVol as any[]).forEach((r: any) => {
@@ -498,8 +498,8 @@ router.get('/report-pdf', async (req: AuthenticatedRequest, res: Response) => {
     // ─── Conclusiones ───
     if (doc.y > 600) doc.addPage();
     doc.moveDown(1.5);
-    doc.rect(50, doc.y, 495, 22).fill('#FEF3C7');
-    doc.fontSize(11).fillColor('#92400E').text('  Conclusiones', 50, doc.y + 5);
+    doc.rect(50, doc.y, 495, 22).fill('#222222');
+    doc.fontSize(11).fillColor('#FFFFFF').text('  Conclusiones', 50, doc.y + 5);
     doc.y += 30;
     doc.fontSize(9).fillColor('#374151');
 
@@ -522,7 +522,7 @@ router.get('/report-pdf', async (req: AuthenticatedRequest, res: Response) => {
 
     // Footer
     doc.moveDown(2);
-    doc.fontSize(8).fillColor('#9CA3AF').text(`Generado automáticamente por ProntoPaga CRM — ${new Date().toLocaleString('es-PE')}`, { align: 'center' });
+    doc.fontSize(8).fillColor('#888888').text(`Generado automáticamente por ProntoPaga CRM — ${new Date().toLocaleString('es-PE')}`, { align: 'center' });
 
     doc.end();
   } catch (err: any) {
