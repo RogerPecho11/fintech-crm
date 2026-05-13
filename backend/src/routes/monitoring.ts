@@ -253,6 +253,241 @@ router.get('/alerts', async (req: AuthenticatedRequest, res: Response) => {
   }
 });
 
+// ─── GET /report-pdf — Genera PDF del informe de monitoreo
+router.get('/report-pdf', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { date_from, date_to, commerce_id } = req.query as any;
+    if (!commerce_id) return res.status(400).json({ error: 'commerce_id requerido' });
+
+    const cid = Number(commerce_id);
+    const from = date_from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const to = date_to || new Date().toISOString().slice(0, 10);
+
+    // Info del comercio
+    const commerceRows = await mysqlQuery(`SELECT id, name, country FROM commerce WHERE id = ? LIMIT 1`, [cid]);
+    if (!commerceRows.length) return res.status(404).json({ error: 'Comercio no encontrado' });
+    const commerce = commerceRows[0];
+    const currency = COUNTRY_CURRENCY[commerce.country?.toUpperCase()] || 'USD';
+    const sym = currency === 'PEN' ? 'S/' : currency === 'CLP' ? '$' : currency === 'BRL' ? 'R$' : '$';
+
+    // Datos payin
+    const payinSql = `SELECT method, status, COUNT(*) as cantidad
+      FROM payment WHERE commerce_id = ? AND deleted_at IS NULL AND created_at BETWEEN ? AND ?
+      GROUP BY method, status ORDER BY method, cantidad DESC`;
+    const payinData = await mysqlQuery(payinSql, [cid, from + ' 00:00:00', to + ' 23:59:59']);
+
+    // Datos payout
+    const payoutSql = `SELECT type as method, status, COUNT(*) as cantidad
+      FROM withdrawal WHERE commerce_id = ? AND deleted_at IS NULL AND created_at BETWEEN ? AND ?
+      GROUP BY type, status ORDER BY type, cantidad DESC`;
+    const payoutData = await mysqlQuery(payoutSql, [cid, from + ' 00:00:00', to + ' 23:59:59']);
+
+    // Totales payin
+    const payinTotalSql = `SELECT status, COUNT(*) as cantidad
+      FROM payment WHERE commerce_id = ? AND deleted_at IS NULL AND created_at BETWEEN ? AND ?
+      GROUP BY status ORDER BY cantidad DESC`;
+    const payinTotals = await mysqlQuery(payinTotalSql, [cid, from + ' 00:00:00', to + ' 23:59:59']);
+
+    // Totales payout
+    const payoutTotalSql = `SELECT status, COUNT(*) as cantidad
+      FROM withdrawal WHERE commerce_id = ? AND deleted_at IS NULL AND created_at BETWEEN ? AND ?
+      GROUP BY status ORDER BY cantidad DESC`;
+    const payoutTotals = await mysqlQuery(payoutTotalSql, [cid, from + ' 00:00:00', to + ' 23:59:59']);
+
+    // Volumen por método payin
+    const payinVolSql = `SELECT method, COUNT(*) as cantidad, COALESCE(SUM(amount), 0) as monto,
+      SUM(CASE WHEN status IN ('success','completed') THEN 1 ELSE 0 END) as aprobadas,
+      SUM(CASE WHEN status IN ('error','canceled','expired','bank_error','authentication_error','rejected') THEN 1 ELSE 0 END) as rechazadas
+      FROM payment WHERE commerce_id = ? AND deleted_at IS NULL AND method IS NOT NULL AND created_at BETWEEN ? AND ?
+      GROUP BY method ORDER BY monto DESC`;
+    const payinVol = await mysqlQuery(payinVolSql, [cid, from + ' 00:00:00', to + ' 23:59:59']);
+
+    // Volumen por método payout
+    const payoutVolSql = `SELECT type as method, COUNT(*) as cantidad, COALESCE(SUM(amount), 0) as monto,
+      SUM(CASE WHEN status IN ('success','completed') THEN 1 ELSE 0 END) as aprobadas,
+      SUM(CASE WHEN status IN ('error','canceled','expired','bank_error','rejected') THEN 1 ELSE 0 END) as rechazadas
+      FROM withdrawal WHERE commerce_id = ? AND deleted_at IS NULL AND type IS NOT NULL AND created_at BETWEEN ? AND ?
+      GROUP BY type ORDER BY monto DESC`;
+    const payoutVol = await mysqlQuery(payoutVolSql, [cid, from + ' 00:00:00', to + ' 23:59:59']);
+
+    // Generar PDF
+    const PDFDocument = require('pdfkit');
+    const doc = new PDFDocument({ size: 'A4', margin: 50 });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=informe_monitoreo_${commerce.name.replace(/\s+/g, '_')}_${from}_${to}.pdf`);
+    doc.pipe(res);
+
+    // Header
+    doc.fontSize(20).fillColor('#1E3A5F').text('Informe de Monitoreo', { align: 'center' });
+    doc.moveDown(0.5);
+    doc.fontSize(10).fillColor('#6B7280').text('ProntoPaga — Sistema de Gestión de Comercios', { align: 'center' });
+    doc.moveDown(1.5);
+
+    // Info comercio
+    doc.fontSize(12).fillColor('#111827').text(`Comercio: ${commerce.name}`);
+    doc.fontSize(10).fillColor('#6B7280').text(`País: ${commerce.country} | Moneda: ${currency}`);
+    doc.text(`Fecha inicio: ${from}`);
+    doc.text(`Fecha término: ${to}`);
+    doc.moveDown(1);
+
+    doc.fontSize(10).fillColor('#374151').text(
+      'El presente informe reúne información relevante sobre el comportamiento de las transacciones durante el período analizado, incluyendo métricas de Payins y Payouts, porcentajes de uso de métodos de pago y detalle de estados transaccionales.',
+      { align: 'justify' }
+    );
+    doc.moveDown(1.5);
+
+    // ─── Payins Totales ───
+    doc.fontSize(14).fillColor('#1E3A5F').text('Payins');
+    doc.moveDown(0.5);
+
+    const payinTotal = payinTotals.reduce((acc: number, r: any) => acc + Number(r.cantidad), 0);
+    // Tabla
+    const drawTable = (data: any[], total: number) => {
+      const startX = 50;
+      let y = doc.y;
+      // Header
+      doc.fontSize(9).fillColor('#6B7280');
+      doc.text('Estado', startX, y, { width: 180 });
+      doc.text('Cantidad', startX + 200, y, { width: 100, align: 'right' });
+      doc.text('Porcentaje', startX + 320, y, { width: 80, align: 'right' });
+      y += 18;
+      doc.moveTo(startX, y).lineTo(startX + 420, y).strokeColor('#E5E7EB').stroke();
+      y += 5;
+
+      doc.fillColor('#111827').fontSize(9);
+      data.forEach((r: any) => {
+        const pct = total > 0 ? (Number(r.cantidad) / total * 100).toFixed(1) : '0.0';
+        doc.text(r.status || 'N/A', startX, y, { width: 180 });
+        doc.text(String(Number(r.cantidad).toLocaleString()), startX + 200, y, { width: 100, align: 'right' });
+        doc.text(pct + '%', startX + 320, y, { width: 80, align: 'right' });
+        y += 16;
+      });
+      // Total
+      doc.moveTo(startX, y).lineTo(startX + 420, y).strokeColor('#E5E7EB').stroke();
+      y += 5;
+      doc.fontSize(9).fillColor('#1E3A5F').font('Helvetica-Bold');
+      doc.text('Total', startX, y, { width: 180 });
+      doc.text(String(total.toLocaleString()), startX + 200, y, { width: 100, align: 'right' });
+      doc.text('100%', startX + 320, y, { width: 80, align: 'right' });
+      doc.font('Helvetica');
+      doc.y = y + 25;
+    };
+
+    drawTable(payinTotals, payinTotal);
+    doc.moveDown(0.5);
+
+    // Volumen por método payin
+    doc.fontSize(11).fillColor('#1E3A5F').text('Volumen por Método de Pago (Payin)');
+    doc.moveDown(0.3);
+    {
+      const startX = 50;
+      let y = doc.y;
+      doc.fontSize(8).fillColor('#6B7280');
+      doc.text('Método', startX, y, { width: 100 });
+      doc.text('Trx', startX + 110, y, { width: 50, align: 'right' });
+      doc.text('Monto', startX + 170, y, { width: 80, align: 'right' });
+      doc.text('Aprobadas', startX + 260, y, { width: 60, align: 'right' });
+      doc.text('Rechazadas', startX + 330, y, { width: 60, align: 'right' });
+      doc.text('Tasa', startX + 400, y, { width: 40, align: 'right' });
+      y += 16;
+      doc.moveTo(startX, y).lineTo(startX + 450, y).strokeColor('#E5E7EB').stroke();
+      y += 4;
+      doc.fillColor('#111827').fontSize(8);
+      (payinVol as any[]).forEach((r: any) => {
+        const t = Number(r.aprobadas) + Number(r.rechazadas);
+        const rate = t > 0 ? (Number(r.aprobadas) / t * 100).toFixed(1) + '%' : 'N/A';
+        const monto = Number(r.monto);
+        const montoStr = monto >= 1000000 ? sym + (monto / 1000000).toFixed(2) + 'M' : monto >= 1000 ? sym + (monto / 1000).toFixed(1) + 'K' : sym + monto.toFixed(0);
+        doc.text(r.method || 'N/A', startX, y, { width: 100 });
+        doc.text(String(Number(r.cantidad).toLocaleString()), startX + 110, y, { width: 50, align: 'right' });
+        doc.text(montoStr, startX + 170, y, { width: 80, align: 'right' });
+        doc.text(String(Number(r.aprobadas).toLocaleString()), startX + 260, y, { width: 60, align: 'right' });
+        doc.text(String(Number(r.rechazadas).toLocaleString()), startX + 330, y, { width: 60, align: 'right' });
+        doc.text(rate, startX + 400, y, { width: 40, align: 'right' });
+        y += 14;
+      });
+      doc.y = y + 10;
+    }
+
+    // ─── Payouts ───
+    if (doc.y > 650) doc.addPage();
+    doc.moveDown(1);
+    doc.fontSize(14).fillColor('#1E3A5F').text('Payouts');
+    doc.moveDown(0.5);
+
+    const payoutTotal = payoutTotals.reduce((acc: number, r: any) => acc + Number(r.cantidad), 0);
+    drawTable(payoutTotals, payoutTotal);
+    doc.moveDown(0.5);
+
+    // Volumen por método payout
+    doc.fontSize(11).fillColor('#1E3A5F').text('Volumen por Método de Pago (Payout)');
+    doc.moveDown(0.3);
+    {
+      const startX = 50;
+      let y = doc.y;
+      doc.fontSize(8).fillColor('#6B7280');
+      doc.text('Método', startX, y, { width: 100 });
+      doc.text('Trx', startX + 110, y, { width: 50, align: 'right' });
+      doc.text('Monto', startX + 170, y, { width: 80, align: 'right' });
+      doc.text('Aprobadas', startX + 260, y, { width: 60, align: 'right' });
+      doc.text('Rechazadas', startX + 330, y, { width: 60, align: 'right' });
+      doc.text('Tasa', startX + 400, y, { width: 40, align: 'right' });
+      y += 16;
+      doc.moveTo(startX, y).lineTo(startX + 450, y).strokeColor('#E5E7EB').stroke();
+      y += 4;
+      doc.fillColor('#111827').fontSize(8);
+      (payoutVol as any[]).forEach((r: any) => {
+        const t = Number(r.aprobadas) + Number(r.rechazadas);
+        const rate = t > 0 ? (Number(r.aprobadas) / t * 100).toFixed(1) + '%' : 'N/A';
+        const monto = Number(r.monto);
+        const montoStr = monto >= 1000000 ? sym + (monto / 1000000).toFixed(2) + 'M' : monto >= 1000 ? sym + (monto / 1000).toFixed(1) + 'K' : sym + monto.toFixed(0);
+        doc.text(r.method || 'N/A', startX, y, { width: 100 });
+        doc.text(String(Number(r.cantidad).toLocaleString()), startX + 110, y, { width: 50, align: 'right' });
+        doc.text(montoStr, startX + 170, y, { width: 80, align: 'right' });
+        doc.text(String(Number(r.aprobadas).toLocaleString()), startX + 260, y, { width: 60, align: 'right' });
+        doc.text(String(Number(r.rechazadas).toLocaleString()), startX + 330, y, { width: 60, align: 'right' });
+        doc.text(rate, startX + 400, y, { width: 40, align: 'right' });
+        y += 14;
+      });
+      doc.y = y + 10;
+    }
+
+    // ─── Conclusiones ───
+    if (doc.y > 600) doc.addPage();
+    doc.moveDown(1.5);
+    doc.fontSize(14).fillColor('#1E3A5F').text('Conclusiones');
+    doc.moveDown(0.5);
+    doc.fontSize(9).fillColor('#374151');
+
+    const totalPayinApproved = (payinVol as any[]).reduce((a: number, r: any) => a + Number(r.aprobadas), 0);
+    const totalPayinRejected = (payinVol as any[]).reduce((a: number, r: any) => a + Number(r.rechazadas), 0);
+    const payinRate = (totalPayinApproved + totalPayinRejected) > 0 ? (totalPayinApproved / (totalPayinApproved + totalPayinRejected) * 100).toFixed(1) : '0';
+
+    const topPayinMethod = (payinVol as any[])[0]?.method || 'N/A';
+    const topPayoutMethod = (payoutVol as any[])[0]?.method || 'N/A';
+
+    const conclusions = [
+      `• Durante el período ${from} al ${to} se procesaron ${payinTotal.toLocaleString()} transacciones de payin y ${payoutTotal.toLocaleString()} de payout.`,
+      `• La tasa de aprobación general de payins fue de ${payinRate}%.`,
+      `• El método de pago más utilizado en payin fue "${topPayinMethod}".`,
+      topPayoutMethod !== 'N/A' ? `• El método de payout más utilizado fue "${topPayoutMethod}".` : '',
+      `• Se recomienda revisar los métodos con tasa de aprobación inferior al 70%.`,
+    ].filter(Boolean);
+
+    conclusions.forEach(c => { doc.text(c); doc.moveDown(0.3); });
+
+    // Footer
+    doc.moveDown(2);
+    doc.fontSize(8).fillColor('#9CA3AF').text(`Generado automáticamente por ProntoPaga CRM — ${new Date().toLocaleString('es-PE')}`, { align: 'center' });
+
+    doc.end();
+  } catch (err: any) {
+    console.error('[Monitoring] report-pdf error:', err.message);
+    res.status(500).json({ error: 'Error al generar PDF: ' + err.message });
+  }
+});
+
 // ─── Legacy endpoints (para evitar 404 de JS cacheado viejo) ──────────────────
 router.get('/by-commerce', (_req: AuthenticatedRequest, res: Response) => res.json({ payin: [], payout: [] }));
 router.get('/payout-time', (_req: AuthenticatedRequest, res: Response) => res.json([]));

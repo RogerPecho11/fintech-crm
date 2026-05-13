@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart, Line, LineChart } from 'recharts';
-import { Activity, RefreshCw, AlertTriangle, Clock, XCircle, TrendingUp } from 'lucide-react';
+import { Activity, RefreshCw, AlertTriangle, Clock, XCircle, TrendingUp, FileText } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../lib/api';
 
@@ -135,10 +135,41 @@ export default function MonitoringPage() {
           <h1 className="text-2xl font-bold text-gray-900">Monitoreo de Transacciones</h1>
           <p className="text-gray-500 text-sm">Datos en tiempo real desde producción</p>
         </div>
-        <button onClick={fetchData} disabled={loading} className="btn-primary flex items-center gap-2">
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          {loading ? 'Cargando...' : 'Consultar'}
-        </button>
+        <div className="flex gap-2">
+          {chartData.length > 0 && (
+            <button
+              onClick={async () => {
+                const toastId = toast.loading('Generando PDF...');
+                try {
+                  const response = await api.get('/monitoring/report-pdf', {
+                    params: { commerce_id: commerceId, date_from: dateFrom, date_to: dateTo },
+                    responseType: 'blob',
+                  });
+                  const blob = new Blob([response.data], { type: 'application/pdf' });
+                  const url = URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.href = url;
+                  const name = commerces.find(c => String(c.id) === commerceId)?.name || 'comercio';
+                  link.download = `informe_monitoreo_${name.replace(/\s+/g, '_')}_${dateFrom}_${dateTo}.pdf`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  URL.revokeObjectURL(url);
+                  toast.success('PDF descargado', { id: toastId });
+                } catch {
+                  toast.error('Error al generar PDF', { id: toastId });
+                }
+              }}
+              className="btn-secondary flex items-center gap-2"
+            >
+              <FileText className="w-4 h-4" /> PDF
+            </button>
+          )}
+          <button onClick={fetchData} disabled={loading} className="btn-primary flex items-center gap-2">
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            {loading ? 'Cargando...' : 'Consultar'}
+          </button>
+        </div>
       </div>
 
       {/* Filtros */}
