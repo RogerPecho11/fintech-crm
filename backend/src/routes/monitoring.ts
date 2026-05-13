@@ -47,6 +47,10 @@ function limitDateRange(from: string, to: string): { from: string; to: string } 
 router.get('/daily-volume', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { date_from, date_to, commerce_id, country } = req.query as any;
+
+    // commerce_id es obligatorio para proteger la réplica
+    if (!commerce_id) return res.json({ payin: [], payout: [] });
+
     const rawFrom = date_from || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const rawTo = date_to || new Date().toISOString().slice(0, 10);
     const { from, to } = limitDateRange(rawFrom, rawTo);
@@ -122,6 +126,8 @@ router.get('/by-commerce', async (req: AuthenticatedRequest, res: Response) => {
 router.get('/by-method', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { date_from, date_to, commerce_id, country } = req.query as any;
+    if (!commerce_id) return res.json([]);
+
     const from = date_from || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const to = date_to || new Date().toISOString().slice(0, 10);
 
@@ -153,6 +159,8 @@ router.get('/by-method', async (req: AuthenticatedRequest, res: Response) => {
 router.get('/approval-rate', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { date_from, date_to, commerce_id, country } = req.query as any;
+    if (!commerce_id) return res.json([]);
+
     const from = date_from || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const to = date_to || new Date().toISOString().slice(0, 10);
 

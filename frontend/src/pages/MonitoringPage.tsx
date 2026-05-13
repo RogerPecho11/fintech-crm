@@ -46,22 +46,23 @@ export default function MonitoringPage() {
   const [methodsByCommerce, setMethodsByCommerce] = useState<{ payin: any[]; payout: any[] }>({ payin: [], payout: [] });
 
   const fetchData = useCallback(async () => {
+    if (!commerceId) {
+      toast.error('Selecciona un comercio para consultar');
+      return;
+    }
     setLoading(true);
     try {
       const params: any = {};
       if (dateFrom) params.date_from = dateFrom;
       if (dateTo) params.date_to = dateTo;
-      if (commerceId) params.commerce_id = commerceId;
+      params.commerce_id = commerceId;
       if (country) params.country = country;
 
       // Cargar secuencialmente para no saturar la réplica
       try { const r = await api.get('/monitoring/daily-volume', { params }); setDailyVolume(r.data); } catch {}
-      try { const r = await api.get('/monitoring/by-commerce', { params }); setByCommerce(r.data); } catch {}
       try { const r = await api.get('/monitoring/by-method', { params }); setByMethod(r.data); } catch {}
       try { const r = await api.get('/monitoring/approval-rate', { params }); setApprovalRate(r.data); } catch {}
-      try { const r = await api.get('/monitoring/alerts'); setAlerts(r.data); } catch {}
       try { const r = await api.get('/monitoring/payout-time', { params }); setPayoutTime(r.data); } catch {}
-      try { const r = await api.get('/monitoring/methods-by-commerce'); setMethodsByCommerce(r.data); } catch {}
     } catch (err) {
       toast.error('Error al cargar datos de monitoreo');
     } finally {
