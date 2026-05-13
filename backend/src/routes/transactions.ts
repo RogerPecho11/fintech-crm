@@ -742,4 +742,137 @@ router.post('/gateway-report-test', async (_req: AuthenticatedRequest, res: Resp
   }
 });
 
+// ─── GET /api/v1/transactions/commerce-changes-export — Excel de cambios en configuración de comercios
+router.get('/commerce-changes-export', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { date_from, date_to } = req.query as Record<string, string>;
+
+    const conditions: string[] = [];
+    const params: any[] = [];
+    let idx = 1;
+
+    if (date_from) { conditions.push(`al.created_at >= $${idx++}`); params.push(date_from); }
+    if (date_to) { conditions.push(`al.created_at <= $${idx++}`); params.push(formatDateTo(date_to)); }
+
+    const where = conditions.length > 0 ? 'AND ' + conditions.join(' AND ') : '';
+
+    const data = await query(
+      `SELECT 
+        al.id,
+        al.action,
+        al.created_at,
+        m.legal_name as merchant_name,
+        m.trade_name,
+        m.country,
+        u.first_name || ' ' || u.last_name as modified_by,
+        al.old_values,
+        al.new_values
+       FROM audit_logs al
+       LEFT JOIN merchants m ON al.merchant_id = m.id
+       LEFT JOIN users u ON al.user_id = u.id
+       WHERE al.entity_type = 'merchant' ${where}
+       ORDER BY al.created_at DESC
+       LIMIT 5000`,
+      params
+    );
+
+    const ExcelJS = require('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Cambios en Comercios');
+
+    sheet.columns = [
+      { header: 'Fecha', key: 'date', width: 20 },
+      { header: 'Comercio', key: 'merchant', width: 30 },
+      { header: 'Nombre Comercial', key: 'trade_name', width: 25 },
+      { header: 'País', key: 'country', width: 12 },
+      { header: 'Acción', key: 'action', width: 18 },
+      { header: 'Modificado por', key: 'modified_by', width: 22 },
+      { header: 'Campos Modificados', key: 'fields_changed', width: 40 },
+      { header: 'Valores Anteriores', key: 'old_values', width: 50 },
+      { header: 'Valores Nuevos', key: 'new_values', width: 50 },
+    ];
+
+    sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFC2B5F' } };
+    sheet.getRow(1).alignment = { vertical: 'middle', horizontal: 'center' };
+    sheet.getRow(1).height = 22;
+
+    for (const row of data as any[]) {
+      // Detectar campos que cambiaron
+      let fieldsChanged = '';
+      let oldVals = '';
+      let newVals = '';
+
+      if (row.action === 'UPDATE' && row.old_values && row.new_values) {
+        const oldObj = typeof row.old_values === 'string' ? JSON.parse(row.old_values) : row.old_values;
+        const newObj = typeof row.new_values === 'string' ? JSON.parse(row.new_values) : row.new_values;
+        const changed: string[] = [];
+        const oldChanges: string[] = [];
+        const newChanges: string[] = [];
+
+        for (const key of Object.keys(newObj)) {
+          if (JSON.stringify(oldObj[key]) !== JSON.stringify(newObj[key])) {
+            changed.push(key);
+            oldChanges.push(`${key}: ${oldObj[key] ?? '—'}`);
+            newChanges.push(`${key}: ${newObj[key] ?? '—'}`);
+          }
+        }
+        fieldsChanged = changed.join(', ');
+        oldVals = oldChanges.join(' | ');
+        newVals = newChanges.join(' | ');
+      } else if (row.action === 'CREATE') {
+        fieldsChanged = 'Creación de comercio';
+        newVals = row.new_values ? `legal_name: ${(typeof row.new_values === 'string' ? JSON.parse(row.new_values) : row.new_values).legal_name || '—'}` : '';
+      } else if (row.action === 'STATUS_CHANGE') {
+        const oldObj = typeof row.old_values === 'string' ? JSON.parse(row.old_values) : (row.old_values || {});
+        const newObj = typeof row.new_values === 'string' ? JSON.parse(row.new_values) : (row.new_values || {});
+        fieldsChanged = 'status';
+        oldVals = `status: ${oldObj.status || '—'}`;
+        newVals = `status: ${newObj.status || '—'}`;
+      }
+
+      const r = sheet.addRow({
+        date: row.created_at ? new Date(row.created_at).toLocaleString('es-PE') : '—',
+        merchant: row.merchant_name || '—',
+        trade_name: row.trade_name || '—',
+        country: row.country || '—',
+        action: row.action === 'CREATE' ? 'Creación' : row.action === 'UPDATE' ? 'Actualización' : row.action === 'STATUS_CHANGE' ? 'Cambio de Estado' : row.action,
+        modified_by: row.modified_by || '—',
+        fields_changed: fieldsChanged,
+        old_values: oldVals,
+        new_values: newVals,
+      });
+
+      if (r.number % 2 === 0) {
+        r.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } };
+      }
+
+      // Color por acción
+      const actionCell = r.getCell('action');
+      if (row.action === 'CREATE') actionCell.font = { color: { argb: 'FF16A34A' }, bold: true };
+      else if (row.action === 'STATUS_CHANGE') actionCell.font = { color: { argb: 'FF3B82F6' }, bold: true };
+      else actionCell.font = { color: { argb: 'FFF59E0B' }, bold: true };
+    }
+
+    sheet.eachRow((row: any) => {
+      row.eachCell((cell: any) => {
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+          bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+          left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+          right: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        };
+      });
+    });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=cambios_comercios_${new Date().toISOString().slice(0,10)}.xlsx`);
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err: any) {
+    console.error('[Transactions] Error generating commerce changes export:', err.message);
+    res.status(500).json({ error: 'Error al generar reporte: ' + err.message });
+  }
+});
+
 export default router;

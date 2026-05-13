@@ -889,6 +889,35 @@ function MonitoringSection() {
           <Download className="w-4 h-4" />
           Historial de Comercios
         </button>
+        <button
+          onClick={async () => {
+            const token = localStorage.getItem('token');
+            try {
+              const params = new URLSearchParams();
+              if (dateFrom) params.set('date_from', dateFrom);
+              if (dateTo) params.set('date_to', dateTo);
+              const qs = params.toString() ? '?' + params.toString() : '';
+              const response = await fetch(
+                (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL + '/api/v1' : '/api/v1') + '/transactions/commerce-changes-export' + qs,
+                { headers: { Authorization: 'Bearer ' + token } }
+              );
+              if (!response.ok) throw new Error('Error');
+              const blob = await response.blob();
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.href = url;
+              link.download = 'cambios_comercios_' + new Date().toISOString().slice(0,10) + '.xlsx';
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              URL.revokeObjectURL(url);
+            } catch { toast.error('Error al descargar'); }
+          }}
+          className="btn-secondary flex items-center gap-2 text-sm"
+        >
+          <Download className="w-4 h-4" />
+          Cambios en Comercios
+        </button>
       </div>
     </div>
   );
