@@ -751,19 +751,36 @@ router.get('/commerce-changes-export', async (req: AuthenticatedRequest, res: Re
     let sql = `SELECT * FROM commerce_report_config`;
     const params: any[] = [];
 
+    // Parsear fechas — el frontend puede enviar ISO, 'YYYY-MM-DD', o 'YYYY-MM-DD HH:mm'
+    const parseDate = (d: string): string => {
+      // Si ya es formato YYYY-MM-DD, usarlo directo
+      if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+      // Si es ISO o tiene T, extraer solo la fecha
+      if (d.includes('T')) return d.split('T')[0];
+      // Si tiene espacio (datetime), extraer solo la fecha
+      if (d.includes(' ')) return d.split(' ')[0];
+      return d;
+    };
+
     // Filtrar por rango de fechas si se proporcionan
     if (date_from && date_to) {
+      const from = parseDate(date_from);
+      const to = parseDate(date_to);
       sql += ` WHERE updated_at BETWEEN ? AND ?`;
-      params.push(date_from + ' 00:00:00', date_to + ' 23:59:59');
+      params.push(from + ' 00:00:00', to + ' 23:59:59');
     } else if (date_from) {
+      const from = parseDate(date_from);
       sql += ` WHERE updated_at >= ?`;
-      params.push(date_from + ' 00:00:00');
+      params.push(from + ' 00:00:00');
     } else if (date_to) {
+      const to = parseDate(date_to);
       sql += ` WHERE updated_at <= ?`;
-      params.push(date_to + ' 23:59:59');
+      params.push(to + ' 23:59:59');
     }
 
     sql += ` ORDER BY updated_at DESC`;
+
+    console.log('[commerce-changes-export] SQL:', sql, 'Params:', params);
 
     const rows: any[] = await mysqlQuery(sql, params);
 
