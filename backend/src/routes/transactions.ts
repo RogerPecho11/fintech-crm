@@ -70,12 +70,16 @@ router.get('/methods', async (_req: AuthenticatedRequest, res: Response) => {
     const cached = getCached(cacheKey);
     if (cached) return res.json(cached);
 
+    // Obtener métodos de pago con su país desde pagos recientes (últimos 90 días para velocidad)
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
     const methods = await mysqlQuery(
-      `SELECT DISTINCT p.method, p.country 
-       FROM payment p 
-       WHERE p.method IS NOT NULL AND p.method != '' 
-       ORDER BY p.country ASC, p.method ASC 
-       LIMIT 200`
+      `SELECT DISTINCT p.method, p.country
+       FROM payment p
+       WHERE p.method IS NOT NULL AND p.method != '' AND p.created_at >= ?
+       ORDER BY p.country ASC, p.method ASC`,
+      [ninetyDaysAgo.toISOString().slice(0, 10)]
     );
     setCache(cacheKey, methods, 30 * 60 * 1000); // 30 min
     res.json(methods);
