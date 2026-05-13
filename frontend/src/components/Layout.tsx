@@ -1,7 +1,7 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Building2, CheckSquare, Calendar, BarChart3,
-  Users, Bell, Webhook, LogOut, Menu, X, Wifi, WifiOff, FileText, Globe
+  Users, Bell, Webhook, LogOut, Menu, X, Wifi, WifiOff, FileText, Globe, Activity
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
@@ -16,6 +16,7 @@ const navItems = [
   { to: '/tasks', icon: CheckSquare, label: 'Tareas',          roles: ['admin', 'onboarding'] },
   { to: '/calendar', icon: Calendar, label: 'Calendario',      roles: ['admin', 'onboarding'] },
   { to: '/reports', icon: BarChart3, label: 'Reportes',        roles: ['admin', 'commercial', 'onboarding'] },
+  { to: '/monitoring', icon: Activity, label: 'Monitoreo',    roles: ['admin'] },
   { to: '/notifications', icon: Bell, label: 'Notificaciones', roles: ['admin', 'commercial', 'onboarding'] },
 ];
 

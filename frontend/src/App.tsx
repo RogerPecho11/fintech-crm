@@ -15,6 +15,7 @@ import NotificationsPage from './pages/NotificationsPage';
 import WebhooksPage from './pages/WebhooksPage';
 import MexicoFormPage from './pages/MexicoFormPage';
 import MexicoReportsPage from './pages/MexicoReportsPage';
+import MonitoringPage from './pages/MonitoringPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -69,6 +70,7 @@ function AppRoutes() {
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="webhooks" element={<WebhooksPage />} />
         <Route path="mexico-reports" element={<MexicoReportsPage />} />
+        <Route path="monitoring" element={<MonitoringPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
