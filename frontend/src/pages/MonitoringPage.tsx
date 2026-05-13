@@ -74,9 +74,10 @@ export default function MonitoringPage() {
   }, [commerceId, dateFrom, dateTo]);
 
   const formatMoney = (v: number) => {
-    if (v >= 1000000) return '$' + (v / 1000000).toFixed(2) + 'M';
-    if (v >= 1000) return '$' + (v / 1000).toFixed(1) + 'K';
-    return '$' + v.toFixed(0);
+    const sym = currency === 'PEN' ? 'S/' : currency === 'CLP' ? '$' : currency === 'MXN' ? '$' : currency === 'COP' ? '$' : currency === 'BRL' ? 'R$' : '$';
+    if (v >= 1000000) return sym + (v / 1000000).toFixed(2) + 'M';
+    if (v >= 1000) return sym + (v / 1000).toFixed(1) + 'K';
+    return sym + v.toFixed(0);
   };
 
   const formatCant = (v: number) => {
