@@ -748,7 +748,9 @@ router.get('/commerce-changes-export', async (req: AuthenticatedRequest, res: Re
   try {
     const { date_from, date_to } = req.query as { date_from?: string; date_to?: string };
 
-    let sql = `SELECT * FROM commerce_report_config`;
+    let sql = `SELECT cc.*, c.name as commerce_name 
+               FROM commerce_configuration cc 
+               LEFT JOIN commerce c ON c.id = cc.commerce_id`;
     const params: any[] = [];
 
     const parseDate = (d: string): string => {
@@ -761,35 +763,22 @@ router.get('/commerce-changes-export', async (req: AuthenticatedRequest, res: Re
     if (date_from && date_to) {
       const from = parseDate(date_from);
       const to = parseDate(date_to);
-      sql += ` WHERE updated_at BETWEEN ? AND ?`;
+      sql += ` WHERE cc.updated_at BETWEEN ? AND ?`;
       params.push(from + ' 00:00:00', to + ' 23:59:59');
     } else if (date_from) {
       const from = parseDate(date_from);
-      sql += ` WHERE updated_at >= ?`;
+      sql += ` WHERE cc.updated_at >= ?`;
       params.push(from + ' 00:00:00');
     } else if (date_to) {
       const to = parseDate(date_to);
-      sql += ` WHERE updated_at <= ?`;
+      sql += ` WHERE cc.updated_at <= ?`;
       params.push(to + ' 23:59:59');
     }
 
-    sql += ` ORDER BY updated_at DESC`;
+    sql += ` ORDER BY cc.updated_at DESC`;
     console.log('[commerce-changes-export] SQL:', sql, 'Params:', params);
 
     const rows: any[] = await mysqlQuery(sql, params);
-
-    // Obtener nombres de comercios
-    const commerceIds = [...new Set(rows.map(r => r.commerce_id))];
-    let commerceNames: Record<number, string> = {};
-    if (commerceIds.length > 0) {
-      try {
-        const commerces: any[] = await mysqlQuery(
-          `SELECT id, name FROM commerce WHERE id IN (${commerceIds.map(() => '?').join(',')})`,
-          commerceIds
-        );
-        commerces.forEach(c => { commerceNames[c.id] = c.name; });
-      } catch { /* si falla, seguimos sin nombres */ }
-    }
 
     // Crear workbook
     const workbook = new ExcelJS.Workbook();
@@ -802,30 +791,19 @@ router.get('/commerce-changes-export', async (req: AuthenticatedRequest, res: Re
       { header: 'ID', key: 'id', width: 8 },
       { header: 'ID Comercio', key: 'commerce_id', width: 12 },
       { header: 'Nombre Comercio', key: 'commerce_name', width: 30 },
-      { header: 'Tipo de Reporte', key: 'report_payload', width: 18 },
-      { header: 'Descripción del Cambio', key: 'change_description', width: 55 },
-      { header: 'Columnas Configuradas', key: 'columns_summary', width: 45 },
-      { header: 'Día de Ejecución', key: 'execution_day', width: 16 },
-      { header: 'Hora de Ejecución', key: 'execution_time', width: 16 },
-      { header: 'Fecha de Creación', key: 'created_at', width: 20 },
-      { header: 'Última Modificación', key: 'updated_at', width: 20 },
-      { header: 'Pre-cierre Habilitado', key: 'preclosing_enabled', width: 20 },
-      { header: 'Día Pre-cierre', key: 'preclosing_day', width: 16 },
-      { header: 'Hora Pre-cierre', key: 'preclosing_time', width: 16 },
+      { header: 'Configuración', key: 'label', width: 35 },
+      { header: 'Descripción', key: 'description', width: 50 },
+      { header: 'Tipo', key: 'type', width: 12 },
+      { header: 'Valor', key: 'content', width: 20 },
+      { header: 'Cambio Realizado', key: 'change_summary', width: 55 },
+      { header: 'Fecha Creación', key: 'created_at', width: 20 },
+      { header: 'Fecha Modificación', key: 'updated_at', width: 20 },
     ];
 
     // Estilo header
     sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
     sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } };
     sheet.getRow(1).alignment = { horizontal: 'center', vertical: 'middle' };
-
-    const reportTypeMap: Record<string, string> = {
-      payments: 'Pagos',
-      withdrawals: 'Retiros',
-      settlements: 'Liquidaciones',
-      chargebacks: 'Contracargos',
-      refunds: 'Reembolsos',
-    };
 
     const formatDate = (d: any): string => {
       if (!d) return 'N/A';
@@ -835,62 +813,40 @@ router.get('/commerce-changes-export', async (req: AuthenticatedRequest, res: Re
       } catch { return String(d); }
     };
 
+    const translateValue = (type: string, content: string): string => {
+      if (type === 'boolean') return content === '1' ? 'Activado' : 'Desactivado';
+      return content || 'N/A';
+    };
+
     if (rows.length > 0) {
       for (const row of rows) {
-        // Parsear config JSON
-        let configParsed: any[] = [];
-        try {
-          configParsed = typeof row.config === 'string' ? JSON.parse(row.config) : (row.config || []);
-        } catch { configParsed = []; }
+        const wasModified = row.updated_at && row.created_at && new Date(row.updated_at).getTime() > new Date(row.created_at).getTime();
+        const valor = translateValue(row.type, row.content);
 
-        // Parsear preclosing_config
-        let preclosingParsed: any = {};
-        try {
-          preclosingParsed = typeof row.preclosing_config === 'string' ? JSON.parse(row.preclosing_config) : (row.preclosing_config || {});
-        } catch { preclosingParsed = {}; }
-
-        // Resumen de columnas
-        const columnsSummary = configParsed
-          .map((col: any) => col.label || col.col_name || '')
-          .filter(Boolean)
-          .join(', ');
-
-        // Tipo de reporte traducido
-        const reportType = reportTypeMap[row.report_payload] || row.report_payload || 'N/A';
-
-        // Descripción del cambio
-        const createdStr = row.created_at ? new Date(row.created_at).getTime() : 0;
-        const updatedStr = row.updated_at ? new Date(row.updated_at).getTime() : 0;
-        const wasModified = updatedStr > createdStr;
-
-        let changeDescription = '';
+        let changeSummary = '';
         if (wasModified) {
-          changeDescription = `Se modificó la configuración del reporte de ${reportType} — ${configParsed.length} columnas configuradas`;
+          changeSummary = `Se modificó "${row.description || row.label}" → ${valor}`;
         } else {
-          changeDescription = `Se creó la configuración del reporte de ${reportType} — ${configParsed.length} columnas configuradas`;
+          changeSummary = `Se creó "${row.description || row.label}" → ${valor}`;
         }
 
         sheet.addRow({
           id: row.id,
           commerce_id: row.commerce_id,
-          commerce_name: commerceNames[row.commerce_id] || `Comercio #${row.commerce_id}`,
-          report_payload: reportType,
-          change_description: changeDescription,
-          columns_summary: columnsSummary,
-          execution_day: row.execution_day ?? 'N/A',
-          execution_time: row.execution_time ?? 'N/A',
+          commerce_name: row.commerce_name || `Comercio #${row.commerce_id}`,
+          label: row.label,
+          description: row.description || 'N/A',
+          type: row.type,
+          content: valor,
+          change_summary: changeSummary,
           created_at: formatDate(row.created_at),
           updated_at: formatDate(row.updated_at),
-          preclosing_enabled: preclosingParsed.enabledPreclosingMonthlyReports ? 'Sí' : 'No',
-          preclosing_day: preclosingParsed.preclosingExecutionDay ?? 'N/A',
-          preclosing_time: preclosingParsed.preclosingExecutionTime ?? 'N/A',
         });
       }
 
       // Auto-filtro
-      sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 13 } };
+      sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 10 } };
 
-      // Alineación de datos
       for (let i = 2; i <= rows.length + 1; i++) {
         sheet.getRow(i).alignment = { vertical: 'middle', wrapText: true };
       }
