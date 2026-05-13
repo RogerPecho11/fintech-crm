@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart, Line } from 'recharts';
 import { Activity, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../lib/api';
 
 export default function MonitoringPage() {
+  const controllerRef = useRef<AbortController | null>(null);
   const [country, setCountry] = useState('');
   const [commerceId, setCommerceId] = useState('');
   const [dateFrom, setDateFrom] = useState(() => {
@@ -22,6 +23,8 @@ export default function MonitoringPage() {
   // Cargar países al inicio
   useEffect(() => {
     api.get('/monitoring/countries').then(r => setCountries(r.data || [])).catch(() => {});
+    // Cancelar requests pendientes al desmontar
+    return () => { controllerRef.current?.abort(); };
   }, []);
 
   // Cuando cambia el país, cargar comercios de ese país
@@ -38,9 +41,12 @@ export default function MonitoringPage() {
       return;
     }
     setLoading(true);
+    const controller = new AbortController();
+    controllerRef.current = controller;
     try {
       const r = await api.get('/monitoring/daily-volume', {
-        params: { commerce_id: commerceId, date_from: dateFrom, date_to: dateTo }
+        params: { commerce_id: commerceId, date_from: dateFrom, date_to: dateTo },
+        signal: controller.signal,
       });
       const { payin, payout, currency: cur } = r.data;
       setCurrency(cur || 'USD');
@@ -66,8 +72,10 @@ export default function MonitoringPage() {
       });
 
       setChartData(Array.from(map.values()).sort((a, b) => a.fecha.localeCompare(b.fecha)));
-    } catch {
-      toast.error('Error al cargar datos');
+    } catch (err: any) {
+      if (err.name !== 'CanceledError' && err.code !== 'ERR_CANCELED') {
+        toast.error('Error al cargar datos');
+      }
     } finally {
       setLoading(false);
     }
