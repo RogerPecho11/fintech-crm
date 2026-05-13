@@ -229,10 +229,11 @@ export default function MonitoringPage() {
               ))}
             </LineChart>
           </ResponsiveContainer>
-          {/* Tabla resumen */}
-          <div className="mt-4 overflow-x-auto">
+          {/* Tabla detalle diario */}
+          <div className="mt-4 overflow-x-auto max-h-96 overflow-y-auto">
             <table className="w-full text-sm">
-              <thead><tr className="bg-gray-50">
+              <thead className="sticky top-0 bg-white"><tr className="bg-gray-50">
+                <th className="text-left p-2">Fecha</th>
                 <th className="text-left p-2">Pasarela</th>
                 <th className="text-right p-2">Trx</th>
                 <th className="text-right p-2">Monto</th>
@@ -241,16 +242,17 @@ export default function MonitoringPage() {
                 <th className="text-right p-2">Tasa</th>
               </tr></thead>
               <tbody>
-                {payinSummary.map((m, i) => {
-                  const total = m.aprobadas + m.rechazadas;
-                  const rate = total > 0 ? (m.aprobadas / total * 100).toFixed(1) : 'N/A';
+                {payinMethods.map((m: any, i: number) => {
+                  const total = Number(m.aprobadas) + Number(m.rechazadas);
+                  const rate = total > 0 ? (Number(m.aprobadas) / total * 100).toFixed(1) : 'N/A';
                   return (
                     <tr key={i} className="border-b border-gray-100">
+                      <td className="p-2 text-gray-500">{fmtDate(m.fecha?.slice(0, 10))}</td>
                       <td className="p-2 font-medium">{m.method}</td>
-                      <td className="p-2 text-right">{m.cantidad.toLocaleString()}</td>
-                      <td className="p-2 text-right">{formatMoney(m.monto)}</td>
-                      <td className="p-2 text-right text-green-600">{m.aprobadas.toLocaleString()}</td>
-                      <td className="p-2 text-right text-red-600">{m.rechazadas.toLocaleString()}</td>
+                      <td className="p-2 text-right">{Number(m.cantidad).toLocaleString()}</td>
+                      <td className="p-2 text-right">{formatMoney(Number(m.monto))}</td>
+                      <td className="p-2 text-right text-green-600">{Number(m.aprobadas).toLocaleString()}</td>
+                      <td className="p-2 text-right text-red-600">{Number(m.rechazadas).toLocaleString()}</td>
                       <td className="p-2 text-right">
                         <span className={`px-2 py-0.5 rounded text-xs font-bold ${Number(rate) >= 80 ? 'bg-green-100 text-green-800' : Number(rate) >= 50 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>{rate}%</span>
                       </td>
@@ -279,9 +281,10 @@ export default function MonitoringPage() {
               ))}
             </LineChart>
           </ResponsiveContainer>
-          <div className="mt-4 overflow-x-auto">
+          <div className="mt-4 overflow-x-auto max-h-96 overflow-y-auto">
             <table className="w-full text-sm">
-              <thead><tr className="bg-gray-50">
+              <thead className="sticky top-0 bg-white"><tr className="bg-gray-50">
+                <th className="text-left p-2">Fecha</th>
                 <th className="text-left p-2">Pasarela</th>
                 <th className="text-right p-2">Trx</th>
                 <th className="text-right p-2">Monto</th>
@@ -290,16 +293,17 @@ export default function MonitoringPage() {
                 <th className="text-right p-2">Tasa</th>
               </tr></thead>
               <tbody>
-                {payoutSummary.map((m, i) => {
-                  const total = m.aprobadas + m.rechazadas;
-                  const rate = total > 0 ? (m.aprobadas / total * 100).toFixed(1) : 'N/A';
+                {payoutMethods.map((m: any, i: number) => {
+                  const total = Number(m.aprobadas) + Number(m.rechazadas);
+                  const rate = total > 0 ? (Number(m.aprobadas) / total * 100).toFixed(1) : 'N/A';
                   return (
                     <tr key={i} className="border-b border-gray-100">
+                      <td className="p-2 text-gray-500">{fmtDate(m.fecha?.slice(0, 10))}</td>
                       <td className="p-2 font-medium">{m.method}</td>
-                      <td className="p-2 text-right">{m.cantidad.toLocaleString()}</td>
-                      <td className="p-2 text-right">{formatMoney(m.monto)}</td>
-                      <td className="p-2 text-right text-green-600">{m.aprobadas.toLocaleString()}</td>
-                      <td className="p-2 text-right text-red-600">{m.rechazadas.toLocaleString()}</td>
+                      <td className="p-2 text-right">{Number(m.cantidad).toLocaleString()}</td>
+                      <td className="p-2 text-right">{formatMoney(Number(m.monto))}</td>
+                      <td className="p-2 text-right text-green-600">{Number(m.aprobadas).toLocaleString()}</td>
+                      <td className="p-2 text-right text-red-600">{Number(m.rechazadas).toLocaleString()}</td>
                       <td className="p-2 text-right">
                         <span className={`px-2 py-0.5 rounded text-xs font-bold ${Number(rate) >= 80 ? 'bg-green-100 text-green-800' : Number(rate) >= 50 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>{rate}%</span>
                       </td>
