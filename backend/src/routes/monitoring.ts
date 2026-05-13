@@ -26,6 +26,7 @@ function setCache(key: string, data: any, ttlMs: number): void {
 }
 
 const CACHE_5MIN = 5 * 60 * 1000;
+const CACHE_10MIN = 10 * 60 * 1000;
 const CACHE_15MIN = 15 * 60 * 1000;
 const CACHE_30MIN = 30 * 60 * 1000;
 
@@ -318,10 +319,12 @@ router.get('/commerces', async (req: AuthenticatedRequest, res: Response) => {
     const results = await mysqlQuery(
       `SELECT id, name, country FROM commerce WHERE deleted_at IS NULL AND enabled = 1 ORDER BY name`
     );
-    setCache(cacheKey, results, CACHE_10MIN);
+    setCache(cacheKey, results, CACHE_30MIN);
     res.json(results);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    // Si falla, devolver array vacío en vez de 500
+    console.error('[Monitoring] commerces error:', err.message);
+    res.json([]);
   }
 });
 
@@ -336,10 +339,11 @@ router.get('/countries', async (req: AuthenticatedRequest, res: Response) => {
       `SELECT DISTINCT country FROM commerce WHERE country IS NOT NULL AND deleted_at IS NULL ORDER BY country`
     );
     const countries = results.map((r: any) => r.country);
-    setCache(cacheKey, countries, CACHE_10MIN);
+    setCache(cacheKey, countries, CACHE_30MIN);
     res.json(countries);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    console.error('[Monitoring] countries error:', err.message);
+    res.json([]);
   }
 });
 
