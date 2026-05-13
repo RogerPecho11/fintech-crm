@@ -74,7 +74,7 @@ export default function MonitoringPage() {
     api.get('/monitoring/countries').then(r => setCountries(r.data)).catch(() => {});
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  // No cargar automáticamente — esperar a que el usuario haga clic en "Consultar"
 
   // Combinar payin/payout para gráfico diario
   const dailyChartData = (() => {
@@ -132,7 +132,7 @@ export default function MonitoringPage() {
         </div>
         <button onClick={fetchData} disabled={loading} className="btn-primary flex items-center gap-2">
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          Actualizar
+          {loading ? 'Cargando...' : 'Consultar'}
         </button>
       </div>
 
