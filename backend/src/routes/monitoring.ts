@@ -25,16 +25,30 @@ function setCache(key: string, data: any, ttlMs: number): void {
   }
 }
 
-const CACHE_2MIN = 2 * 60 * 1000;
 const CACHE_5MIN = 5 * 60 * 1000;
-const CACHE_10MIN = 10 * 60 * 1000;
+const CACHE_15MIN = 15 * 60 * 1000;
+const CACHE_30MIN = 30 * 60 * 1000;
+
+// Limitar rango de fechas a máximo 31 días para proteger la réplica
+function limitDateRange(from: string, to: string): { from: string; to: string } {
+  const maxDays = 31;
+  const toDate = new Date(to);
+  const fromDate = new Date(from);
+  const diffDays = (toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24);
+  if (diffDays > maxDays) {
+    const limitedFrom = new Date(toDate.getTime() - maxDays * 24 * 60 * 60 * 1000);
+    return { from: limitedFrom.toISOString().slice(0, 10), to };
+  }
+  return { from, to };
+}
 
 // ─── GET /api/v1/monitoring/daily-volume — Transacciones y monto por día (payin/payout)
 router.get('/daily-volume', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { date_from, date_to, commerce_id, country } = req.query as any;
-    const from = date_from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    const to = date_to || new Date().toISOString().slice(0, 10);
+    const rawFrom = date_from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const rawTo = date_to || new Date().toISOString().slice(0, 10);
+    const { from, to } = limitDateRange(rawFrom, rawTo);
 
     const cacheKey = `daily-vol:${from}:${to}:${commerce_id || ''}:${country || ''}`;
     const cached = getCached(cacheKey);
@@ -218,7 +232,7 @@ router.get('/alerts', async (req: AuthenticatedRequest, res: Response) => {
     const payoutTime = await mysqlQuery(payoutTimeSql);
 
     const result = { inactivity, drops, payoutTime };
-    setCache(cacheKey, result, CACHE_2MIN);
+    setCache(cacheKey, result, CACHE_5MIN);
     res.json(result);
   } catch (err: any) {
     console.error('[Monitoring] alerts error:', err.message);

@@ -54,23 +54,14 @@ export default function MonitoringPage() {
       if (commerceId) params.commerce_id = commerceId;
       if (country) params.country = country;
 
-      const [vol, comm, meth, appr, alrt, pTime, methComm] = await Promise.all([
-        api.get('/monitoring/daily-volume', { params }),
-        api.get('/monitoring/by-commerce', { params }),
-        api.get('/monitoring/by-method', { params }),
-        api.get('/monitoring/approval-rate', { params }),
-        api.get('/monitoring/alerts'),
-        api.get('/monitoring/payout-time', { params }),
-        api.get('/monitoring/methods-by-commerce'),
-      ]);
-
-      setDailyVolume(vol.data);
-      setByCommerce(comm.data);
-      setByMethod(meth.data);
-      setApprovalRate(appr.data);
-      setAlerts(alrt.data);
-      setPayoutTime(pTime.data);
-      setMethodsByCommerce(methComm.data);
+      // Cargar secuencialmente para no saturar la réplica
+      try { const r = await api.get('/monitoring/daily-volume', { params }); setDailyVolume(r.data); } catch {}
+      try { const r = await api.get('/monitoring/by-commerce', { params }); setByCommerce(r.data); } catch {}
+      try { const r = await api.get('/monitoring/by-method', { params }); setByMethod(r.data); } catch {}
+      try { const r = await api.get('/monitoring/approval-rate', { params }); setApprovalRate(r.data); } catch {}
+      try { const r = await api.get('/monitoring/alerts'); setAlerts(r.data); } catch {}
+      try { const r = await api.get('/monitoring/payout-time', { params }); setPayoutTime(r.data); } catch {}
+      try { const r = await api.get('/monitoring/methods-by-commerce'); setMethodsByCommerce(r.data); } catch {}
     } catch (err) {
       toast.error('Error al cargar datos de monitoreo');
     } finally {
