@@ -204,8 +204,9 @@ export default function MonitoringPage() {
             <YAxis yAxisId="left" tickFormatter={formatMoney} />
             <YAxis yAxisId="right" orientation="right" />
             <Tooltip formatter={(value: any, name: string) => {
-              if (name.includes('monto')) return [formatMoney(Number(value)), name.includes('payin') ? 'Monto Payin' : 'Monto Payout'];
-              return [Number(value).toLocaleString(), name.includes('payin') ? 'Cant. Payin' : 'Cant. Payout'];
+              const nameLower = name.toLowerCase();
+              if (nameLower.includes('monto')) return [formatMoney(Number(value)), name];
+              return [Number(value).toLocaleString(), name];
             }} />
             <Legend />
             <Bar yAxisId="left" dataKey="payin_monto" name="Monto Payin" fill="#1E3A5F" />

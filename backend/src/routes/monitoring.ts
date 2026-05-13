@@ -141,8 +141,8 @@ router.get('/by-method', async (req: AuthenticatedRequest, res: Response) => {
     if (country) { whereExtra += ` AND country = ?`; params.push(country); }
 
     const sql = `SELECT method, COUNT(*) as cantidad, COALESCE(SUM(amount), 0) as monto,
-      SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as aprobadas,
-      SUM(CASE WHEN status IN ('error','canceled','expired','bank_error','authentication_error') THEN 1 ELSE 0 END) as rechazadas
+      SUM(CASE WHEN status IN ('success','completed') THEN 1 ELSE 0 END) as aprobadas,
+      SUM(CASE WHEN status IN ('error','canceled','expired','bank_error','authentication_error','rejected') THEN 1 ELSE 0 END) as rechazadas
       FROM payment WHERE deleted_at IS NULL AND method IS NOT NULL AND created_at BETWEEN ? AND ?${whereExtra}
       GROUP BY method ORDER BY monto DESC LIMIT 25`;
 
@@ -176,10 +176,10 @@ router.get('/approval-rate', async (req: AuthenticatedRequest, res: Response) =>
     // Solo considerar transacciones con status final (no pending/new/created)
     const sql = `SELECT method,
       COUNT(*) as total,
-      SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as aprobadas,
-      ROUND(SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) as tasa_aprobacion
+      SUM(CASE WHEN status IN ('success','completed') THEN 1 ELSE 0 END) as aprobadas,
+      ROUND(SUM(CASE WHEN status IN ('success','completed') THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) as tasa_aprobacion
       FROM payment WHERE deleted_at IS NULL AND method IS NOT NULL
-      AND status IN ('completed','error','canceled','expired','bank_error','authentication_error','rejected','chargeback')
+      AND status IN ('success','completed','error','canceled','expired','bank_error','authentication_error','rejected','chargeback')
       AND created_at BETWEEN ? AND ?${whereExtra}
       GROUP BY method HAVING total >= 10 ORDER BY tasa_aprobacion ASC LIMIT 20`;
 
@@ -288,12 +288,12 @@ router.get('/methods-by-commerce', async (req: AuthenticatedRequest, res: Respon
     const cached = getCached(cacheKey);
     if (cached) return res.json(cached);
 
-    // Solo últimos 7 días y status completed para reducir escaneo
+    // Solo últimos 7 días y status success/completed para reducir escaneo
     const payinSql = `SELECT p.commerce_id, c.name as commerce_name, p.method
       FROM payment p INNER JOIN commerce c ON c.id = p.commerce_id
       WHERE p.deleted_at IS NULL AND p.method IS NOT NULL
       AND p.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-      AND p.status = 'completed'
+      AND p.status IN ('success','completed')
       GROUP BY p.commerce_id, c.name, p.method
       ORDER BY c.name, p.method`;
 
@@ -301,7 +301,7 @@ router.get('/methods-by-commerce', async (req: AuthenticatedRequest, res: Respon
       FROM withdrawal w INNER JOIN commerce c ON c.id = w.commerce_id
       WHERE w.deleted_at IS NULL AND w.type IS NOT NULL
       AND w.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-      AND w.status = 'completed'
+      AND w.status IN ('success','completed')
       GROUP BY w.commerce_id, c.name, w.type
       ORDER BY c.name, w.type`;
 
