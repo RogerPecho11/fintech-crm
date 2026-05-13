@@ -751,18 +751,13 @@ router.get('/commerce-changes-export', async (req: AuthenticatedRequest, res: Re
     let sql = `SELECT * FROM commerce_report_config`;
     const params: any[] = [];
 
-    // Parsear fechas — el frontend puede enviar ISO, 'YYYY-MM-DD', o 'YYYY-MM-DD HH:mm'
     const parseDate = (d: string): string => {
-      // Si ya es formato YYYY-MM-DD, usarlo directo
       if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
-      // Si es ISO o tiene T, extraer solo la fecha
       if (d.includes('T')) return d.split('T')[0];
-      // Si tiene espacio (datetime), extraer solo la fecha
       if (d.includes(' ')) return d.split(' ')[0];
       return d;
     };
 
-    // Filtrar por rango de fechas si se proporcionan
     if (date_from && date_to) {
       const from = parseDate(date_from);
       const to = parseDate(date_to);
@@ -779,54 +774,132 @@ router.get('/commerce-changes-export', async (req: AuthenticatedRequest, res: Re
     }
 
     sql += ` ORDER BY updated_at DESC`;
-
     console.log('[commerce-changes-export] SQL:', sql, 'Params:', params);
 
     const rows: any[] = await mysqlQuery(sql, params);
 
-    // Crear workbook de Excel
+    // Obtener nombres de comercios
+    const commerceIds = [...new Set(rows.map(r => r.commerce_id))];
+    let commerceNames: Record<number, string> = {};
+    if (commerceIds.length > 0) {
+      try {
+        const commerces: any[] = await mysqlQuery(
+          `SELECT id, name FROM commerce WHERE id IN (${commerceIds.map(() => '?').join(',')})`,
+          commerceIds
+        );
+        commerces.forEach(c => { commerceNames[c.id] = c.name; });
+      } catch { /* si falla, seguimos sin nombres */ }
+    }
+
+    // Crear workbook
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'CRM ProntoPaga';
     workbook.created = new Date();
-
     const sheet = workbook.addWorksheet('Cambios Comercios');
 
+    // Columnas en español
+    sheet.columns = [
+      { header: 'ID', key: 'id', width: 8 },
+      { header: 'ID Comercio', key: 'commerce_id', width: 12 },
+      { header: 'Nombre Comercio', key: 'commerce_name', width: 30 },
+      { header: 'Tipo de Reporte', key: 'report_payload', width: 18 },
+      { header: 'Descripción del Cambio', key: 'change_description', width: 55 },
+      { header: 'Columnas Configuradas', key: 'columns_summary', width: 45 },
+      { header: 'Día de Ejecución', key: 'execution_day', width: 16 },
+      { header: 'Hora de Ejecución', key: 'execution_time', width: 16 },
+      { header: 'Fecha de Creación', key: 'created_at', width: 20 },
+      { header: 'Última Modificación', key: 'updated_at', width: 20 },
+      { header: 'Pre-cierre Habilitado', key: 'preclosing_enabled', width: 20 },
+      { header: 'Día Pre-cierre', key: 'preclosing_day', width: 16 },
+      { header: 'Hora Pre-cierre', key: 'preclosing_time', width: 16 },
+    ];
+
+    // Estilo header
+    sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+    sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } };
+    sheet.getRow(1).alignment = { horizontal: 'center', vertical: 'middle' };
+
+    const reportTypeMap: Record<string, string> = {
+      payments: 'Pagos',
+      withdrawals: 'Retiros',
+      settlements: 'Liquidaciones',
+      chargebacks: 'Contracargos',
+      refunds: 'Reembolsos',
+    };
+
+    const formatDate = (d: any): string => {
+      if (!d) return 'N/A';
+      try {
+        const date = new Date(d);
+        return date.toLocaleString('es-PE', { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+      } catch { return String(d); }
+    };
+
     if (rows.length > 0) {
-      // Usar las columnas del primer registro como headers
-      const columnKeys = Object.keys(rows[0]);
-      sheet.columns = columnKeys.map(key => ({
-        header: key.replace(/_/g, ' ').toUpperCase(),
-        key,
-        width: Math.max(key.length + 5, 15),
-      }));
-
-      // Estilo del header
-      sheet.getRow(1).font = { bold: true, size: 11 };
-      sheet.getRow(1).fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF1E3A5F' },
-      };
-      sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
-
-      // Agregar filas
       for (const row of rows) {
-        sheet.addRow(row);
+        // Parsear config JSON
+        let configParsed: any[] = [];
+        try {
+          configParsed = typeof row.config === 'string' ? JSON.parse(row.config) : (row.config || []);
+        } catch { configParsed = []; }
+
+        // Parsear preclosing_config
+        let preclosingParsed: any = {};
+        try {
+          preclosingParsed = typeof row.preclosing_config === 'string' ? JSON.parse(row.preclosing_config) : (row.preclosing_config || {});
+        } catch { preclosingParsed = {}; }
+
+        // Resumen de columnas
+        const columnsSummary = configParsed
+          .map((col: any) => col.label || col.col_name || '')
+          .filter(Boolean)
+          .join(', ');
+
+        // Tipo de reporte traducido
+        const reportType = reportTypeMap[row.report_payload] || row.report_payload || 'N/A';
+
+        // Descripción del cambio
+        const createdStr = row.created_at ? new Date(row.created_at).getTime() : 0;
+        const updatedStr = row.updated_at ? new Date(row.updated_at).getTime() : 0;
+        const wasModified = updatedStr > createdStr;
+
+        let changeDescription = '';
+        if (wasModified) {
+          changeDescription = `Se modificó la configuración del reporte de ${reportType} — ${configParsed.length} columnas configuradas`;
+        } else {
+          changeDescription = `Se creó la configuración del reporte de ${reportType} — ${configParsed.length} columnas configuradas`;
+        }
+
+        sheet.addRow({
+          id: row.id,
+          commerce_id: row.commerce_id,
+          commerce_name: commerceNames[row.commerce_id] || `Comercio #${row.commerce_id}`,
+          report_payload: reportType,
+          change_description: changeDescription,
+          columns_summary: columnsSummary,
+          execution_day: row.execution_day ?? 'N/A',
+          execution_time: row.execution_time ?? 'N/A',
+          created_at: formatDate(row.created_at),
+          updated_at: formatDate(row.updated_at),
+          preclosing_enabled: preclosingParsed.enabledPreclosingMonthlyReports ? 'Sí' : 'No',
+          preclosing_day: preclosingParsed.preclosingExecutionDay ?? 'N/A',
+          preclosing_time: preclosingParsed.preclosingExecutionTime ?? 'N/A',
+        });
       }
 
       // Auto-filtro
-      sheet.autoFilter = {
-        from: { row: 1, column: 1 },
-        to: { row: 1, column: columnKeys.length },
-      };
+      sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 13 } };
+
+      // Alineación de datos
+      for (let i = 2; i <= rows.length + 1; i++) {
+        sheet.getRow(i).alignment = { vertical: 'middle', wrapText: true };
+      }
     } else {
-      sheet.addRow(['No se encontraron registros para el rango seleccionado']);
+      sheet.addRow({ id: 'No se encontraron registros para el rango seleccionado' });
     }
 
-    // Enviar como descarga
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename=cambios_comercios_${new Date().toISOString().slice(0, 10)}.xlsx`);
-
     await workbook.xlsx.write(res);
     res.end();
   } catch (err: any) {
