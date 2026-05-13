@@ -77,36 +77,47 @@ router.get('/daily-volume', async (req: AuthenticatedRequest, res: Response) => 
     const { date_from, date_to, commerce_id } = req.query as any;
     if (!commerce_id) return res.json({ payin: [], payout: [], currency: 'USD' });
 
-    const from = date_from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    const to = date_to || new Date().toISOString().slice(0, 10);
+    const rawFrom = date_from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const rawTo = date_to || new Date().toISOString().slice(0, 10);
+
+    // Limitar a máximo 60 días para proteger la réplica
+    const toDate = new Date(rawTo);
+    const fromDate = new Date(rawFrom);
+    const diffDays = (toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24);
+    const from = diffDays > 60
+      ? new Date(toDate.getTime() - 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+      : rawFrom;
+    const to = rawTo;
 
     const cacheKey = `daily-vol:${from}:${to}:${commerce_id}`;
     const cached = getCached(cacheKey);
     if (cached) return res.json(cached);
 
-    // Obtener moneda del comercio
-    const commerceRows = await mysqlQuery(`SELECT country FROM commerce WHERE id = ? LIMIT 1`, [Number(commerce_id)]);
+    const cid = Number(commerce_id);
+
+    // Obtener moneda del comercio (usa cache de commerces si existe)
+    const commerceRows = await mysqlQuery(`SELECT country FROM commerce WHERE id = ? LIMIT 1`, [cid]);
     const country = commerceRows[0]?.country || '';
     const currency = COUNTRY_CURRENCY[country?.toUpperCase()] || 'USD';
 
-    const params = [from + ' 00:00:00', to + ' 23:59:59', Number(commerce_id)];
+    const dateParams = [from + ' 00:00:00', to + ' 23:59:59', cid];
 
-    const payinSql = `SELECT DATE(created_at) as fecha,
-      COUNT(*) as cantidad,
-      COALESCE(SUM(amount), 0) as monto
+    // Una sola query para payin agrupada por fecha — usa índice (commerce_id, created_at)
+    const payinSql = `SELECT DATE(created_at) as fecha, COUNT(*) as cantidad, COALESCE(SUM(amount), 0) as monto
       FROM payment
-      WHERE deleted_at IS NULL AND created_at BETWEEN ? AND ? AND commerce_id = ?
+      WHERE commerce_id = ? AND deleted_at IS NULL AND created_at BETWEEN ? AND ?
       GROUP BY DATE(created_at) ORDER BY fecha`;
 
-    const payoutSql = `SELECT DATE(created_at) as fecha,
-      COUNT(*) as cantidad,
-      COALESCE(SUM(amount), 0) as monto
+    const payoutSql = `SELECT DATE(created_at) as fecha, COUNT(*) as cantidad, COALESCE(SUM(amount), 0) as monto
       FROM withdrawal
-      WHERE deleted_at IS NULL AND created_at BETWEEN ? AND ? AND commerce_id = ?
+      WHERE commerce_id = ? AND deleted_at IS NULL AND created_at BETWEEN ? AND ?
       GROUP BY DATE(created_at) ORDER BY fecha`;
 
-    const payin = await mysqlQuery(payinSql, params);
-    const payout = await mysqlQuery(payoutSql, params);
+    // commerce_id primero en params para que use el índice
+    const [payin, payout] = await Promise.all([
+      mysqlQuery(payinSql, [cid, from + ' 00:00:00', to + ' 23:59:59']),
+      mysqlQuery(payoutSql, [cid, from + ' 00:00:00', to + ' 23:59:59']),
+    ]);
 
     const result = { payin, payout, currency };
     setCache(cacheKey, result, CACHE_5MIN);
