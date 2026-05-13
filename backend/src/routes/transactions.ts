@@ -294,7 +294,7 @@ router.get('/summary-multi', async (req: AuthenticatedRequest, res: Response) =>
 // ─── GET /api/v1/transactions/summary/:commerceId — resumen de pagos
 router.get('/summary/:commerceId', async (req: AuthenticatedRequest, res: Response) => {
   const { commerceId } = req.params;
-  const { date_from, date_to } = req.query as Record<string, string>;
+  const { date_from, date_to, method } = req.query as Record<string, string>;
 
   try {
     let dateFilter = '';
@@ -307,6 +307,11 @@ router.get('/summary/:commerceId', async (req: AuthenticatedRequest, res: Respon
     if (date_to) {
       dateFilter += ' AND p.created_at <= ?';
       params.push(formatDateTo(date_to));
+    }
+    if (method) {
+      const methods = method.split(',').map(m => m.trim()).filter(Boolean);
+      if (methods.length === 1) { dateFilter += ' AND p.method = ?'; params.push(methods[0]); }
+      else if (methods.length > 1) { dateFilter += ` AND p.method IN (${methods.map(() => '?').join(',')})`; params.push(...methods); }
     }
 
     const summary = await mysqlQuery(
@@ -363,7 +368,7 @@ router.get('/summary/:commerceId', async (req: AuthenticatedRequest, res: Respon
 // ─── GET /api/v1/transactions/movements/:commerceId — pagos detallados
 router.get('/movements/:commerceId', async (req: AuthenticatedRequest, res: Response) => {
   const { commerceId } = req.params;
-  const { date_from, date_to, page = '1', limit = '50' } = req.query as Record<string, string>;
+  const { date_from, date_to, method, page = '1', limit = '50' } = req.query as Record<string, string>;
 
   try {
     let dateFilter = '';
@@ -376,6 +381,11 @@ router.get('/movements/:commerceId', async (req: AuthenticatedRequest, res: Resp
     if (date_to) {
       dateFilter += ' AND p.created_at <= ?';
       params.push(formatDateTo(date_to));
+    }
+    if (method) {
+      const methods = method.split(',').map(m => m.trim()).filter(Boolean);
+      if (methods.length === 1) { dateFilter += ' AND p.method = ?'; params.push(methods[0]); }
+      else if (methods.length > 1) { dateFilter += ` AND p.method IN (${methods.map(() => '?').join(',')})`; params.push(...methods); }
     }
 
     const pageNum = parseInt(page);

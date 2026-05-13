@@ -813,191 +813,20 @@ function MerchantHoverCell({ name, merchantId }: { name: string; merchantId: str
 }
 
 function MonitoringSection() {
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [countryFilter, setCountryFilter] = useState('');
-  const [selectedMethods, setSelectedMethods] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-
-  const { data: commerces, isLoading } = useQuery({
-    queryKey: ['tx-commerces'],
-    queryFn: () => api.get('/transactions/commerces').then(r => r.data),
-  });
-
-  const { data: methods } = useQuery({
-    queryKey: ['tx-methods'],
-    queryFn: () => api.get('/transactions/methods').then(r => r.data),
-  });
-
-  // PaÃ­ses Ãºnicos
-  const countries = Array.from(new Set((commerces || []).map((c: any) => c.country).filter(Boolean))).sort() as string[];
-
-  // Comercios filtrados por paÃ­s
-  const filteredCommerces = countryFilter
-    ? (commerces || []).filter((c: any) => c.country === countryFilter)
-    : (commerces || []);
-
-  // Query multi-comercio
-  const { data: multiSummary, isLoading: multiLoading } = useQuery({
-    queryKey: ['tx-summary-multi', selectedIds.join(','), dateFrom, dateTo, selectedMethods.join(',')],
-    queryFn: () => api.get('/transactions/summary-multi', {
-      params: { ids: selectedIds.join(','), date_from: dateFrom || undefined, date_to: dateTo || undefined, method: selectedMethods.join(',') || undefined }
-    }).then(r => r.data),
-    enabled: selectedIds.length > 0,
-    staleTime: 5 * 60 * 1000, // 5 min cache
-  });
-
-  // Query individual (para detalle cuando solo hay 1 seleccionado)
-  const { data: summary } = useQuery({
-    queryKey: ['tx-summary', selectedIds[0], dateFrom, dateTo],
-    queryFn: () => api.get(`/transactions/summary/${selectedIds[0]}`, {
-      params: { date_from: dateFrom || undefined, date_to: dateTo || undefined }
-    }).then(r => r.data),
-    enabled: selectedIds.length === 1,
-  });
-
-  const { data: movements } = useQuery({
-    queryKey: ['tx-movements', selectedIds[0], dateFrom, dateTo],
-    queryFn: () => api.get(`/transactions/movements/${selectedIds[0]}`, {
-      params: { date_from: dateFrom || undefined, date_to: dateTo || undefined, limit: 20 }
-    }).then(r => r.data),
-    enabled: selectedIds.length === 1,
-  });
-
-  // Query tendencia diaria (grÃ¡fico lineal)
-  const { data: dailyTrend } = useQuery({
-    queryKey: ['tx-daily-trend', selectedIds.join(','), dateFrom, dateTo, selectedMethods.join(',')],
-    queryFn: () => api.get('/transactions/daily-trend', {
-      params: { ids: selectedIds.join(','), date_from: dateFrom || undefined, date_to: dateTo || undefined, method: selectedMethods.join(',') || undefined }
-    }).then(r => r.data),
-    enabled: selectedIds.length > 0,
-    staleTime: 5 * 60 * 1000, // 5 min cache
-  });
-
-  const toggleCommerce = (id: number) => {
-    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-  };
-
-  const selectAllFiltered = () => {
-    const ids = filteredCommerces.map((c: any) => c.id);
-    setSelectedIds(ids);
-  };
-
-  const clearSelection = () => setSelectedIds([]);
 
   return (
     <div className="card p-6">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-lg font-bold text-gray-900">Monitoreo de Transacciones</h2>
-          <p className="text-sm text-gray-500">Datos en tiempo real de la base de producciÃ³n</p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={async () => {
-              const token = localStorage.getItem('token');
-              try {
-                const params = new URLSearchParams();
-                if (dateFrom) params.set('date_from', dateFrom);
-                if (dateTo) params.set('date_to', dateTo);
-                const qs = params.toString() ? `?${params.toString()}` : '';
-                const response = await fetch(
-                  `${import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL + '/api/v1' : '/api/v1'}/transactions/gateway-changes-export${qs}`,
-                  { headers: { Authorization: `Bearer ${token}` } }
-                );
-                if (!response.ok) throw new Error('Error');
-                const blob = await response.blob();
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `cambios_pasarelas_${new Date().toISOString().slice(0,10)}.xlsx`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
-              } catch { toast.error('Error al descargar'); }
-            }}
-            className="btn-secondary flex items-center gap-2 text-sm"
-          >
-            <Download className="w-4 h-4" />
-            Cambios Pasarelas
-          </button>
-          <button
-            onClick={async () => {
-              const token = localStorage.getItem('token');
-              try {
-                const response = await fetch(
-                  `${import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL + '/api/v1' : '/api/v1'}/transactions/history-export`,
-                  { headers: { Authorization: `Bearer ${token}` } }
-                );
-                if (!response.ok) throw new Error('Error');
-                const blob = await response.blob();
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `historial_comercios_${new Date().toISOString().slice(0,10)}.xlsx`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
-              } catch { toast.error('Error al descargar'); }
-            }}
-            className="btn-secondary flex items-center gap-2 text-sm"
-          >
-            <Download className="w-4 h-4" />
-            Historial de Comercios
-          </button>
+          <h2 className="text-lg font-bold text-gray-900">Dashboard de Pasarelas y Configuraciones de Comercios</h2>
+          <p className="text-sm text-gray-500">Modificaciones de pasarelas y configuraciones de comercios</p>
         </div>
       </div>
 
-      {/* Filtros */}
-      <div className="flex flex-wrap gap-3 mb-4 p-3 bg-gray-50 rounded-lg items-end">
-        <div>
-          <label className="text-xs text-gray-500 block mb-1">PaÃ­s</label>
-          <select
-            className="input text-sm w-32"
-            value={countryFilter}
-            onChange={e => { setCountryFilter(e.target.value); setSelectedIds([]); }}
-          >
-            <option value="">Todos</option>
-            {countries.map((c: string) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="text-xs text-gray-500 block mb-1">Pasarelas {selectedMethods.length > 0 && `(${selectedMethods.length})`}</label>
-          <details className="relative">
-            <summary className="input text-sm w-44 cursor-pointer truncate">{selectedMethods.length === 0 ? 'Todas' : selectedMethods.join(', ')}</summary>
-            <div className="absolute z-40 top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-2 w-56 max-h-48 overflow-y-auto">
-              {selectedMethods.length > 0 && (
-                <button onClick={() => setSelectedMethods([])} className="text-xs text-gray-400 hover:text-gray-600 mb-1 block">Limpiar</button>
-              )}
-              {((methods || []) as any[])
-                .filter((m: any) => !countryFilter || m.country === countryFilter)
-                .map((m: any) => m.method)
-                .filter((v: string, i: number, a: string[]) => a.indexOf(v) === i)
-                .map((method: string) => (
-                <label key={method} className="flex items-center gap-1.5 text-xs p-1 rounded hover:bg-gray-50 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedMethods.includes(method)}
-                    onChange={() => setSelectedMethods(prev => prev.includes(method) ? prev.filter(x => x !== method) : [...prev, method])}
-                    className="w-3 h-3 rounded border-gray-300 text-pink-500 focus:ring-pink-500"
-                  />
-                  <span className="truncate">{method}</span>
-                </label>
-              ))}
-            </div>
-          </details>
-        </div>
-        <div>
-          <label className="text-xs text-gray-500 block mb-1">Comercios ({selectedIds.length} seleccionados)</label>
-          <div className="flex gap-1">
-            <button onClick={selectAllFiltered} className="btn-secondary text-xs px-2 py-1">Seleccionar todos</button>
-            <button onClick={clearSelection} className="btn-secondary text-xs px-2 py-1">Limpiar</button>
-          </div>
-        </div>
+      {/* Filtros de fecha y botones */}
+      <div className="flex flex-wrap gap-3 p-3 bg-gray-50 rounded-lg items-end">
         <div>
           <label className="text-xs text-gray-500 block mb-1">Desde</label>
           <input type="datetime-local" className="input text-sm" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
@@ -1006,253 +835,61 @@ function MonitoringSection() {
           <label className="text-xs text-gray-500 block mb-1">Hasta</label>
           <input type="datetime-local" className="input text-sm" value={dateTo} onChange={e => setDateTo(e.target.value)} />
         </div>
+        <button
+          onClick={async () => {
+            const token = localStorage.getItem('token');
+            try {
+              const params = new URLSearchParams();
+              if (dateFrom) params.set('date_from', dateFrom);
+              if (dateTo) params.set('date_to', dateTo);
+              const qs = params.toString() ? '?' + params.toString() : '';
+              const response = await fetch(
+                (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL + '/api/v1' : '/api/v1') + '/transactions/gateway-changes-export' + qs,
+                { headers: { Authorization: 'Bearer ' + token } }
+              );
+              if (!response.ok) throw new Error('Error');
+              const blob = await response.blob();
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.href = url;
+              link.download = 'cambios_pasarelas_' + new Date().toISOString().slice(0,10) + '.xlsx';
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              URL.revokeObjectURL(url);
+            } catch { toast.error('Error al descargar'); }
+          }}
+          className="btn-secondary flex items-center gap-2 text-sm"
+        >
+          <Download className="w-4 h-4" />
+          Cambios Pasarelas
+        </button>
+        <button
+          onClick={async () => {
+            const token = localStorage.getItem('token');
+            try {
+              const response = await fetch(
+                (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL + '/api/v1' : '/api/v1') + '/transactions/history-export',
+                { headers: { Authorization: 'Bearer ' + token } }
+              );
+              if (!response.ok) throw new Error('Error');
+              const blob = await response.blob();
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.href = url;
+              link.download = 'historial_comercios_' + new Date().toISOString().slice(0,10) + '.xlsx';
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              URL.revokeObjectURL(url);
+            } catch { toast.error('Error al descargar'); }
+          }}
+          className="btn-secondary flex items-center gap-2 text-sm"
+        >
+          <Download className="w-4 h-4" />
+          Historial de Comercios
+        </button>
       </div>
-
-      {/* Lista de comercios con checkboxes */}
-      {!isLoading && (
-        <div className="mb-4 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1">
-            {filteredCommerces.map((c: any) => (
-              <label key={c.id} className={`flex items-center gap-1.5 text-xs p-1.5 rounded cursor-pointer hover:bg-gray-50 ${selectedIds.includes(c.id) ? 'bg-pink-50 border border-pink-200' : ''}`}>
-                <input
-                  type="checkbox"
-                  checked={selectedIds.includes(c.id)}
-                  onChange={() => toggleCommerce(c.id)}
-                  className="w-3 h-3 rounded border-gray-300 text-pink-500 focus:ring-pink-500"
-                />
-                <span className="truncate">{c.name}</span>
-                <span className="text-gray-400 flex-shrink-0">({c.country || 'â€”'})</span>
-              </label>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {isLoading && <div className="text-center py-8 text-gray-400">Cargando comercios...</div>}
-
-      {multiLoading && <div className="text-center py-4 text-gray-400">Consultando transacciones...</div>}
-
-      {/* GrÃ¡fico lineal de tendencia diaria */}
-      {selectedIds.length >= 1 && dailyTrend?.data?.length > 0 && (
-        <div className="mb-4">
-          <h4 className="text-sm font-semibold text-gray-700 mb-3">Tendencia Diaria de Transacciones</h4>
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={dailyTrend.data.map((d: any) => ({ ...d, date: new Date(d.date).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit' }) }))}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="date" tick={{ fill: '#9ca3af', fontSize: 10 }} />
-              <YAxis tick={{ fill: '#9ca3af', fontSize: 11 }} />
-              <Tooltip contentStyle={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
-              <Legend />
-              <Line type="monotone" dataKey="total" name="Total" stroke="#3B82F6" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="success_count" name="Exitosas" stroke="#10B981" strokeWidth={1.5} dot={false} />
-              <Line type="monotone" dataKey="failed_count" name="Fallidas" stroke="#EF4444" strokeWidth={1.5} dot={false} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-
-      {/* GrÃ¡fico comparativo (mÃºltiples comercios) */}
-      {selectedIds.length >= 1 && multiSummary?.data?.length > 0 && (
-        <div className="space-y-4">
-          <div>
-            <h4 className="text-sm font-semibold text-gray-700 mb-3">Comparativo de Transacciones</h4>
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={multiSummary.data} margin={{ left: 10, bottom: 60 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="name" tick={{ fill: '#9ca3af', fontSize: 9 }} angle={-30} textAnchor="end" height={70} />
-                <YAxis tick={{ fill: '#9ca3af', fontSize: 11 }} />
-                <Tooltip
-                  contentStyle={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
-                  formatter={(v: any, name: string) => [Number(v).toLocaleString(), name === 'total_transactions' ? 'Total' : name === 'success_count' ? 'Exitosas' : name === 'pending_count' ? 'Pendientes' : 'Fallidas']}
-                />
-                <Legend />
-                <Bar dataKey="success_count" name="Exitosas" fill="#10B981" stackId="a" />
-                <Bar dataKey="pending_count" name="Pendientes" fill="#F59E0B" stackId="a" />
-                <Bar dataKey="failed_count" name="Fallidas" fill="#EF4444" stackId="a" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Tabla resumen */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="table-header">Comercio</th>
-                  <th className="table-header">PaÃ­s</th>
-                  <th className="table-header text-right">Total</th>
-                  <th className="table-header text-right">Exitosas</th>
-                  <th className="table-header text-right">Pendientes</th>
-                  <th className="table-header text-right">Fallidas</th>
-                  <th className="table-header text-right">Monto</th>
-                </tr>
-              </thead>
-              <tbody>
-                {multiSummary.data.map((c: any) => (
-                  <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50">
-                    <td className="table-cell font-medium text-gray-900">{c.name}</td>
-                    <td className="table-cell text-gray-500">{c.country || 'â€”'}</td>
-                    <td className="table-cell text-right font-semibold">{Number(c.total_transactions).toLocaleString()}</td>
-                    <td className="table-cell text-right text-emerald-600">{Number(c.success_count || 0).toLocaleString()}</td>
-                    <td className="table-cell text-right text-yellow-600">{Number(c.pending_count || 0).toLocaleString()}</td>
-                    <td className="table-cell text-right text-red-500">{Number(c.failed_count || 0).toLocaleString()}</td>
-                    <td className="table-cell text-right font-mono">${Number(c.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* GrÃ¡ficos circulares por comercio */}
-          {multiSummary.data.length > 0 && (
-            <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-3">DistribuciÃ³n por Comercio</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {multiSummary.data.filter((c: any) => Number(c.total_transactions) > 0).map((c: any) => {
-                  const pieData = [
-                    { name: 'Exitosas', value: Number(c.success_count || 0), fill: '#10B981' },
-                    { name: 'Pendientes', value: Number(c.pending_count || 0), fill: '#F59E0B' },
-                    { name: 'Fallidas', value: Number(c.failed_count || 0), fill: '#EF4444' },
-                  ].filter(d => d.value > 0);
-                  return (
-                    <div key={c.id} className="border border-gray-100 rounded-lg p-3">
-                      <p className="text-xs font-semibold text-gray-700 mb-1 truncate">{c.name}</p>
-                      <p className="text-xs text-gray-400 mb-2">{Number(c.total_transactions).toLocaleString()} transacciones</p>
-                      <ResponsiveContainer width="100%" height={120}>
-                        <PieChart>
-                          <Pie data={pieData} cx="50%" cy="50%" innerRadius={25} outerRadius={45} dataKey="value" paddingAngle={2}>
-                            {pieData.map((entry, i) => (
-                              <Cell key={i} fill={entry.fill} />
-                            ))}
-                          </Pie>
-                          <Tooltip formatter={(v: any, name: string) => [Number(v).toLocaleString(), name]} />
-                        </PieChart>
-                      </ResponsiveContainer>
-                      <div className="flex justify-center gap-3 mt-1">
-                        {pieData.map(d => (
-                          <span key={d.name} className="flex items-center gap-1 text-[10px] text-gray-500">
-                            <span className="w-2 h-2 rounded-full" style={{ background: d.fill }} />
-                            {d.name}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Resumen individual */}
-      {selectedIds.length === 1 && summary && (
-        <div className="space-y-4">
-          {/* Totales */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="bg-gray-50 rounded-lg p-3">
-              <p className="text-xs text-gray-500">Total Transacciones</p>
-              <p className="text-xl font-bold text-gray-900">{Number(summary.totals?.total_transactions || 0).toLocaleString()}</p>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-3">
-              <p className="text-xs text-gray-500">Monto Total</p>
-              <p className="text-xl font-bold text-gray-900">{summary.currency || '$'} {Number(summary.totals?.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-3">
-              <p className="text-xs text-gray-500">Primera TransacciÃ³n</p>
-              <p className="text-sm font-medium text-gray-700">{summary.totals?.first_date ? new Date(summary.totals.first_date).toLocaleDateString('es-PE') : 'â€”'}</p>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-3">
-              <p className="text-xs text-gray-500">Ãšltima TransacciÃ³n</p>
-              <p className="text-sm font-medium text-gray-700">{summary.totals?.last_date ? new Date(summary.totals.last_date).toLocaleDateString('es-PE') : 'â€”'}</p>
-            </div>
-          </div>
-
-          {/* Por tipo */}
-          {summary.summary?.length > 0 && (
-            <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">Por Tipo de TransacciÃ³n</h4>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-100">
-                      <th className="table-header">Tipo</th>
-                      <th className="table-header">Estado</th>
-                      <th className="table-header">Cantidad</th>
-                      <th className="table-header">Monto Total</th>
-                      <th className="table-header">% del Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {summary.summary.map((s: any, i: number) => (
-                      <tr key={i} className="border-b border-gray-50">
-                        <td className="table-cell font-medium">{s.type || 'â€”'}</td>
-                        <td className="table-cell">
-                          <span className={`text-xs font-medium ${s.status === 'success' ? 'text-emerald-600' : s.status === 'pending' ? 'text-yellow-600' : 'text-red-500'}`}>{s.status || 'â€”'}</span>
-                        </td>
-                        <td className="table-cell">{Number(s.total_transactions).toLocaleString()}</td>
-                        <td className="table-cell font-mono">{summary.currency || '$'} {Number(s.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                        <td className="table-cell">
-                          <div className="flex items-center gap-2">
-                            <div className="w-16 bg-gray-100 rounded-full h-1.5">
-                              <div className={`h-1.5 rounded-full ${s.status === 'success' ? 'bg-emerald-500' : s.status === 'pending' ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${Math.min(100, s.percentage)}%` }} />
-                            </div>
-                            <span className="text-xs font-semibold text-gray-700">{s.percentage}%</span>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* Ãšltimos movimientos */}
-          {movements?.data?.length > 0 && (
-            <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">Ãšltimos Pagos</h4>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-100">
-                      <th className="table-header">Fecha</th>
-                      <th className="table-header">Tipo</th>
-                      <th className="table-header">MÃ©todo</th>
-                      <th className="table-header">Monto</th>
-                      <th className="table-header">Estado</th>
-                      <th className="table-header">UID</th>
-                      <th className="table-header">Referencia</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {movements.data.map((m: any) => (
-                      <tr key={m.id} className="border-b border-gray-50">
-                        <td className="table-cell text-xs">{new Date(m.created_at).toLocaleString('es-PE')}</td>
-                        <td className="table-cell">{m.type || 'â€”'}</td>
-                        <td className="table-cell text-xs">{m.method || 'â€”'}</td>
-                        <td className="table-cell font-mono">{summary?.currency || '$'} {Number(m.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                        <td className="table-cell">
-                          <span className={`text-xs font-medium ${m.status === 'success' ? 'text-emerald-600' : m.status === 'pending' ? 'text-yellow-600' : 'text-red-500'}`}>
-                            {m.status || 'â€”'}
-                          </span>
-                        </td>
-                        <td className="table-cell text-xs font-mono text-gray-500">{m.uid || 'â€”'}</td>
-                        <td className="table-cell text-xs font-mono text-gray-500">{m.reference || 'â€”'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <p className="text-xs text-gray-400 mt-2">Mostrando {movements.data.length} de {movements.total} movimientos</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {selectedIds.length === 0 && !isLoading && (
-        <div className="text-center py-8 text-gray-400">Selecciona uno o mÃ¡s comercios para ver sus transacciones</div>
-      )}
     </div>
   );
 }
