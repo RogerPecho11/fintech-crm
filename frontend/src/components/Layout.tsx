@@ -139,7 +139,7 @@ export default function Layout() {
           <div className="flex items-center gap-3 px-2 py-2">
             <div
               className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-              style={{ backgroundColor: '#F0184A' }}
+              style={{ backgroundColor: '#FC2B5F' }}
             >
               {getInitials(`${user?.first_name} ${user?.last_name}`)}
             </div>

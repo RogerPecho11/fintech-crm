@@ -30,7 +30,7 @@ import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import SlaPanel from '../components/SlaPanel';
 
-const CHART_COLORS = ['#F0184A', '#3b82f6', '#f59e0b', '#10b981', '#8b5cf6', '#06b6d4', '#f97316', '#84cc16'];
+const CHART_COLORS = ['#FC2B5F', '#3b82f6', '#f59e0b', '#10b981', '#8b5cf6', '#06b6d4', '#f97316', '#84cc16'];
 
 const TOOLTIP_STYLE = {
   contentStyle: {
@@ -48,9 +48,9 @@ function StatCard({ icon: Icon, label, value, sub, accent = false }: any) {
     <div className="card flex items-start gap-4">
       <div
         className="p-2.5 rounded-xl flex-shrink-0"
-        style={{ backgroundColor: accent ? '#F0184A' : '#fff0f3' }}
+        style={{ backgroundColor: accent ? '#FC2B5F' : '#fff0f3' }}
       >
-        <Icon className="w-5 h-5" style={{ color: accent ? '#fff' : '#F0184A' }} />
+        <Icon className="w-5 h-5" style={{ color: accent ? '#fff' : '#FC2B5F' }} />
       </div>
       <div>
         <p className="text-gray-500 text-sm">{label}</p>
@@ -282,7 +282,7 @@ export default function DashboardPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#F0184A', borderTopColor: 'transparent' }} />
+        <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#FC2B5F', borderTopColor: 'transparent' }} />
       </div>
     );
   }
@@ -315,7 +315,7 @@ export default function DashboardPage() {
       <div className="card p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Globe className="w-4 h-4" style={{ color: '#F0184A' }} />
+            <Globe className="w-4 h-4" style={{ color: '#FC2B5F' }} />
             <h3 className="font-semibold text-gray-900 text-sm">Países Operativos</h3>
             <span className="badge bg-gray-100 text-gray-500 text-xs">{activeCountries.length}</span>
           </div>
@@ -323,8 +323,8 @@ export default function DashboardPage() {
             onClick={() => setShowCountryPanel(!showCountryPanel)}
             className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors"
             style={showCountryPanel
-              ? { backgroundColor: '#F0184A', color: 'white', borderColor: '#F0184A' }
-              : { backgroundColor: 'white', color: '#F0184A', borderColor: '#F0184A' }
+              ? { backgroundColor: '#FC2B5F', color: 'white', borderColor: '#FC2B5F' }
+              : { backgroundColor: 'white', color: '#FC2B5F', borderColor: '#FC2B5F' }
             }
           >
             <Plus className="w-3.5 h-3.5" />
@@ -400,7 +400,7 @@ export default function DashboardPage() {
       <div className="card p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Settings className="w-4 h-4" style={{ color: '#F0184A' }} />
+            <Settings className="w-4 h-4" style={{ color: '#FC2B5F' }} />
             <h3 className="font-semibold text-gray-900 text-sm">Configuración del Sistema</h3>
           </div>
           <div className="flex gap-2 flex-wrap">
@@ -418,8 +418,8 @@ export default function DashboardPage() {
                 onClick={() => setActiveConfigPanel(activeConfigPanel === key ? null : key)}
                 className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors"
                 style={activeConfigPanel === key
-                  ? { backgroundColor: '#F0184A', color: 'white', borderColor: '#F0184A' }
-                  : { backgroundColor: 'white', color: '#F0184A', borderColor: '#F0184A' }
+                  ? { backgroundColor: '#FC2B5F', color: 'white', borderColor: '#FC2B5F' }
+                  : { backgroundColor: 'white', color: '#FC2B5F', borderColor: '#FC2B5F' }
                 }
               >
                 <Icon className="w-3.5 h-3.5" />
@@ -861,7 +861,7 @@ export default function DashboardPage() {
       {user?.role === 'admin' && (
         <div className="card p-4">
           <div className="flex items-center gap-2 mb-4">
-            <Shield className="w-4 h-4" style={{ color: '#F0184A' }} />
+            <Shield className="w-4 h-4" style={{ color: '#FC2B5F' }} />
             <h3 className="font-semibold text-gray-900 text-sm">Configuración de SLA</h3>
             <span className="badge bg-rose-50 text-rose-600 text-xs ml-1">Admin</span>
           </div>
@@ -922,8 +922,8 @@ export default function DashboardPage() {
             <AreaChart data={metrics?.monthlyTrend || []}>
               <defs>
                 <linearGradient id="colorNew" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor="#F0184A" stopOpacity={0.15} />
-                  <stop offset="95%" stopColor="#F0184A" stopOpacity={0} />
+                  <stop offset="5%"  stopColor="#FC2B5F" stopOpacity={0.15} />
+                  <stop offset="95%" stopColor="#FC2B5F" stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="colorCert" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%"  stopColor="#10b981" stopOpacity={0.15} />
@@ -935,7 +935,7 @@ export default function DashboardPage() {
               <YAxis tick={{ fill: '#9CA3AF', fontSize: 11 }} />
               <Tooltip {...TOOLTIP_STYLE} />
               <Legend />
-              <Area type="monotone" dataKey="new_merchants" name="Nuevos"      stroke="#F0184A" fill="url(#colorNew)"  strokeWidth={2} />
+              <Area type="monotone" dataKey="new_merchants" name="Nuevos"      stroke="#FC2B5F" fill="url(#colorNew)"  strokeWidth={2} />
               <Area type="monotone" dataKey="certified"     name="Certificados" stroke="#10b981" fill="url(#colorCert)" strokeWidth={2} />
             </AreaChart>
           </ResponsiveContainer>
@@ -983,8 +983,8 @@ export default function DashboardPage() {
               <Tooltip {...TOOLTIP_STYLE} />
               <Bar dataKey="value" name="Comercios" radius={[6, 6, 0, 0]}>
                 {riskData.map((_, index) => {
-                  const colors = ['#10b981', '#f59e0b', '#f97316', '#F0184A'];
-                  return <Cell key={index} fill={colors[index] || '#F0184A'} />;
+                  const colors = ['#10b981', '#f59e0b', '#f97316', '#FC2B5F'];
+                  return <Cell key={index} fill={colors[index] || '#FC2B5F'} />;
                 })}
               </Bar>
             </BarChart>
@@ -1125,13 +1125,13 @@ export default function DashboardPage() {
         <div className="space-y-3">
           {(metrics?.recentActivity || []).map((activity: any) => (
             <div key={activity.id} className="flex items-start gap-3">
-              <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ backgroundColor: '#F0184A' }} />
+              <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ backgroundColor: '#FC2B5F' }} />
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-gray-700">
                   <span className="font-medium text-gray-900">{activity.user_name}</span>
                   {' '}{activity.action.toLowerCase().replace('_', ' ')}{' '}
                   {activity.merchant_name && (
-                    <Link to={`/merchants/${activity.merchant_id}`} className="font-medium hover:underline" style={{ color: '#F0184A' }}>
+                    <Link to={`/merchants/${activity.merchant_id}`} className="font-medium hover:underline" style={{ color: '#FC2B5F' }}>
                       {activity.merchant_name}
                     </Link>
                   )}
@@ -1186,7 +1186,7 @@ function GatewayEmailsPanel() {
   return (
     <div className="card p-4">
       <div className="flex items-center gap-2 mb-3">
-        <Activity className="w-4 h-4" style={{ color: '#F0184A' }} />
+        <Activity className="w-4 h-4" style={{ color: '#FC2B5F' }} />
         <h3 className="font-semibold text-gray-900 text-sm">Reporte Diario de Pasarelas</h3>
         <span className="badge bg-rose-50 text-rose-600 text-xs ml-1">Admin</span>
       </div>

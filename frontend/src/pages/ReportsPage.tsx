@@ -151,7 +151,7 @@ export default function ReportsPage() {
       name: u.user_name.split(' ')[0],
       value: Number(u.completion_rate || 0),
     }));
-  const PIE_COLORS = ['#F0184A','#3b82f6','#10b981','#f59e0b','#8b5cf6','#06b6d4','#f97316'];
+  const PIE_COLORS = ['#FC2B5F','#3b82f6','#10b981','#f59e0b','#8b5cf6','#06b6d4','#f97316'];
 
   return (
     <div className="space-y-6">
@@ -193,7 +193,7 @@ export default function ReportsPage() {
                     <div className="w-full bg-gray-100 rounded-full h-1">
                       <div
                         className="h-1 rounded-full"
-                        style={{ width: `${(item.count / (summary.mccSummary[0]?.count || 1)) * 100}%`, backgroundColor: '#F0184A' }}
+                        style={{ width: `${(item.count / (summary.mccSummary[0]?.count || 1)) * 100}%`, backgroundColor: '#FC2B5F' }}
                       />
                     </div>
                   </div>
@@ -336,7 +336,7 @@ export default function ReportsPage() {
         {/* Header */}
         <div className="flex flex-wrap items-center gap-3 mb-5">
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <CheckSquare className="w-5 h-5 flex-shrink-0" style={{ color: '#F0184A' }} />
+            <CheckSquare className="w-5 h-5 flex-shrink-0" style={{ color: '#FC2B5F' }} />
             <h2 className="text-lg font-bold text-gray-900">Tareas por Usuario</h2>
             {taskReport && (
               <span className="badge bg-gray-100 text-gray-500 text-xs">
@@ -414,7 +414,7 @@ export default function ReportsPage() {
         {taskLoading ? (
           <div className="flex items-center justify-center h-32">
             <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin"
-              style={{ borderColor: '#F0184A', borderTopColor: 'transparent' }} />
+              style={{ borderColor: '#FC2B5F', borderTopColor: 'transparent' }} />
           </div>
         ) : (
           <>

@@ -143,7 +143,7 @@ export default function SlaPanel() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-24">
-        <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#F0184A', borderTopColor: 'transparent' }} />
+        <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#FC2B5F', borderTopColor: 'transparent' }} />
       </div>
     );
   }
@@ -170,7 +170,7 @@ export default function SlaPanel() {
             className={`px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
               activeTab === tab ? 'border-transparent' : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
-            style={activeTab === tab ? { color: '#F0184A', borderColor: '#F0184A' } : undefined}
+            style={activeTab === tab ? { color: '#FC2B5F', borderColor: '#FC2B5F' } : undefined}
           >
             {TAB_LABELS[tab]}
           </button>

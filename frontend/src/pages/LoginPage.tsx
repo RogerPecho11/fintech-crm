@@ -29,7 +29,7 @@ export default function LoginPage() {
       {/* Background accent */}
       <div
         className="fixed top-0 left-0 right-0 h-1.5"
-        style={{ background: 'linear-gradient(90deg, #F0184A 0%, #ff6b95 100%)' }}
+        style={{ background: 'linear-gradient(90deg, #FC2B5F 0%, #ff6b95 100%)' }}
       />
 
       <div className="w-full max-w-md">

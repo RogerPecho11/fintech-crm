@@ -81,7 +81,7 @@ export default function TasksPage() {
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               filter === f.val ? 'text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
-            style={filter === f.val ? { backgroundColor: '#F0184A', color: 'white' } : undefined}
+            style={filter === f.val ? { backgroundColor: '#FC2B5F', color: 'white' } : undefined}
           >
             {f.label}
           </button>
@@ -90,7 +90,7 @@ export default function TasksPage() {
 
       {isLoading ? (
         <div className="flex items-center justify-center h-48">
-          <div className="w-6 h-6 border-2 rounded-full animate-spin" style={{ borderColor: '#F0184A', borderTopColor: 'transparent' }} />
+          <div className="w-6 h-6 border-2 rounded-full animate-spin" style={{ borderColor: '#FC2B5F', borderTopColor: 'transparent' }} />
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -255,7 +255,7 @@ function TaskColumn({ title, tasks, color, icon: Icon, slaData, onStatusChange }
           </div>
           {task.description && <p className="text-xs text-gray-500 whitespace-pre-line">{task.description}</p>}
           {task.merchant_name && (
-            <p className="text-xs" style={{ color: '#F0184A' }}>{task.merchant_name}</p>
+            <p className="text-xs" style={{ color: '#FC2B5F' }}>{task.merchant_name}</p>
           )}
           <div className="flex items-center justify-between">
             {task.due_date && (
@@ -349,7 +349,7 @@ function TaskColumn({ title, tasks, color, icon: Icon, slaData, onStatusChange }
                   onClick={() => handleComplete(completeModal)}
                   disabled={completing}
                   className="flex-1 px-4 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-50"
-                  style={{ background: '#F0184A' }}
+                  style={{ background: '#FC2B5F' }}
                 >
                   {completing ? 'Guardando...' : 'Completar Tarea'}
                 </button>

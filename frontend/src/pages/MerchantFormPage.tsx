@@ -352,7 +352,7 @@ export default function MerchantFormPage() {
             className={`flex-1 py-2 text-xs font-medium rounded-lg transition-colors ${
               step > s.id ? 'bg-rose-50 text-rose-600' : step < s.id ? 'bg-gray-100 text-gray-400' : ''
             }`}
-            style={step === s.id ? { backgroundColor: '#F0184A', color: 'white' } : undefined}
+            style={step === s.id ? { backgroundColor: '#FC2B5F', color: 'white' } : undefined}
           >
             {s.label}
           </button>

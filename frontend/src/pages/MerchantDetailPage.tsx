@@ -134,7 +134,7 @@ export default function MerchantDetailPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-2 rounded-full animate-spin" style={{ borderColor: '#F0184A', borderTopColor: 'transparent' }} />
+        <div className="w-8 h-8 border-2 rounded-full animate-spin" style={{ borderColor: '#FC2B5F', borderTopColor: 'transparent' }} />
       </div>
     );
   }
@@ -277,7 +277,7 @@ export default function MerchantDetailPage() {
                 ? 'border-transparent text-white'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
-            style={tab === t ? { color: '#F0184A', borderColor: '#F0184A' } : undefined}
+            style={tab === t ? { color: '#FC2B5F', borderColor: '#FC2B5F' } : undefined}
           >
             {t}
           </button>
@@ -312,7 +312,7 @@ export default function MerchantDetailPage() {
               {merchant.website && (
                 <InfoRow label="URL comercio" value={
                   <a href={merchant.website} target="_blank" rel="noopener noreferrer"
-                    className="hover:underline truncate block" style={{ color: '#F0184A' }}>
+                    className="hover:underline truncate block" style={{ color: '#FC2B5F' }}>
                     {merchant.website}
                   </a>
                 } />
@@ -520,7 +520,7 @@ export default function MerchantDetailPage() {
           <div className="space-y-2">
             {(documents || []).map((doc: any) => (
               <div key={doc.id} className="card p-4 flex items-center gap-4">
-                <FileText className="w-8 h-8 flex-shrink-0" style={{ color: '#F0184A' }} />
+                <FileText className="w-8 h-8 flex-shrink-0" style={{ color: '#FC2B5F' }} />
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-gray-900 text-sm truncate">{doc.name}</p>
                   <p className="text-xs text-gray-500">
@@ -690,7 +690,7 @@ export default function MerchantDetailPage() {
                   }
                 }}
                 className="flex-1 px-4 py-2 rounded-lg text-white text-sm font-medium"
-                style={{ background: '#F0184A' }}
+                style={{ background: '#FC2B5F' }}
               >
                 Guardar
               </button>
@@ -816,7 +816,7 @@ function TimelineItem({ item }: { item: any }) {
           </p>
         )}
         {item.type === 'document' && (
-          <p className="text-sm text-gray-700">Documento subido: <span style={{ color: '#F0184A' }}>{item.name}</span></p>
+          <p className="text-sm text-gray-700">Documento subido: <span style={{ color: '#FC2B5F' }}>{item.name}</span></p>
         )}
         {item.type === 'task' && (
           <p className="text-sm text-gray-700">Tarea: <span className="text-purple-600">{item.title}</span> ({item.status})</p>
@@ -847,7 +847,7 @@ function ContractSection({ merchantId }: { merchantId: string }) {
       <div className="space-y-2">
         {contracts.map((doc: any) => (
           <div key={doc.id} className="flex items-center gap-3 p-3 border border-gray-100 rounded-lg bg-gray-50">
-            <FileText className="w-5 h-5 flex-shrink-0" style={{ color: '#F0184A' }} />
+            <FileText className="w-5 h-5 flex-shrink-0" style={{ color: '#FC2B5F' }} />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-900 truncate">{doc.name || doc.original_name}</p>
               <p className="text-xs text-gray-500">{doc.uploaded_by_name} · {new Date(doc.created_at).toLocaleDateString()}</p>
