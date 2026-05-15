@@ -1,7 +1,8 @@
 import { Router, Response } from 'express';
 import { authenticate } from '../middleware/auth';
 import { AuthenticatedRequest } from '../types';
-import { mysqlQuery } from '../database/mysqlConnection';
+import { mysqlQuery, mysqlQueryCached, mysqlQueryPaginatedCached, MysqlCache, getMysqlStats, clearMysqlCache } from '../database/mysqlConnection';
+import { mysqlCache } from '../database/mysqlCache';
 import { query } from '../database/connection';
 import nodemailer from 'nodemailer';
 import ExcelJS from 'exceljs';
@@ -9,25 +10,9 @@ import ExcelJS from 'exceljs';
 const router = Router();
 router.use(authenticate);
 
-// ─── Cache en memoria para reducir consultas a MySQL ─────────────────────────
-const cache = new Map<string, { data: any; expires: number }>();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
-
-function getCached(key: string): any | null {
-  const entry = cache.get(key);
-  if (!entry) return null;
-  if (Date.now() > entry.expires) { cache.delete(key); return null; }
-  return entry.data;
-}
-
-function setCache(key: string, data: any, ttl: number = CACHE_TTL): void {
-  cache.set(key, { data, expires: Date.now() + ttl });
-  // Limpiar entradas viejas cada 100 inserciones
-  if (cache.size > 200) {
-    const now = Date.now();
-    for (const [k, v] of cache) { if (now > v.expires) cache.delete(k); }
-  }
-}
+// ─── Cache centralizado (usa mysqlCache global) ─────────────────────────────
+function getCached(key: string): any | null { return mysqlCache.get(key); }
+function setCache(key: string, data: any, ttl: number = MysqlCache.TTL_SUMMARY): void { mysqlCache.set(key, data, ttl); }
 
 // Helper: si date_to no tiene hora (solo fecha), agregar 23:59:59
 function formatDateTo(val: string): string {
@@ -49,14 +34,16 @@ router.get('/commerces', async (_req: AuthenticatedRequest, res: Response) => {
     const cached = getCached(cacheKey);
     if (cached) return res.json(cached);
 
-    const commerces = await mysqlQuery(
+    const commerces = await mysqlQueryCached(
+      'commerces-list',
       `SELECT id, name, slug, rut, country, enabled, created_at
        FROM commerce
        WHERE (is_deleted IS NULL OR is_deleted = 0)
        ORDER BY name ASC
-       LIMIT 200`
+       LIMIT 200`,
+      [],
+      MysqlCache.TTL_STATIC // 30 min — comercios no cambian seguido
     );
-    setCache(cacheKey, commerces, 10 * 60 * 1000); // 10 min
     res.json(commerces);
   } catch (err: any) {
     console.error('[Transactions] Error fetching commerces:', err.message);

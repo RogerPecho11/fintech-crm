@@ -9,6 +9,7 @@ import { useSocket } from '../contexts/SocketContext';
 import { getInitials } from '../lib/utils';
 import NotificationBell from './NotificationBell';
 import ProntoPagaLogo, { ProntoPagaLogoFallback } from './ProntoPagaLogo';
+import DbResourceMonitor from './DbResourceMonitor';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', exact: true, roles: ['admin', 'commercial', 'onboarding'] },
@@ -43,6 +44,7 @@ export default function Layout() {
   }[user?.role || 'commercial'];
 
   return (
+    <>
     <div className="flex h-screen overflow-hidden bg-gray-50">
       {/* Mobile overlay */}
       {sidebarOpen && (
@@ -187,6 +189,10 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+
     </div>
+    {/* Monitor de recursos DB - fuera del overflow-hidden para que sea visible */}
+    {(user?.role === 'admin' || user?.role === 'onboarding') && <DbResourceMonitor />}
+    </>
   );
 }

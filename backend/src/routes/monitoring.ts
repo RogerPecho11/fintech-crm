@@ -1,29 +1,19 @@
 import { Router, Response } from 'express';
 import { authenticate } from '../middleware/auth';
 import { AuthenticatedRequest } from '../types';
-import { mysqlQuery } from '../database/mysqlConnection';
+import { mysqlQuery, mysqlQueryCached, MysqlCache, getMysqlStats } from '../database/mysqlConnection';
 
 const router = Router();
 router.use(authenticate);
 
-// ─── Cache ────────────────────────────────────────────────────────────────────
-const cache = new Map<string, { data: any; expires: number }>();
-const CACHE_5MIN = 5 * 60 * 1000;
-const CACHE_30MIN = 30 * 60 * 1000;
+// ─── Cache centralizado (usa mysqlCache global) ──────────────────────────────
+const CACHE_5MIN = MysqlCache.TTL_SUMMARY;
+const CACHE_30MIN = MysqlCache.TTL_STATIC;
 
-function getCached(key: string): any | null {
-  const entry = cache.get(key);
-  if (!entry) return null;
-  if (Date.now() > entry.expires) { cache.delete(key); return null; }
-  return entry.data;
-}
-function setCache(key: string, data: any, ttl: number): void {
-  cache.set(key, { data, expires: Date.now() + ttl });
-  if (cache.size > 100) {
-    const now = Date.now();
-    for (const [k, v] of cache) { if (now > v.expires) cache.delete(k); }
-  }
-}
+// Helpers de compatibilidad que usan el cache centralizado
+import { mysqlCache } from '../database/mysqlCache';
+function getCached(key: string): any | null { return mysqlCache.get(key); }
+function setCache(key: string, data: any, ttl: number): void { mysqlCache.set(key, data, ttl); }
 
 // País → Moneda
 const COUNTRY_CURRENCY: Record<string, string> = {
@@ -310,6 +300,30 @@ router.get('/report-pdf', async (req: AuthenticatedRequest, res: Response) => {
       GROUP BY type ORDER BY monto DESC`;
     const payoutVol = await mysqlQuery(payoutVolSql, [cid, from + ' 00:00:00', to + ' 23:59:59']);
 
+    // ─── NUEVO: Motivos de error Payin (por status + internal_state + método) ───
+    const payinErrorsSql = `SELECT method, status, internal_state,
+      COUNT(*) as cantidad
+      FROM payment
+      WHERE commerce_id = ? AND deleted_at IS NULL
+      AND status NOT IN ('success','completed','pending','new','created','processing')
+      AND created_at BETWEEN ? AND ?
+      GROUP BY method, status, internal_state
+      ORDER BY cantidad DESC
+      LIMIT 50`;
+    const payinErrors = await mysqlQuery(payinErrorsSql, [cid, from + ' 00:00:00', to + ' 23:59:59']);
+
+    // ─── NUEVO: Motivos de error Payout (por status + internal_state + tipo) ───
+    const payoutErrorsSql = `SELECT type as method, status, internal_state,
+      COUNT(*) as cantidad
+      FROM withdrawal
+      WHERE commerce_id = ? AND deleted_at IS NULL
+      AND status NOT IN ('success','completed','pending','new','created','processing')
+      AND created_at BETWEEN ? AND ?
+      GROUP BY type, status, internal_state
+      ORDER BY cantidad DESC
+      LIMIT 50`;
+    const payoutErrors = await mysqlQuery(payoutErrorsSql, [cid, from + ' 00:00:00', to + ' 23:59:59']);
+
     // Generar PDF
     const PDFDocument = require('pdfkit');
     const doc = new PDFDocument({ size: 'A4', margin: 50 });
@@ -495,6 +509,114 @@ router.get('/report-pdf', async (req: AuthenticatedRequest, res: Response) => {
       doc.y += 16;
     });
 
+    // ─── NUEVO: Motivos de Error — Payin ───
+    if (doc.y > 450) doc.addPage();
+    doc.moveDown(1.5);
+    doc.rect(50, doc.y, 495, 22).fill('#991B1B');
+    doc.fontSize(12).fillColor('#FFFFFF').text('  Motivos de Error — Payin', 50, doc.y + 5);
+    doc.y += 30;
+
+    if ((payinErrors as any[]).length === 0) {
+      doc.fontSize(9).fillColor('#6B7280').text('No se registraron errores en el período seleccionado.');
+      doc.moveDown(1);
+    } else {
+      const totalPayinErrors = (payinErrors as any[]).reduce((a: number, r: any) => a + Number(r.cantidad), 0);
+
+      // Header
+      const startX = 50;
+      let y = doc.y;
+      doc.rect(startX, y, 495, 14).fill('#FEF2F2');
+      doc.fontSize(7).fillColor('#991B1B');
+      doc.text('Método', startX + 5, y + 3, { width: 80 });
+      doc.text('Estado', startX + 90, y + 3, { width: 80 });
+      doc.text('Motivo (internal_state)', startX + 175, y + 3, { width: 160 });
+      doc.text('Cantidad', startX + 350, y + 3, { width: 55, align: 'right' });
+      doc.text('% del total', startX + 415, y + 3, { width: 60, align: 'right' });
+      y += 18;
+
+      doc.fontSize(8);
+      (payinErrors as any[]).forEach((r: any, idx: number) => {
+        if (doc.y > 750) { doc.addPage(); y = 50; }
+        if (idx % 2 === 0) doc.rect(startX, y - 2, 495, 14).fill('#FFFBFB');
+        const pct = totalPayinErrors > 0 ? (Number(r.cantidad) / totalPayinErrors * 100).toFixed(1) : '0.0';
+        const pctNum = parseFloat(pct);
+        const pctColor = pctNum >= 30 ? '#DC2626' : pctNum >= 15 ? '#F59E0B' : '#6B7280';
+
+        doc.fillColor('#111827').text(r.method || 'N/A', startX + 5, y, { width: 80 });
+        doc.fillColor('#DC2626').text(r.status || 'N/A', startX + 90, y, { width: 80 });
+        doc.fillColor('#374151').text(r.internal_state || 'Sin detalle', startX + 175, y, { width: 160 });
+        doc.fillColor('#111827').text(String(Number(r.cantidad).toLocaleString()), startX + 350, y, { width: 55, align: 'right' });
+        doc.fillColor(pctColor).text(pct + '%', startX + 415, y, { width: 60, align: 'right' });
+
+        // Mini barra de proporción
+        const barW = Math.max(1, pctNum * 0.2);
+        doc.rect(startX + 480, y + 3, barW, 6).fill(pctColor);
+        y += 14;
+      });
+
+      // Total errores
+      doc.rect(startX, y, 495, 14).fill('#FEE2E2');
+      doc.fontSize(8).fillColor('#991B1B').font('Helvetica-Bold');
+      doc.text('Total errores', startX + 5, y + 3, { width: 200 });
+      doc.text(String(totalPayinErrors.toLocaleString()), startX + 350, y + 3, { width: 55, align: 'right' });
+      doc.text('100%', startX + 415, y + 3, { width: 60, align: 'right' });
+      doc.font('Helvetica');
+      doc.y = y + 25;
+    }
+
+    // ─── NUEVO: Motivos de Error — Payout ───
+    if (doc.y > 450) doc.addPage();
+    doc.moveDown(1);
+    doc.rect(50, doc.y, 495, 22).fill('#78350F');
+    doc.fontSize(12).fillColor('#FFFFFF').text('  Motivos de Error — Payout', 50, doc.y + 5);
+    doc.y += 30;
+
+    if ((payoutErrors as any[]).length === 0) {
+      doc.fontSize(9).fillColor('#6B7280').text('No se registraron errores en el período seleccionado.');
+      doc.moveDown(1);
+    } else {
+      const totalPayoutErrors = (payoutErrors as any[]).reduce((a: number, r: any) => a + Number(r.cantidad), 0);
+
+      const startX = 50;
+      let y = doc.y;
+      doc.rect(startX, y, 495, 14).fill('#FFFBEB');
+      doc.fontSize(7).fillColor('#78350F');
+      doc.text('Método', startX + 5, y + 3, { width: 80 });
+      doc.text('Estado', startX + 90, y + 3, { width: 80 });
+      doc.text('Motivo (internal_state)', startX + 175, y + 3, { width: 160 });
+      doc.text('Cantidad', startX + 350, y + 3, { width: 55, align: 'right' });
+      doc.text('% del total', startX + 415, y + 3, { width: 60, align: 'right' });
+      y += 18;
+
+      doc.fontSize(8);
+      (payoutErrors as any[]).forEach((r: any, idx: number) => {
+        if (doc.y > 750) { doc.addPage(); y = 50; }
+        if (idx % 2 === 0) doc.rect(startX, y - 2, 495, 14).fill('#FFFEF5');
+        const pct = totalPayoutErrors > 0 ? (Number(r.cantidad) / totalPayoutErrors * 100).toFixed(1) : '0.0';
+        const pctNum = parseFloat(pct);
+        const pctColor = pctNum >= 30 ? '#DC2626' : pctNum >= 15 ? '#F59E0B' : '#6B7280';
+
+        doc.fillColor('#111827').text(r.method || 'N/A', startX + 5, y, { width: 80 });
+        doc.fillColor('#B45309').text(r.status || 'N/A', startX + 90, y, { width: 80 });
+        doc.fillColor('#374151').text(r.internal_state || 'Sin detalle', startX + 175, y, { width: 160 });
+        doc.fillColor('#111827').text(String(Number(r.cantidad).toLocaleString()), startX + 350, y, { width: 55, align: 'right' });
+        doc.fillColor(pctColor).text(pct + '%', startX + 415, y, { width: 60, align: 'right' });
+
+        const barW = Math.max(1, pctNum * 0.2);
+        doc.rect(startX + 480, y + 3, barW, 6).fill(pctColor);
+        y += 14;
+      });
+
+      // Total errores
+      doc.rect(startX, y, 495, 14).fill('#FEF3C7');
+      doc.fontSize(8).fillColor('#78350F').font('Helvetica-Bold');
+      doc.text('Total errores', startX + 5, y + 3, { width: 200 });
+      doc.text(String(totalPayoutErrors.toLocaleString()), startX + 350, y + 3, { width: 55, align: 'right' });
+      doc.text('100%', startX + 415, y + 3, { width: 60, align: 'right' });
+      doc.font('Helvetica');
+      doc.y = y + 25;
+    }
+
     // ─── Conclusiones ───
     if (doc.y > 600) doc.addPage();
     doc.moveDown(1.5);
@@ -510,12 +632,20 @@ router.get('/report-pdf', async (req: AuthenticatedRequest, res: Response) => {
     const topPayinMethod = (payinVol as any[])[0]?.method || 'N/A';
     const topPayoutMethod = (payoutVol as any[])[0]?.method || 'N/A';
 
+    // Top motivo de error
+    const topPayinError = (payinErrors as any[])[0];
+    const topPayoutError = (payoutErrors as any[])[0];
+    const totalPayinErr = (payinErrors as any[]).reduce((a: number, r: any) => a + Number(r.cantidad), 0);
+    const totalPayoutErr = (payoutErrors as any[]).reduce((a: number, r: any) => a + Number(r.cantidad), 0);
+
     const conclusions = [
       `• Durante el período ${from} al ${to} se procesaron ${payinTotal.toLocaleString()} transacciones de payin y ${payoutTotal.toLocaleString()} de payout.`,
       `• La tasa de aprobación general de payins fue de ${payinRate}%.`,
       `• El método de pago más utilizado en payin fue "${topPayinMethod}".`,
       topPayoutMethod !== 'N/A' ? `• El método de payout más utilizado fue "${topPayoutMethod}".` : '',
-      `• Se recomienda revisar los métodos con tasa de aprobación inferior al 70%.`,
+      totalPayinErr > 0 ? `• Se registraron ${totalPayinErr.toLocaleString()} errores en payin. El motivo principal fue "${topPayinError?.internal_state || topPayinError?.status || 'N/A'}" en método "${topPayinError?.method || 'N/A'}" (${topPayinError ? (Number(topPayinError.cantidad) / totalPayinErr * 100).toFixed(1) : 0}% de los errores).` : '',
+      totalPayoutErr > 0 ? `• Se registraron ${totalPayoutErr.toLocaleString()} errores en payout. El motivo principal fue "${topPayoutError?.internal_state || topPayoutError?.status || 'N/A'}" en método "${topPayoutError?.method || 'N/A'}" (${topPayoutError ? (Number(topPayoutError.cantidad) / totalPayoutErr * 100).toFixed(1) : 0}% de los errores).` : '',
+      `• Se recomienda revisar los métodos con tasa de aprobación inferior al 70% y los motivos de error recurrentes.`,
     ].filter(Boolean);
 
     conclusions.forEach(c => { doc.text(c); doc.moveDown(0.3); });
@@ -528,6 +658,25 @@ router.get('/report-pdf', async (req: AuthenticatedRequest, res: Response) => {
   } catch (err: any) {
     console.error('[Monitoring] report-pdf error:', err.message);
     res.status(500).json({ error: 'Error al generar PDF: ' + err.message });
+  }
+});
+
+// ─── GET /cache-stats — Estadísticas del cache y rate limiter
+router.get('/cache-stats', async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    res.json(getMysqlStats());
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── POST /cache-clear — Limpiar cache manualmente
+router.post('/cache-clear', async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    mysqlCache.clear();
+    res.json({ message: 'Cache limpiado exitosamente' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 
