@@ -118,9 +118,9 @@ export default function CalendarPage() {
                     relative p-1.5 rounded-lg text-sm transition-colors min-h-[60px] text-left
                     ${isSelected ? 'bg-rose-50' : 'hover:bg-gray-50'}
                   `}
-                  style={isSelected ? { borderWidth: 1, borderStyle: 'solid', borderColor: '#FC2B5F' } : isToday ? { outline: '1px solid #FC2B5F', outlineOffset: '-1px' } : undefined}
+                  style={isSelected ? { borderWidth: 1, borderStyle: 'solid', borderColor: '#F0184A' } : isToday ? { outline: '1px solid #F0184A', outlineOffset: '-1px' } : undefined}
                 >
-                  <span className="text-xs font-medium" style={isToday ? { color: '#FC2B5F' } : { color: '#6b7280' }}>
+                  <span className="text-xs font-medium" style={isToday ? { color: '#F0184A' } : { color: '#6b7280' }}>
                     {format(day, 'd')}
                   </span>
                   <div className="mt-1 space-y-0.5">
@@ -150,7 +150,7 @@ export default function CalendarPage() {
               {selectedDay ? format(selectedDay, "d 'de' MMMM", { locale: es }) : 'Selecciona un día'}
             </h3>
             {selectedDay && (
-              <button onClick={() => openCreateModal(selectedDay)} className="hover:opacity-70 transition-opacity" style={{ color: '#FC2B5F' }}>
+              <button onClick={() => openCreateModal(selectedDay)} className="hover:opacity-70 transition-opacity" style={{ color: '#F0184A' }}>
                 <Plus className="w-4 h-4" />
               </button>
             )}
@@ -180,7 +180,7 @@ export default function CalendarPage() {
                     {event.end_time && ` - ${format(new Date(event.end_time), 'HH:mm')}`}
                   </p>
                   {event.merchant_name && (
-                    <p className="text-xs mt-1" style={{ color: '#FC2B5F' }}>{event.merchant_name}</p>
+                    <p className="text-xs mt-1" style={{ color: '#F0184A' }}>{event.merchant_name}</p>
                   )}
                 </div>
               ))}

@@ -113,7 +113,7 @@ export default function MerchantsPage() {
           <div className="flex items-center justify-center h-48">
             <div
               className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin"
-              style={{ borderColor: '#FC2B5F', borderTopColor: 'transparent' }}
+              style={{ borderColor: '#F0184A', borderTopColor: 'transparent' }}
             />
           </div>
         ) : merchants.length === 0 ? (
@@ -123,7 +123,7 @@ export default function MerchantsPage() {
             <Link
               to="/merchants/new"
               className="text-sm mt-2 hover:underline font-medium"
-              style={{ color: '#FC2B5F' }}
+              style={{ color: '#F0184A' }}
             >
               Registrar el primero
             </Link>
@@ -156,7 +156,7 @@ export default function MerchantsPage() {
                         to={`/merchants/${m.id}`}
                         className="hover:underline transition-colors"
                         style={{ color: 'inherit' }}
-                        onMouseEnter={e => (e.currentTarget.style.color = '#FC2B5F')}
+                        onMouseEnter={e => (e.currentTarget.style.color = '#F0184A')}
                         onMouseLeave={e => (e.currentTarget.style.color = 'inherit')}
                       >
                         <p className="font-semibold text-gray-900">{m.legal_name}</p>

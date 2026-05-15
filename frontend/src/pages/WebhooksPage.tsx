@@ -110,7 +110,7 @@ export default function WebhooksPage() {
                   <button
                     onClick={() => setSelectedWebhook(selectedWebhook === wh.id ? null : wh.id)}
                     className="text-gray-400 transition-colors"
-                    style={selectedWebhook === wh.id ? { color: '#FC2B5F' } : undefined}
+                    style={selectedWebhook === wh.id ? { color: '#F0184A' } : undefined}
                     title="Ver logs"
                   >
                     <Eye className="w-4 h-4" />

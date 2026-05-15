@@ -236,7 +236,7 @@ export default function MexicoFormPage() {
             type="submit"
             disabled={submitting}
             className="w-full py-3 rounded-xl text-white font-semibold text-sm disabled:opacity-50 transition-colors"
-            style={{ background: '#FC2B5F' }}
+            style={{ background: '#F0184A' }}
           >
             {submitting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Enviar Formulario'}
           </button>

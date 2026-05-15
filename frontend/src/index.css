@@ -4,10 +4,10 @@
 
 /* ── ProntoPaga Brand Variables ── */
 :root {
-  --color-primary:        #FC2B5F;
-  --color-primary-hover:  #EB265D;
-  --color-secondary:      #000000;
-  --color-text-primary:   #000000;
+  --color-primary:        #F0184A;
+  --color-primary-hover:  #d4153f;
+  --color-secondary:      #1A1A1A;
+  --color-text-primary:   #1A1A1A;
   --color-text-inverse:   #FFFFFF;
   --color-background:     #FFFFFF;
   --color-border:         #E5E7EB;
@@ -89,7 +89,7 @@
   }
   .sidebar-link.active {
     color: var(--color-primary);
-    background-color: #fff0f3;
+    background-color: #fef1f4;
     font-weight: 600;
   }
 }

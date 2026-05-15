@@ -35,7 +35,7 @@ export default function NotificationBell() {
         {unreadCount > 0 && (
           <span
             className="absolute top-1 right-1 w-4 h-4 rounded-full text-xs text-white flex items-center justify-center font-bold"
-            style={{ backgroundColor: '#FC2B5F' }}
+            style={{ backgroundColor: '#F0184A' }}
           >
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
@@ -52,7 +52,7 @@ export default function NotificationBell() {
                 <button
                   onClick={() => markAllRead.mutate()}
                   className="text-xs font-medium transition-colors"
-                  style={{ color: '#FC2B5F' }}
+                  style={{ color: '#F0184A' }}
                 >
                   Marcar todas como leídas
                 </button>
@@ -82,7 +82,7 @@ export default function NotificationBell() {
               <a
                 href="/notifications"
                 className="text-xs font-medium transition-colors"
-                style={{ color: '#FC2B5F' }}
+                style={{ color: '#F0184A' }}
                 onClick={() => setOpen(false)}
               >
                 Ver todas las notificaciones →

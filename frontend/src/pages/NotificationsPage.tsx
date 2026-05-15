@@ -75,7 +75,7 @@ export default function NotificationsPage() {
 
       {isLoading ? (
         <div className="flex items-center justify-center h-48">
-          <div className="w-6 h-6 border-2 rounded-full animate-spin" style={{ borderColor: '#FC2B5F', borderTopColor: 'transparent' }} />
+          <div className="w-6 h-6 border-2 rounded-full animate-spin" style={{ borderColor: '#F0184A', borderTopColor: 'transparent' }} />
         </div>
       ) : notifications.length === 0 ? (
         <div className="card text-center py-16">
@@ -103,7 +103,7 @@ export default function NotificationsPage() {
                     </p>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       {!n.is_read && (
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#FC2B5F' }} />
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#F0184A' }} />
                       )}
                       <button
                         onClick={(e) => { e.stopPropagation(); deleteNotif.mutate(n.id); }}
@@ -121,7 +121,7 @@ export default function NotificationsPage() {
                         to={`/merchants/${n.merchant_id}`}
                         onClick={e => e.stopPropagation()}
                         className="text-xs hover:underline"
-                        style={{ color: '#FC2B5F' }}
+                        style={{ color: '#F0184A' }}
                       >
                         {n.merchant_name}
                       </Link>

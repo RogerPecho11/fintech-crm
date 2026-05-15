@@ -215,7 +215,7 @@ export default function CertificationForm({ merchant, onClose }: Props) {
       const html = `<html><head><title>${t('title')} - ${form.merchant_name}</title>
         <style>
           body{font-family:'Inter',sans-serif;padding:40px;color:#111;font-size:13px;}
-          h1{color:#FC2B5F;font-size:22px;margin:0;}
+          h1{color:#F0184A;font-size:22px;margin:0;}
           h2{color:#374151;font-size:16px;margin-top:28px;border-bottom:1px solid #E5E7EB;padding-bottom:6px;}
           .field{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F3F4F6;}
           .label{color:#6B7280;} .value{font-weight:600;}
@@ -317,7 +317,7 @@ export default function CertificationForm({ merchant, onClose }: Props) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={handleGeneratePDF} disabled={generating} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg text-white disabled:opacity-50" style={{ background: '#FC2B5F' }}>
+            <button onClick={handleGeneratePDF} disabled={generating} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg text-white disabled:opacity-50" style={{ background: '#F0184A' }}>
               <Download className="w-3.5 h-3.5" /> {generating ? 'Generando...' : t('generate_pdf')}
             </button>
             <button onClick={onClose} className="ml-2 text-gray-400 hover:text-gray-600">
@@ -404,7 +404,7 @@ export default function CertificationForm({ merchant, onClose }: Props) {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h4 className="font-semibold text-gray-900">Transacciones ({transactions.length})</h4>
-                  <button onClick={() => setShowTxModal(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg text-white" style={{ background: '#FC2B5F' }}>
+                  <button onClick={() => setShowTxModal(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg text-white" style={{ background: '#F0184A' }}>
                     <Plus className="w-3.5 h-3.5" /> Agregar transacción
                   </button>
                 </div>
@@ -590,7 +590,7 @@ export default function CertificationForm({ merchant, onClose }: Props) {
             </div>
             <div className="flex gap-3 mt-6">
               <button onClick={() => setShowTxModal(false)} className="btn-secondary flex-1">Cancelar</button>
-              <button onClick={addTransaction} className="flex-1 px-4 py-2 rounded-lg text-white text-sm font-medium" style={{ background: '#FC2B5F' }}>Agregar</button>
+              <button onClick={addTransaction} className="flex-1 px-4 py-2 rounded-lg text-white text-sm font-medium" style={{ background: '#F0184A' }}>Agregar</button>
             </div>
           </div>
         </div>
