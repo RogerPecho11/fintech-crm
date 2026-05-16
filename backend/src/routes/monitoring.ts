@@ -301,16 +301,29 @@ router.get('/report-pdf', async (req: AuthenticatedRequest, res: Response) => {
     const payoutVol = await mysqlQuery(payoutVolSql, [cid, from + ' 00:00:00', to + ' 23:59:59']);
 
     // ─── NUEVO: Motivos de error Payin (por status + internal_state + método) ───
-    const payinErrorsSql = `SELECT method, status, internal_state,
+    const payinErrorsSql = `SELECT method, status, internal_state, method_detail,
       COUNT(*) as cantidad
       FROM payment
       WHERE commerce_id = ? AND deleted_at IS NULL
       AND status NOT IN ('success','completed','pending','new','created','processing')
       AND created_at BETWEEN ? AND ?
-      GROUP BY method, status, internal_state
+      GROUP BY method, status, internal_state, method_detail
       ORDER BY cantidad DESC
       LIMIT 50`;
     const payinErrors = await mysqlQuery(payinErrorsSql, [cid, from + ' 00:00:00', to + ' 23:59:59']);
+
+    // Resumen de motivos de rechazo Payin (agrupado solo por status + internal_state)
+    const payinRejectReasonsSql = `SELECT 
+      CONCAT(status, ' → ', COALESCE(internal_state, 'sin detalle')) as motivo,
+      COUNT(*) as cantidad
+      FROM payment
+      WHERE commerce_id = ? AND deleted_at IS NULL
+      AND status NOT IN ('success','completed','pending','new','created','processing')
+      AND created_at BETWEEN ? AND ?
+      GROUP BY motivo
+      ORDER BY cantidad DESC
+      LIMIT 20`;
+    const payinRejectReasons = await mysqlQuery(payinRejectReasonsSql, [cid, from + ' 00:00:00', to + ' 23:59:59']);
 
     // ─── NUEVO: Motivos de error Payout (por status + internal_state + tipo) ───
     const payoutErrorsSql = `SELECT type as method, status, internal_state,
@@ -323,6 +336,19 @@ router.get('/report-pdf', async (req: AuthenticatedRequest, res: Response) => {
       ORDER BY cantidad DESC
       LIMIT 50`;
     const payoutErrors = await mysqlQuery(payoutErrorsSql, [cid, from + ' 00:00:00', to + ' 23:59:59']);
+
+    // Resumen de motivos de rechazo Payout
+    const payoutRejectReasonsSql = `SELECT 
+      CONCAT(status, ' → ', COALESCE(internal_state, 'sin detalle')) as motivo,
+      COUNT(*) as cantidad
+      FROM withdrawal
+      WHERE commerce_id = ? AND deleted_at IS NULL
+      AND status NOT IN ('success','completed','pending','new','created','processing')
+      AND created_at BETWEEN ? AND ?
+      GROUP BY motivo
+      ORDER BY cantidad DESC
+      LIMIT 20`;
+    const payoutRejectReasons = await mysqlQuery(payoutRejectReasonsSql, [cid, from + ' 00:00:00', to + ' 23:59:59']);
 
     // Generar PDF
     const PDFDocument = require('pdfkit');
@@ -522,44 +548,84 @@ router.get('/report-pdf', async (req: AuthenticatedRequest, res: Response) => {
     } else {
       const totalPayinErrors = (payinErrors as any[]).reduce((a: number, r: any) => a + Number(r.cantidad), 0);
 
-      // Header
+      // ── Primero: Resumen de motivos de rechazo (% global) ──
+      doc.fontSize(10).fillColor('#111111').text('Resumen de Motivos de Rechazo');
+      doc.moveDown(0.3);
+      const totalReasons = (payinRejectReasons as any[]).reduce((a: number, r: any) => a + Number(r.cantidad), 0);
+      {
+        const startX = 50;
+        let y = doc.y;
+        doc.rect(startX, y, 495, 14).fill('#FEF2F2');
+        doc.fontSize(7).fillColor('#991B1B');
+        doc.text('Motivo (estado → sub-estado)', startX + 5, y + 3, { width: 280 });
+        doc.text('Cantidad', startX + 310, y + 3, { width: 70, align: 'right' });
+        doc.text('% del total', startX + 390, y + 3, { width: 60, align: 'right' });
+        y += 16;
+
+        doc.fontSize(8);
+        (payinRejectReasons as any[]).forEach((r: any, idx: number) => {
+          if (y > 750) { doc.addPage(); y = 50; }
+          if (idx % 2 === 0) doc.rect(startX, y - 1, 495, 13).fill('#FFFBFB');
+          const pct = totalReasons > 0 ? (Number(r.cantidad) / totalReasons * 100).toFixed(1) : '0.0';
+          const pctNum = parseFloat(pct);
+          const pctColor = pctNum >= 30 ? '#DC2626' : pctNum >= 15 ? '#F59E0B' : '#6B7280';
+
+          doc.fillColor('#374151').text(r.motivo || 'N/A', startX + 5, y, { width: 280 });
+          doc.fillColor('#111827').text(String(Number(r.cantidad).toLocaleString()), startX + 310, y, { width: 70, align: 'right' });
+          doc.fillColor(pctColor).text(pct + '%', startX + 390, y, { width: 60, align: 'right' });
+
+          // Barra proporcional
+          const barW = Math.max(1, pctNum * 0.4);
+          doc.rect(startX + 460, y + 2, barW, 7).fill(pctColor);
+          y += 13;
+        });
+        doc.y = y + 15;
+      }
+
+      // ── Segundo: Detalle por método ──
+      doc.fontSize(10).fillColor('#111111').text('Detalle por Método de Pago');
+      doc.moveDown(0.3);
+
       const startX = 50;
       let y = doc.y;
       doc.rect(startX, y, 495, 14).fill('#FEF2F2');
       doc.fontSize(7).fillColor('#991B1B');
-      doc.text('Método', startX + 5, y + 3, { width: 80 });
-      doc.text('Estado', startX + 90, y + 3, { width: 80 });
-      doc.text('Motivo (internal_state)', startX + 175, y + 3, { width: 160 });
-      doc.text('Cantidad', startX + 350, y + 3, { width: 55, align: 'right' });
-      doc.text('% del total', startX + 415, y + 3, { width: 60, align: 'right' });
-      y += 18;
+      doc.text('Método', startX + 5, y + 3, { width: 100 });
+      doc.text('Estado', startX + 110, y + 3, { width: 65 });
+      doc.text('Sub-estado', startX + 180, y + 3, { width: 120 });
+      doc.text('Cantidad', startX + 320, y + 3, { width: 60, align: 'right' });
+      doc.text('% del total', startX + 390, y + 3, { width: 60, align: 'right' });
+      y += 16;
 
-      doc.fontSize(8);
+      doc.fontSize(7.5);
       (payinErrors as any[]).forEach((r: any, idx: number) => {
-        if (doc.y > 750) { doc.addPage(); y = 50; }
-        if (idx % 2 === 0) doc.rect(startX, y - 2, 495, 14).fill('#FFFBFB');
+        if (y > 750) { doc.addPage(); y = 50; }
+        if (idx % 2 === 0) doc.rect(startX, y - 1, 495, 13).fill('#FFFBFB');
         const pct = totalPayinErrors > 0 ? (Number(r.cantidad) / totalPayinErrors * 100).toFixed(1) : '0.0';
         const pctNum = parseFloat(pct);
         const pctColor = pctNum >= 30 ? '#DC2626' : pctNum >= 15 ? '#F59E0B' : '#6B7280';
 
-        doc.fillColor('#111827').text(r.method || 'N/A', startX + 5, y, { width: 80 });
-        doc.fillColor('#DC2626').text(r.status || 'N/A', startX + 90, y, { width: 80 });
-        doc.fillColor('#374151').text(r.internal_state || 'Sin detalle', startX + 175, y, { width: 160 });
-        doc.fillColor('#111827').text(String(Number(r.cantidad).toLocaleString()), startX + 350, y, { width: 55, align: 'right' });
-        doc.fillColor(pctColor).text(pct + '%', startX + 415, y, { width: 60, align: 'right' });
+        // Truncar nombre de método si es muy largo
+        const methodName = (r.method || 'N/A').length > 16 ? (r.method || 'N/A').slice(0, 15) + '…' : (r.method || 'N/A');
 
-        // Mini barra de proporción
-        const barW = Math.max(1, pctNum * 0.2);
-        doc.rect(startX + 480, y + 3, barW, 6).fill(pctColor);
-        y += 14;
+        doc.fillColor('#111827').text(methodName, startX + 5, y, { width: 100 });
+        doc.fillColor('#DC2626').text(r.status || 'N/A', startX + 110, y, { width: 65 });
+        doc.fillColor('#374151').text(r.internal_state || 'sin detalle', startX + 180, y, { width: 120 });
+        doc.fillColor('#111827').text(String(Number(r.cantidad).toLocaleString()), startX + 320, y, { width: 60, align: 'right' });
+        doc.fillColor(pctColor).text(pct + '%', startX + 390, y, { width: 60, align: 'right' });
+
+        // Mini barra
+        const barW = Math.max(1, pctNum * 0.4);
+        doc.rect(startX + 460, y + 2, barW, 7).fill(pctColor);
+        y += 13;
       });
 
       // Total errores
       doc.rect(startX, y, 495, 14).fill('#FEE2E2');
       doc.fontSize(8).fillColor('#991B1B').font('Helvetica-Bold');
       doc.text('Total errores', startX + 5, y + 3, { width: 200 });
-      doc.text(String(totalPayinErrors.toLocaleString()), startX + 350, y + 3, { width: 55, align: 'right' });
-      doc.text('100%', startX + 415, y + 3, { width: 60, align: 'right' });
+      doc.text(String(totalPayinErrors.toLocaleString()), startX + 320, y + 3, { width: 60, align: 'right' });
+      doc.text('100%', startX + 390, y + 3, { width: 60, align: 'right' });
       doc.font('Helvetica');
       doc.y = y + 25;
     }
@@ -577,42 +643,81 @@ router.get('/report-pdf', async (req: AuthenticatedRequest, res: Response) => {
     } else {
       const totalPayoutErrors = (payoutErrors as any[]).reduce((a: number, r: any) => a + Number(r.cantidad), 0);
 
+      // ── Resumen de motivos de rechazo Payout ──
+      doc.fontSize(10).fillColor('#111111').text('Resumen de Motivos de Rechazo');
+      doc.moveDown(0.3);
+      const totalPOReas = (payoutRejectReasons as any[]).reduce((a: number, r: any) => a + Number(r.cantidad), 0);
+      {
+        const startX = 50;
+        let y = doc.y;
+        doc.rect(startX, y, 495, 14).fill('#FFFBEB');
+        doc.fontSize(7).fillColor('#78350F');
+        doc.text('Motivo (estado → sub-estado)', startX + 5, y + 3, { width: 280 });
+        doc.text('Cantidad', startX + 310, y + 3, { width: 70, align: 'right' });
+        doc.text('% del total', startX + 390, y + 3, { width: 60, align: 'right' });
+        y += 16;
+
+        doc.fontSize(8);
+        (payoutRejectReasons as any[]).forEach((r: any, idx: number) => {
+          if (y > 750) { doc.addPage(); y = 50; }
+          if (idx % 2 === 0) doc.rect(startX, y - 1, 495, 13).fill('#FFFEF5');
+          const pct = totalPOReas > 0 ? (Number(r.cantidad) / totalPOReas * 100).toFixed(1) : '0.0';
+          const pctNum = parseFloat(pct);
+          const pctColor = pctNum >= 30 ? '#DC2626' : pctNum >= 15 ? '#F59E0B' : '#6B7280';
+
+          doc.fillColor('#374151').text(r.motivo || 'N/A', startX + 5, y, { width: 280 });
+          doc.fillColor('#111827').text(String(Number(r.cantidad).toLocaleString()), startX + 310, y, { width: 70, align: 'right' });
+          doc.fillColor(pctColor).text(pct + '%', startX + 390, y, { width: 60, align: 'right' });
+
+          const barW = Math.max(1, pctNum * 0.4);
+          doc.rect(startX + 460, y + 2, barW, 7).fill(pctColor);
+          y += 13;
+        });
+        doc.y = y + 15;
+      }
+
+      // ── Detalle por método Payout ──
+      doc.fontSize(10).fillColor('#111111').text('Detalle por Método');
+      doc.moveDown(0.3);
+
       const startX = 50;
       let y = doc.y;
       doc.rect(startX, y, 495, 14).fill('#FFFBEB');
       doc.fontSize(7).fillColor('#78350F');
-      doc.text('Método', startX + 5, y + 3, { width: 80 });
-      doc.text('Estado', startX + 90, y + 3, { width: 80 });
-      doc.text('Motivo (internal_state)', startX + 175, y + 3, { width: 160 });
-      doc.text('Cantidad', startX + 350, y + 3, { width: 55, align: 'right' });
-      doc.text('% del total', startX + 415, y + 3, { width: 60, align: 'right' });
-      y += 18;
+      doc.text('Método', startX + 5, y + 3, { width: 100 });
+      doc.text('Estado', startX + 110, y + 3, { width: 65 });
+      doc.text('Sub-estado', startX + 180, y + 3, { width: 120 });
+      doc.text('Cantidad', startX + 320, y + 3, { width: 60, align: 'right' });
+      doc.text('% del total', startX + 390, y + 3, { width: 60, align: 'right' });
+      y += 16;
 
-      doc.fontSize(8);
+      doc.fontSize(7.5);
       (payoutErrors as any[]).forEach((r: any, idx: number) => {
-        if (doc.y > 750) { doc.addPage(); y = 50; }
-        if (idx % 2 === 0) doc.rect(startX, y - 2, 495, 14).fill('#FFFEF5');
+        if (y > 750) { doc.addPage(); y = 50; }
+        if (idx % 2 === 0) doc.rect(startX, y - 1, 495, 13).fill('#FFFEF5');
         const pct = totalPayoutErrors > 0 ? (Number(r.cantidad) / totalPayoutErrors * 100).toFixed(1) : '0.0';
         const pctNum = parseFloat(pct);
         const pctColor = pctNum >= 30 ? '#DC2626' : pctNum >= 15 ? '#F59E0B' : '#6B7280';
 
-        doc.fillColor('#111827').text(r.method || 'N/A', startX + 5, y, { width: 80 });
-        doc.fillColor('#B45309').text(r.status || 'N/A', startX + 90, y, { width: 80 });
-        doc.fillColor('#374151').text(r.internal_state || 'Sin detalle', startX + 175, y, { width: 160 });
-        doc.fillColor('#111827').text(String(Number(r.cantidad).toLocaleString()), startX + 350, y, { width: 55, align: 'right' });
-        doc.fillColor(pctColor).text(pct + '%', startX + 415, y, { width: 60, align: 'right' });
+        const methodName = (r.method || 'N/A').length > 16 ? (r.method || 'N/A').slice(0, 15) + '…' : (r.method || 'N/A');
 
-        const barW = Math.max(1, pctNum * 0.2);
-        doc.rect(startX + 480, y + 3, barW, 6).fill(pctColor);
-        y += 14;
+        doc.fillColor('#111827').text(methodName, startX + 5, y, { width: 100 });
+        doc.fillColor('#B45309').text(r.status || 'N/A', startX + 110, y, { width: 65 });
+        doc.fillColor('#374151').text(r.internal_state || 'sin detalle', startX + 180, y, { width: 120 });
+        doc.fillColor('#111827').text(String(Number(r.cantidad).toLocaleString()), startX + 320, y, { width: 60, align: 'right' });
+        doc.fillColor(pctColor).text(pct + '%', startX + 390, y, { width: 60, align: 'right' });
+
+        const barW = Math.max(1, pctNum * 0.4);
+        doc.rect(startX + 460, y + 2, barW, 7).fill(pctColor);
+        y += 13;
       });
 
       // Total errores
       doc.rect(startX, y, 495, 14).fill('#FEF3C7');
       doc.fontSize(8).fillColor('#78350F').font('Helvetica-Bold');
       doc.text('Total errores', startX + 5, y + 3, { width: 200 });
-      doc.text(String(totalPayoutErrors.toLocaleString()), startX + 350, y + 3, { width: 55, align: 'right' });
-      doc.text('100%', startX + 415, y + 3, { width: 60, align: 'right' });
+      doc.text(String(totalPayoutErrors.toLocaleString()), startX + 320, y + 3, { width: 60, align: 'right' });
+      doc.text('100%', startX + 390, y + 3, { width: 60, align: 'right' });
       doc.font('Helvetica');
       doc.y = y + 25;
     }
