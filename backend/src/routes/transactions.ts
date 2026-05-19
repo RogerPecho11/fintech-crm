@@ -851,6 +851,123 @@ router.get('/commerce-changes-export', async (req: AuthenticatedRequest, res: Re
   }
 });
 
+// ─── GET /api/v1/transactions/gateway-dashboard-export — Excel de pasarelas por comercio
+router.get('/gateway-dashboard-export', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { country } = req.query as Record<string, string>;
+
+    let countryFilter = '';
+    const params: any[] = [];
+    if (country) {
+      countryFilter = ' AND c.country = ?';
+      params.push(country);
+    }
+
+    const payinSql = `SELECT c.id as commerce_id, c.name as commerce_name, c.country,
+      gp.name as gateway_name, cg.status as gateway_status
+      FROM commerce_gateway cg
+      JOIN commerce c ON c.id = cg.commerce_id
+      LEFT JOIN gateway_payment gp ON gp.id = cg.gateway_payment_id
+      WHERE cg.deleted_at IS NULL AND (c.is_deleted IS NULL OR c.is_deleted = 0)${countryFilter}
+      ORDER BY c.name, gp.name`;
+
+    const payoutSql = `SELECT c.id as commerce_id, c.name as commerce_name, c.country,
+      gw.name as gateway_name, cgw.status as gateway_status
+      FROM commerce_gateway_withdrawal cgw
+      JOIN commerce c ON c.id = cgw.commerce_id
+      LEFT JOIN gateway_withdrawal gw ON gw.id = cgw.gateway_withdrawal_id
+      WHERE cgw.deleted_at IS NULL AND (c.is_deleted IS NULL OR c.is_deleted = 0)${countryFilter}
+      ORDER BY c.name, gw.name`;
+
+    const [payinData, payoutData] = await Promise.all([
+      mysqlQuery(payinSql, params),
+      mysqlQuery(payoutSql, params),
+    ]);
+
+    // Agrupar por comercio
+    const commerceMap = new Map<number, any>();
+    (payinData as any[]).forEach((r: any) => {
+      if (!commerceMap.has(r.commerce_id)) {
+        commerceMap.set(r.commerce_id, { id: r.commerce_id, name: r.commerce_name, country: r.country, payin: [], payout: [] });
+      }
+      commerceMap.get(r.commerce_id).payin.push({ gateway: r.gateway_name, status: r.gateway_status });
+    });
+    (payoutData as any[]).forEach((r: any) => {
+      if (!commerceMap.has(r.commerce_id)) {
+        commerceMap.set(r.commerce_id, { id: r.commerce_id, name: r.commerce_name, country: r.country, payin: [], payout: [] });
+      }
+      commerceMap.get(r.commerce_id).payout.push({ gateway: r.gateway_name, status: r.gateway_status });
+    });
+
+    const commerces = Array.from(commerceMap.values());
+
+    // Generar Excel
+    const ExcelJS = require('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Pasarelas por Comercio');
+
+    sheet.columns = [
+      { header: 'ID', key: 'id', width: 8 },
+      { header: 'Comercio', key: 'name', width: 35 },
+      { header: 'País', key: 'country', width: 10 },
+      { header: 'Pasarelas Pay In (activas)', key: 'payin', width: 50 },
+      { header: 'Pasarelas Pay Out (activas)', key: 'payout', width: 50 },
+      { header: '# Pay In', key: 'payin_count', width: 10 },
+      { header: '# Pay Out', key: 'payout_count', width: 10 },
+    ];
+
+    // Header style
+    sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+    sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFC2B5F' } };
+    sheet.getRow(1).alignment = { vertical: 'middle', horizontal: 'center' };
+    sheet.getRow(1).height = 22;
+
+    for (const c of commerces) {
+      const payinActive = c.payin.filter((g: any) => g.status === 'active' || g.status === '1' || g.status === 1);
+      const payoutActive = c.payout.filter((g: any) => g.status === 'active' || g.status === '1' || g.status === 1);
+
+      const row = sheet.addRow({
+        id: c.id,
+        name: c.name,
+        country: c.country || '—',
+        payin: payinActive.map((g: any) => g.gateway).join(', ') || '—',
+        payout: payoutActive.map((g: any) => g.gateway).join(', ') || '—',
+        payin_count: payinActive.length,
+        payout_count: payoutActive.length,
+      });
+
+      if (row.number % 2 === 0) {
+        row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } };
+      }
+    }
+
+    // Bordes
+    sheet.eachRow((row: any) => {
+      row.eachCell((cell: any) => {
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+          bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+          left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+          right: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        };
+      });
+    });
+
+    // Auto-filtro
+    if (commerces.length > 0) {
+      sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 7 } };
+    }
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=pasarelas_por_comercio_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err: any) {
+    console.error('[Transactions] Error gateway-dashboard-export:', err.message);
+    res.status(500).json({ error: 'Error al generar Excel: ' + err.message });
+  }
+});
+
 // ─── GET /api/v1/transactions/gateway-dashboard — Dashboard de pasarelas y configuraciones por comercio
 router.get('/gateway-dashboard', async (req: AuthenticatedRequest, res: Response) => {
   try {

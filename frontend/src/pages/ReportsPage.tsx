@@ -963,6 +963,30 @@ function GatewayDashboard() {
 
   const countries = [...new Set((data?.commerces || []).map((c: any) => c.country))].filter(Boolean).sort();
 
+  const handleExportExcel = async () => {
+    const toastId = toast.loading('Generando Excel...');
+    try {
+      const params: any = {};
+      if (country) params.country = country;
+      const response = await api.get('/transactions/gateway-dashboard-export', {
+        params,
+        responseType: 'blob',
+      });
+      const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `pasarelas_por_comercio_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success('Excel descargado', { id: toastId });
+    } catch {
+      toast.error('Error al exportar', { id: toastId });
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Resumen */}
@@ -1030,6 +1054,13 @@ function GatewayDashboard() {
             onChange={e => setSearch(e.target.value)}
           />
         </div>
+        <button
+          onClick={handleExportExcel}
+          className="btn-secondary flex items-center gap-2 text-sm"
+        >
+          <Download className="w-4 h-4" />
+          Exportar Excel
+        </button>
       </div>
 
       {/* Tabla de comercios con sus pasarelas */}
