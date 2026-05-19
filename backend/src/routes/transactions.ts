@@ -851,4 +851,117 @@ router.get('/commerce-changes-export', async (req: AuthenticatedRequest, res: Re
   }
 });
 
+// ─── GET /api/v1/transactions/gateway-dashboard — Dashboard de pasarelas y configuraciones por comercio
+router.get('/gateway-dashboard', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { country } = req.query as Record<string, string>;
+    const cacheKey = `gw-dashboard:${country || 'all'}`;
+    const cached = getCached(cacheKey);
+    if (cached) return res.json(cached);
+
+    let countryFilter = '';
+    const params: any[] = [];
+    if (country) {
+      countryFilter = ' AND c.country = ?';
+      params.push(country);
+    }
+
+    // Pay In: pasarelas activas por comercio
+    const payinSql = `SELECT c.id as commerce_id, c.name as commerce_name, c.country,
+      gp.name as gateway_name, cg.status as gateway_status, cg.created_at
+      FROM commerce_gateway cg
+      JOIN commerce c ON c.id = cg.commerce_id
+      LEFT JOIN gateway_payment gp ON gp.id = cg.gateway_payment_id
+      WHERE cg.deleted_at IS NULL AND (c.is_deleted IS NULL OR c.is_deleted = 0)${countryFilter}
+      ORDER BY c.name, gp.name`;
+
+    // Pay Out: pasarelas activas por comercio
+    const payoutSql = `SELECT c.id as commerce_id, c.name as commerce_name, c.country,
+      gw.name as gateway_name, cgw.status as gateway_status, cgw.created_at
+      FROM commerce_gateway_withdrawal cgw
+      JOIN commerce c ON c.id = cgw.commerce_id
+      LEFT JOIN gateway_withdrawal gw ON gw.id = cgw.gateway_withdrawal_id
+      WHERE cgw.deleted_at IS NULL AND (c.is_deleted IS NULL OR c.is_deleted = 0)${countryFilter}
+      ORDER BY c.name, gw.name`;
+
+    const [payinData, payoutData] = await Promise.all([
+      mysqlQuery(payinSql, params),
+      mysqlQuery(payoutSql, params),
+    ]);
+
+    // Agrupar por comercio
+    const commerceMap = new Map<number, any>();
+
+    (payinData as any[]).forEach((r: any) => {
+      if (!commerceMap.has(r.commerce_id)) {
+        commerceMap.set(r.commerce_id, {
+          id: r.commerce_id,
+          name: r.commerce_name,
+          country: r.country,
+          payin: [],
+          payout: [],
+        });
+      }
+      commerceMap.get(r.commerce_id).payin.push({
+        gateway: r.gateway_name,
+        status: r.gateway_status,
+        created_at: r.created_at,
+      });
+    });
+
+    (payoutData as any[]).forEach((r: any) => {
+      if (!commerceMap.has(r.commerce_id)) {
+        commerceMap.set(r.commerce_id, {
+          id: r.commerce_id,
+          name: r.commerce_name,
+          country: r.country,
+          payin: [],
+          payout: [],
+        });
+      }
+      commerceMap.get(r.commerce_id).payout.push({
+        gateway: r.gateway_name,
+        status: r.gateway_status,
+        created_at: r.created_at,
+      });
+    });
+
+    const commerces = Array.from(commerceMap.values());
+
+    // Resumen de pasarelas
+    const payinGateways = new Map<string, number>();
+    const payoutGateways = new Map<string, number>();
+
+    (payinData as any[]).forEach((r: any) => {
+      const name = r.gateway_name || 'Sin nombre';
+      payinGateways.set(name, (payinGateways.get(name) || 0) + 1);
+    });
+    (payoutData as any[]).forEach((r: any) => {
+      const name = r.gateway_name || 'Sin nombre';
+      payoutGateways.set(name, (payoutGateways.get(name) || 0) + 1);
+    });
+
+    const result = {
+      commerces,
+      summary: {
+        totalCommerces: commerces.length,
+        totalPayinConfigs: (payinData as any[]).length,
+        totalPayoutConfigs: (payoutData as any[]).length,
+        payinGateways: Array.from(payinGateways.entries())
+          .map(([name, count]) => ({ name, count }))
+          .sort((a, b) => b.count - a.count),
+        payoutGateways: Array.from(payoutGateways.entries())
+          .map(([name, count]) => ({ name, count }))
+          .sort((a, b) => b.count - a.count),
+      },
+    };
+
+    setCache(cacheKey, result, MysqlCache.TTL_SEMI_STATIC); // 15 min
+    res.json(result);
+  } catch (err: any) {
+    console.error('[Transactions] Error gateway-dashboard:', err.message);
+    res.status(500).json({ error: 'Error al consultar configuraciones de pasarelas: ' + err.message });
+  }
+});
+
 export default router;

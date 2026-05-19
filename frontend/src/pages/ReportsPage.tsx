@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -821,11 +821,17 @@ function MonitoringSection() {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-lg font-bold text-gray-900">Dashboard de Pasarelas y Configuraciones de Comercios</h2>
-          <p className="text-sm text-gray-500">Modificaciones de pasarelas y configuraciones de comercios</p>
+          <p className="text-sm text-gray-500">Métodos de pago activos por comercio y modificaciones de pasarelas</p>
         </div>
       </div>
 
+      {/* Sección: Métodos de pago activos por comercio */}
+      <GatewayDashboard />
+
       {/* Filtros de fecha y botones */}
+      <div className="mt-6 pt-6 border-t border-gray-200">
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">Exportar Cambios de Pasarelas</h3>
+      </div>
       <div className="flex flex-wrap gap-3 p-3 bg-gray-50 rounded-lg items-end">
         <div>
           <label className="text-xs text-gray-500 block mb-1">Desde</label>
@@ -919,6 +925,172 @@ function MonitoringSection() {
           Cambios en Comercios
         </button>
       </div>
+    </div>
+  );
+}
+
+// ─── Componente: Dashboard de Pasarelas por Comercio ─────────────────────────
+function GatewayDashboard() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [country, setCountry] = useState('');
+  const [search, setSearch] = useState('');
+
+  const fetchData = async (countryFilter?: string) => {
+    setLoading(true);
+    try {
+      const params: any = {};
+      if (countryFilter) params.country = countryFilter;
+      const res = await api.get('/transactions/gateway-dashboard', { params });
+      setData(res.data);
+    } catch {
+      toast.error('Error al cargar pasarelas');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchData(); }, []);
+
+  const handleCountryChange = (val: string) => {
+    setCountry(val);
+    fetchData(val);
+  };
+
+  const filteredCommerces = (data?.commerces || []).filter((c: any) =>
+    !search || c.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const countries = [...new Set((data?.commerces || []).map((c: any) => c.country))].filter(Boolean).sort();
+
+  return (
+    <div className="space-y-4">
+      {/* Resumen */}
+      {data?.summary && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-blue-50 rounded-lg p-4">
+            <p className="text-xs text-blue-600 font-medium">Comercios con Pasarelas</p>
+            <p className="text-2xl font-bold text-blue-900">{data.summary.totalCommerces}</p>
+          </div>
+          <div className="bg-green-50 rounded-lg p-4">
+            <p className="text-xs text-green-600 font-medium">Configuraciones Pay In</p>
+            <p className="text-2xl font-bold text-green-900">{data.summary.totalPayinConfigs}</p>
+          </div>
+          <div className="bg-purple-50 rounded-lg p-4">
+            <p className="text-xs text-purple-600 font-medium">Configuraciones Pay Out</p>
+            <p className="text-2xl font-bold text-purple-900">{data.summary.totalPayoutConfigs}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Resumen de pasarelas más usadas */}
+      {data?.summary && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <h4 className="text-xs font-semibold text-gray-600 mb-2 uppercase">Top Pasarelas Pay In</h4>
+            <div className="space-y-1.5">
+              {data.summary.payinGateways.slice(0, 8).map((g: any) => (
+                <div key={g.name} className="flex items-center justify-between text-sm">
+                  <span className="text-gray-700 truncate">{g.name}</span>
+                  <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">{g.count} comercios</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <h4 className="text-xs font-semibold text-gray-600 mb-2 uppercase">Top Pasarelas Pay Out</h4>
+            <div className="space-y-1.5">
+              {data.summary.payoutGateways.slice(0, 8).map((g: any) => (
+                <div key={g.name} className="flex items-center justify-between text-sm">
+                  <span className="text-gray-700 truncate">{g.name}</span>
+                  <span className="text-xs font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded">{g.count} comercios</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Filtros */}
+      <div className="flex flex-wrap gap-3 items-end">
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">País</label>
+          <select className="input text-sm" value={country} onChange={e => handleCountryChange(e.target.value)}>
+            <option value="">Todos</option>
+            {countries.map((c: any) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div className="flex-1 min-w-[200px]">
+          <label className="text-xs text-gray-500 block mb-1">Buscar comercio</label>
+          <input
+            type="text"
+            className="input text-sm w-full"
+            placeholder="Nombre del comercio..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* Tabla de comercios con sus pasarelas */}
+      {loading ? (
+        <div className="flex items-center justify-center h-32">
+          <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#FC2B5F', borderTopColor: 'transparent' }} />
+        </div>
+      ) : (
+        <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 bg-white z-10">
+              <tr className="bg-gray-50">
+                <th className="text-left p-2 font-medium text-gray-600">Comercio</th>
+                <th className="text-left p-2 font-medium text-gray-600">País</th>
+                <th className="text-left p-2 font-medium text-gray-600">Pasarelas Pay In</th>
+                <th className="text-left p-2 font-medium text-gray-600">Pasarelas Pay Out</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredCommerces.length === 0 ? (
+                <tr><td colSpan={4} className="text-center py-8 text-gray-400">Sin datos</td></tr>
+              ) : filteredCommerces.map((c: any) => (
+                <tr key={c.id} className="border-b border-gray-100 hover:bg-gray-50">
+                  <td className="p-2 font-medium text-gray-900">{c.name}</td>
+                  <td className="p-2 text-gray-500">{c.country}</td>
+                  <td className="p-2">
+                    <div className="flex flex-wrap gap-1">
+                      {c.payin.length === 0 ? (
+                        <span className="text-xs text-gray-400">—</span>
+                      ) : c.payin.map((g: any, i: number) => (
+                        <span key={i} className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          g.status === 'active' || g.status === '1' || g.status === 1
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-gray-100 text-gray-500'
+                        }`}>
+                          {g.gateway || 'N/A'}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="p-2">
+                    <div className="flex flex-wrap gap-1">
+                      {c.payout.length === 0 ? (
+                        <span className="text-xs text-gray-400">—</span>
+                      ) : c.payout.map((g: any, i: number) => (
+                        <span key={i} className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          g.status === 'active' || g.status === '1' || g.status === 1
+                            ? 'bg-purple-100 text-purple-700'
+                            : 'bg-gray-100 text-gray-500'
+                        }`}>
+                          {g.gateway || 'N/A'}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
