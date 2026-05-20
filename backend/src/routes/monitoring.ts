@@ -470,23 +470,25 @@ router.get('/report-pdf', async (req: AuthenticatedRequest, res: Response) => {
     const drawTable = (data: any[], total: number) => {
       const startX = 50;
       let y = doc.y;
+      if (y > 700) { doc.addPage(); y = 50; doc.y = 50; }
       // Header row
       doc.rect(startX, y, 450, 16).fill('#F9FAFB');
       doc.fontSize(8).fillColor('#6B7280');
-      doc.text('Estado', startX + 5, y + 4, { width: 170 });
-      doc.text('Cantidad', startX + 200, y + 4, { width: 100, align: 'right' });
-      doc.text('Porcentaje', startX + 320, y + 4, { width: 80, align: 'right' });
+      doc.text('Estado', startX + 5, y + 4, { width: 170, lineBreak: false });
+      doc.text('Cantidad', startX + 200, y + 4, { width: 100, align: 'right', lineBreak: false });
+      doc.text('Porcentaje', startX + 320, y + 4, { width: 80, align: 'right', lineBreak: false });
       y += 20;
 
       doc.fontSize(9);
       data.forEach((r: any) => {
+        if (y > 750) { doc.addPage(); y = 50; }
         const pct = total > 0 ? (Number(r.cantidad) / total * 100).toFixed(1) : '0.0';
         const color = STATUS_COLORS[r.status] || '#6B7280';
         // Color dot
         doc.circle(startX + 8, y + 6, 3).fill(color);
-        doc.fillColor('#111827').text(r.status || 'N/A', startX + 16, y, { width: 170 });
-        doc.text(String(Number(r.cantidad).toLocaleString()), startX + 200, y, { width: 100, align: 'right' });
-        doc.fillColor(color).text(pct + '%', startX + 320, y, { width: 80, align: 'right' });
+        doc.fillColor('#111827').text(r.status || 'N/A', startX + 16, y, { width: 170, lineBreak: false });
+        doc.text(String(Number(r.cantidad).toLocaleString()), startX + 200, y, { width: 100, align: 'right', lineBreak: false });
+        doc.fillColor(color).text(pct + '%', startX + 320, y, { width: 80, align: 'right', lineBreak: false });
         // Mini bar
         const barWidth = Math.max(1, Number(pct) * 0.4);
         doc.rect(startX + 410, y + 3, barWidth, 7).fill(color);
@@ -495,9 +497,9 @@ router.get('/report-pdf', async (req: AuthenticatedRequest, res: Response) => {
       // Total row
       doc.rect(startX, y, 450, 16).fill('#F2F2F2');
       doc.fontSize(9).fillColor('#111111').font('Helvetica-Bold');
-      doc.text('Total', startX + 5, y + 4, { width: 170 });
-      doc.text(String(total.toLocaleString()), startX + 200, y + 4, { width: 100, align: 'right' });
-      doc.text('100%', startX + 320, y + 4, { width: 80, align: 'right' });
+      doc.text('Total', startX + 5, y + 4, { width: 170, lineBreak: false });
+      doc.text(String(total.toLocaleString()), startX + 200, y + 4, { width: 100, align: 'right', lineBreak: false });
+      doc.text('100%', startX + 320, y + 4, { width: 80, align: 'right', lineBreak: false });
       doc.font('Helvetica');
       doc.y = y + 25;
     };
@@ -565,6 +567,7 @@ router.get('/report-pdf', async (req: AuthenticatedRequest, res: Response) => {
     }
 
     // Volumen por método payin
+    if (doc.y > 650) doc.addPage();
     doc.fontSize(11).fillColor('#111111').text('Volumen por Método de Pago (Payin)');
     doc.moveDown(0.3);
     {
@@ -581,19 +584,22 @@ router.get('/report-pdf', async (req: AuthenticatedRequest, res: Response) => {
       y += 18;
       doc.fillColor('#111827').fontSize(8);
       (payinVol as any[]).forEach((r: any, idx: number) => {
+        if (y > 750) { doc.addPage(); y = 50; }
         if (idx % 2 === 0) doc.rect(startX, y - 2, 450, 14).fill('#FAFAFA');
         const t = Number(r.aprobadas) + Number(r.rechazadas);
         const rate = t > 0 ? (Number(r.aprobadas) / t * 100).toFixed(1) + '%' : 'N/A';
         const monto = Number(r.monto);
         const montoStr = monto >= 1000000 ? sym + (monto / 1000000).toFixed(2) + 'M' : monto >= 1000 ? sym + (monto / 1000).toFixed(1) + 'K' : sym + monto.toFixed(0);
-        doc.fillColor('#111827').text(r.method || 'N/A', startX + 5, y, { width: 90 });
-        doc.text(String(Number(r.cantidad).toLocaleString()), startX + 100, y, { width: 50, align: 'right' });
-        doc.text(montoStr, startX + 160, y, { width: 80, align: 'right' });
-        doc.fillColor('#10B981').text(String(Number(r.aprobadas).toLocaleString()), startX + 250, y, { width: 55, align: 'right' });
-        doc.fillColor('#EF4444').text(String(Number(r.rechazadas).toLocaleString()), startX + 315, y, { width: 55, align: 'right' });
+        // Truncar nombre de método largo
+        const methodName = (r.method || 'N/A').length > 14 ? (r.method || 'N/A').slice(0, 13) + '…' : (r.method || 'N/A');
+        doc.fillColor('#111827').text(methodName, startX + 5, y, { width: 90, lineBreak: false });
+        doc.text(String(Number(r.cantidad).toLocaleString()), startX + 100, y, { width: 50, align: 'right', lineBreak: false });
+        doc.text(montoStr, startX + 160, y, { width: 80, align: 'right', lineBreak: false });
+        doc.fillColor('#10B981').text(String(Number(r.aprobadas).toLocaleString()), startX + 250, y, { width: 55, align: 'right', lineBreak: false });
+        doc.fillColor('#EF4444').text(String(Number(r.rechazadas).toLocaleString()), startX + 315, y, { width: 55, align: 'right', lineBreak: false });
         const rateNum = parseFloat(rate);
         const rateColor = rateNum >= 80 ? '#10B981' : rateNum >= 50 ? '#F59E0B' : '#EF4444';
-        doc.fillColor(rateColor).text(rate, startX + 385, y, { width: 55, align: 'right' });
+        doc.fillColor(rateColor).text(rate, startX + 385, y, { width: 55, align: 'right', lineBreak: false });
         y += 14;
       });
       doc.y = y + 10;
@@ -645,19 +651,21 @@ router.get('/report-pdf', async (req: AuthenticatedRequest, res: Response) => {
       y += 18;
       doc.fillColor('#111827').fontSize(8);
       (payoutVol as any[]).forEach((r: any, idx: number) => {
+        if (y > 750) { doc.addPage(); y = 50; }
         if (idx % 2 === 0) doc.rect(startX, y - 2, 450, 14).fill('#FAFAFA');
         const t = Number(r.aprobadas) + Number(r.rechazadas);
         const rate = t > 0 ? (Number(r.aprobadas) / t * 100).toFixed(1) + '%' : 'N/A';
         const monto = Number(r.monto);
         const montoStr = monto >= 1000000 ? sym + (monto / 1000000).toFixed(2) + 'M' : monto >= 1000 ? sym + (monto / 1000).toFixed(1) + 'K' : sym + monto.toFixed(0);
-        doc.fillColor('#111827').text(r.method || 'N/A', startX + 5, y, { width: 90 });
-        doc.text(String(Number(r.cantidad).toLocaleString()), startX + 100, y, { width: 50, align: 'right' });
-        doc.text(montoStr, startX + 160, y, { width: 80, align: 'right' });
-        doc.fillColor('#10B981').text(String(Number(r.aprobadas).toLocaleString()), startX + 250, y, { width: 55, align: 'right' });
-        doc.fillColor('#EF4444').text(String(Number(r.rechazadas).toLocaleString()), startX + 315, y, { width: 55, align: 'right' });
+        const methodName = (r.method || 'N/A').length > 14 ? (r.method || 'N/A').slice(0, 13) + '…' : (r.method || 'N/A');
+        doc.fillColor('#111827').text(methodName, startX + 5, y, { width: 90, lineBreak: false });
+        doc.text(String(Number(r.cantidad).toLocaleString()), startX + 100, y, { width: 50, align: 'right', lineBreak: false });
+        doc.text(montoStr, startX + 160, y, { width: 80, align: 'right', lineBreak: false });
+        doc.fillColor('#10B981').text(String(Number(r.aprobadas).toLocaleString()), startX + 250, y, { width: 55, align: 'right', lineBreak: false });
+        doc.fillColor('#EF4444').text(String(Number(r.rechazadas).toLocaleString()), startX + 315, y, { width: 55, align: 'right', lineBreak: false });
         const rateNum = parseFloat(rate);
         const rateColor = rateNum >= 80 ? '#10B981' : rateNum >= 50 ? '#F59E0B' : '#EF4444';
-        doc.fillColor(rateColor).text(rate, startX + 385, y, { width: 55, align: 'right' });
+        doc.fillColor(rateColor).text(rate, startX + 385, y, { width: 55, align: 'right', lineBreak: false });
         y += 14;
       });
       doc.y = y + 10;
@@ -671,14 +679,16 @@ router.get('/report-pdf', async (req: AuthenticatedRequest, res: Response) => {
     doc.y += 30;
 
     (payinVol as any[]).forEach((r: any) => {
+      if (doc.y > 750) doc.addPage();
       const t = Number(r.aprobadas) + Number(r.rechazadas);
       const rate = t > 0 ? Number(r.aprobadas) / t * 100 : 0;
       const barColor = rate >= 80 ? '#10B981' : rate >= 50 ? '#F59E0B' : '#EF4444';
       const barWidth = Math.max(2, rate * 2.8);
 
-      doc.fontSize(8).fillColor('#374151').text(r.method || 'N/A', 55, doc.y, { width: 100 });
+      const methodLabel = (r.method || 'N/A').length > 14 ? (r.method || 'N/A').slice(0, 13) + '…' : (r.method || 'N/A');
+      doc.fontSize(8).fillColor('#374151').text(methodLabel, 55, doc.y, { width: 100, lineBreak: false });
       doc.rect(160, doc.y + 1, barWidth, 10).fill(barColor);
-      doc.fontSize(8).fillColor('#111827').text(rate.toFixed(1) + '%', 160 + barWidth + 5, doc.y);
+      doc.fontSize(8).fillColor('#111827').text(rate.toFixed(1) + '%', 160 + barWidth + 5, doc.y, { lineBreak: false });
       doc.y += 16;
     });
 
