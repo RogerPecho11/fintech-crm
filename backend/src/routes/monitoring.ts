@@ -397,6 +397,76 @@ router.get('/report-pdf', async (req: AuthenticatedRequest, res: Response) => {
       pending: '#6B7280', processing: '#3B82F6',
     };
 
+    // ─── Función para dibujar gráfico circular (pie chart) ───
+    const drawPieChart = (data: any[], total: number, centerX: number, centerY: number, radius: number, colors: Record<string, string>) => {
+      if (total === 0 || data.length === 0) return;
+      let startAngle = -Math.PI / 2; // Empezar desde arriba
+
+      data.forEach((item: any) => {
+        const value = Number(item.cantidad);
+        const sliceAngle = (value / total) * 2 * Math.PI;
+        const endAngle = startAngle + sliceAngle;
+        const color = colors[item.status] || colors[item.method] || '#6B7280';
+
+        // Dibujar sector
+        const x1 = centerX + radius * Math.cos(startAngle);
+        const y1 = centerY + radius * Math.sin(startAngle);
+        const x2 = centerX + radius * Math.cos(endAngle);
+        const y2 = centerY + radius * Math.sin(endAngle);
+        const largeArc = sliceAngle > Math.PI ? 1 : 0;
+
+        doc.path(`M ${centerX} ${centerY} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2} Z`)
+          .fill(color);
+
+        // Etiqueta de porcentaje (solo si > 5%)
+        const pct = (value / total * 100);
+        if (pct >= 5) {
+          const midAngle = startAngle + sliceAngle / 2;
+          const labelRadius = radius * 0.65;
+          const lx = centerX + labelRadius * Math.cos(midAngle);
+          const ly = centerY + labelRadius * Math.sin(midAngle);
+          doc.fontSize(7).fillColor('#FFFFFF').text(
+            pct.toFixed(0) + '%',
+            lx - 10, ly - 4, { width: 20, align: 'center' }
+          );
+        }
+
+        startAngle = endAngle;
+      });
+
+      // Leyenda al lado del gráfico
+      const legendX = centerX + radius + 20;
+      let legendY = centerY - (data.length * 7);
+      data.forEach((item: any) => {
+        const color = colors[item.status] || colors[item.method] || '#6B7280';
+        const pct = total > 0 ? (Number(item.cantidad) / total * 100).toFixed(1) : '0';
+        doc.rect(legendX, legendY, 8, 8).fill(color);
+        doc.fontSize(7).fillColor('#374151').text(
+          `${item.status || item.method || 'N/A'} (${pct}%)`,
+          legendX + 12, legendY, { width: 120 }
+        );
+        legendY += 12;
+      });
+    };
+
+    // Dibujar gráfico circular de Payins
+    const pieY = doc.y + 55;
+    drawPieChart(payinTotals, payinTotal, 160, pieY, 50, STATUS_COLORS);
+
+    // Texto resumen al lado derecho del pie
+    doc.fontSize(9).fillColor('#111111');
+    doc.text(`Total: ${payinTotal.toLocaleString()} transacciones`, 320, pieY - 20);
+    const payinSuccess = payinTotals.find((r: any) => r.status === 'success' || r.status === 'completed');
+    const payinSuccessCount = payinSuccess ? Number(payinSuccess.cantidad) : 0;
+    const payinSuccessRate = payinTotal > 0 ? (payinSuccessCount / payinTotal * 100).toFixed(1) : '0';
+    doc.fontSize(11).fillColor('#10B981').text(`${payinSuccessRate}% aprobadas`, 320, pieY - 5);
+    const payinFailCount = payinTotal - payinSuccessCount;
+    const payinFailRate = payinTotal > 0 ? (payinFailCount / payinTotal * 100).toFixed(1) : '0';
+    doc.fontSize(9).fillColor('#EF4444').text(`${payinFailRate}% rechazadas/error`, 320, pieY + 12);
+
+    doc.y = pieY + 65;
+    doc.moveDown(0.5);
+
     const drawTable = (data: any[], total: number) => {
       const startX = 50;
       let y = doc.y;
@@ -434,6 +504,65 @@ router.get('/report-pdf', async (req: AuthenticatedRequest, res: Response) => {
 
     drawTable(payinTotals, payinTotal);
     doc.moveDown(0.5);
+
+    // Gráfico circular: distribución por método de pago (Payin)
+    if ((payinVol as any[]).length > 0) {
+      doc.fontSize(10).fillColor('#111111').text('Distribución por Método de Pago (Payin)');
+      doc.moveDown(0.3);
+
+      const METHOD_COLORS_PDF = ['#1E3A5F', '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#F97316', '#84CC16', '#EC4899'];
+      const methodColorMap: Record<string, string> = {};
+      (payinVol as any[]).forEach((r: any, i: number) => {
+        methodColorMap[r.method] = METHOD_COLORS_PDF[i % METHOD_COLORS_PDF.length];
+      });
+
+      const totalPayinVol = (payinVol as any[]).reduce((a: number, r: any) => a + Number(r.cantidad), 0);
+      const pieMethodY = doc.y + 55;
+
+      // Dibujar pie chart de métodos
+      if (totalPayinVol > 0) {
+        let startAngle = -Math.PI / 2;
+        const cx = 160, cy = pieMethodY, r = 48;
+
+        (payinVol as any[]).forEach((item: any) => {
+          const value = Number(item.cantidad);
+          const sliceAngle = (value / totalPayinVol) * 2 * Math.PI;
+          const endAngle = startAngle + sliceAngle;
+          const color = methodColorMap[item.method] || '#6B7280';
+
+          const x1 = cx + r * Math.cos(startAngle);
+          const y1 = cy + r * Math.sin(startAngle);
+          const x2 = cx + r * Math.cos(endAngle);
+          const y2 = cy + r * Math.sin(endAngle);
+          const largeArc = sliceAngle > Math.PI ? 1 : 0;
+
+          doc.path(`M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`).fill(color);
+
+          const pct = (value / totalPayinVol * 100);
+          if (pct >= 8) {
+            const midAngle = startAngle + sliceAngle / 2;
+            const lx = cx + r * 0.6 * Math.cos(midAngle);
+            const ly = cy + r * 0.6 * Math.sin(midAngle);
+            doc.fontSize(7).fillColor('#FFFFFF').text(pct.toFixed(0) + '%', lx - 10, ly - 4, { width: 20, align: 'center' });
+          }
+          startAngle = endAngle;
+        });
+
+        // Leyenda
+        let ly = pieMethodY - ((payinVol as any[]).length * 6);
+        (payinVol as any[]).forEach((item: any) => {
+          const color = methodColorMap[item.method] || '#6B7280';
+          const pct = totalPayinVol > 0 ? (Number(item.cantidad) / totalPayinVol * 100).toFixed(1) : '0';
+          const methodLabel = (item.method || 'N/A').length > 20 ? (item.method || 'N/A').slice(0, 19) + '…' : (item.method || 'N/A');
+          doc.rect(230, ly, 8, 8).fill(color);
+          doc.fontSize(7).fillColor('#374151').text(`${methodLabel} — ${pct}%`, 242, ly, { width: 180 });
+          ly += 12;
+        });
+      }
+
+      doc.y = pieMethodY + 65;
+      doc.moveDown(0.5);
+    }
 
     // Volumen por método payin
     doc.fontSize(11).fillColor('#111111').text('Volumen por Método de Pago (Payin)');
@@ -478,6 +607,24 @@ router.get('/report-pdf', async (req: AuthenticatedRequest, res: Response) => {
     doc.y += 30;
 
     const payoutTotal = payoutTotals.reduce((acc: number, r: any) => acc + Number(r.cantidad), 0);
+
+    // Gráfico circular de Payouts
+    const pieYPayout = doc.y + 55;
+    drawPieChart(payoutTotals, payoutTotal, 160, pieYPayout, 50, STATUS_COLORS);
+
+    doc.fontSize(9).fillColor('#111111');
+    doc.text(`Total: ${payoutTotal.toLocaleString()} transacciones`, 320, pieYPayout - 20);
+    const payoutSuccess = payoutTotals.find((r: any) => r.status === 'success' || r.status === 'completed');
+    const payoutSuccessCount = payoutSuccess ? Number(payoutSuccess.cantidad) : 0;
+    const payoutSuccessRate = payoutTotal > 0 ? (payoutSuccessCount / payoutTotal * 100).toFixed(1) : '0';
+    doc.fontSize(11).fillColor('#10B981').text(`${payoutSuccessRate}% aprobadas`, 320, pieYPayout - 5);
+    const payoutFailCount = payoutTotal - payoutSuccessCount;
+    const payoutFailRate = payoutTotal > 0 ? (payoutFailCount / payoutTotal * 100).toFixed(1) : '0';
+    doc.fontSize(9).fillColor('#EF4444').text(`${payoutFailRate}% rechazadas/error`, 320, pieYPayout + 12);
+
+    doc.y = pieYPayout + 65;
+    doc.moveDown(0.5);
+
     drawTable(payoutTotals, payoutTotal);
     doc.moveDown(0.5);
 
