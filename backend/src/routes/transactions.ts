@@ -410,24 +410,37 @@ router.get('/movements/:commerceId', async (req: AuthenticatedRequest, res: Resp
 // ─── GET /api/v1/transactions/history-export — Excel con historial de comercios
 router.get('/history-export', async (_req: AuthenticatedRequest, res: Response) => {
   try {
-    // Query: comercios + monedas configuradas + moneda de gateway en una sola query
+    // Query: comercios + monedas configuradas
     const data = await mysqlQuery(
       `SELECT c.id, c.name, c.country, c.enabled,
-              GROUP_CONCAT(DISTINCT cc_cur.isocode SEPARATOR ', ') as currencies,
-              GROUP_CONCAT(DISTINCT cg_cur.isocode SEPARATOR ', ') as tx_currencies
+              GROUP_CONCAT(DISTINCT cc_cur.isocode SEPARATOR ', ') as currencies
        FROM commerce c
        LEFT JOIN commerce_currency cc ON cc.commerce_id = c.id
        LEFT JOIN currency cc_cur ON cc_cur.id = cc.currency_id
-       LEFT JOIN commerce_gateway cg ON cg.commerce_id = c.id AND cg.deleted_at IS NULL
-       LEFT JOIN currency cg_cur ON cg_cur.id = cg.currency_id
        WHERE (c.is_deleted IS NULL OR c.is_deleted = 0)
        GROUP BY c.id, c.name, c.country, c.enabled
        ORDER BY c.name ASC`
     );
 
+    // Query separada: moneda de la última transacción por comercio
+    const lastTxCurrencies = await mysqlQuery(
+      `SELECT p.commerce_id, cur.isocode as last_currency
+       FROM payment p
+       INNER JOIN (
+         SELECT commerce_id, MAX(id) as max_id
+         FROM payment
+         WHERE deleted_at IS NULL
+         GROUP BY commerce_id
+       ) latest ON p.id = latest.max_id
+       LEFT JOIN commerce_gateway cg ON cg.id = p.gateway_payment_id
+       LEFT JOIN currency cur ON cur.id = cg.currency_id
+       WHERE cur.isocode IS NOT NULL`
+    );
+
+    // Mapa de commerce_id → moneda última transacción
     const txCurrencyMap: Record<number, string> = {};
-    for (const c of data as any[]) {
-      if (c.tx_currencies) txCurrencyMap[c.id] = c.tx_currencies;
+    for (const row of lastTxCurrencies as any[]) {
+      txCurrencyMap[row.commerce_id] = row.last_currency;
     }
 
     // Generar Excel
@@ -456,7 +469,7 @@ router.get('/history-export', async (_req: AuthenticatedRequest, res: Response) 
         country: c.country || '—',
         status: c.enabled ? 'Habilitado' : 'Deshabilitado',
         currencies: c.currencies || '—',
-        tx_currencies: c.tx_currencies || '—',
+        tx_currencies: txCurrencyMap[c.id] || '—',
       });
       // Color alterno en filas
       if (row.number % 2 === 0) {
