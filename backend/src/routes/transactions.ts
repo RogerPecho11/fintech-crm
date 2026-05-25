@@ -418,39 +418,48 @@ router.get('/history-export', async (_req: AuthenticatedRequest, res: Response) 
        ORDER BY c.name ASC`
     );
 
-    // Query: monedas de pasarelas ACTIVAS por comercio (Pay In)
+    // Query: monedas de pasarelas ACTIVAS por comercio (Pay In) — solo la más reciente por comercio
     const payinCurrencies = await mysqlQuery(
-      `SELECT cg.commerce_id, GROUP_CONCAT(DISTINCT cur.isocode SEPARATOR ', ') as currencies
+      `SELECT cg.commerce_id, cur.isocode as currency
        FROM commerce_gateway cg
        JOIN currency cur ON cur.id = cg.currency_id
-       WHERE cg.deleted_at IS NULL AND cg.status = 'active'
+       WHERE cg.deleted_at IS NULL 
+       AND (cg.status = 'active' OR cg.status = '1' OR cg.status = 1)
        AND cur.isocode IS NOT NULL
-       GROUP BY cg.commerce_id`
+       AND cg.id = (
+         SELECT MAX(cg2.id) FROM commerce_gateway cg2 
+         WHERE cg2.commerce_id = cg.commerce_id 
+         AND cg2.deleted_at IS NULL 
+         AND (cg2.status = 'active' OR cg2.status = '1' OR cg2.status = 1)
+       )`
     );
 
-    // Query: monedas de pasarelas ACTIVAS por comercio (Pay Out)
+    // Query: monedas de pasarelas ACTIVAS por comercio (Pay Out) — solo la más reciente por comercio
     const payoutCurrencies = await mysqlQuery(
-      `SELECT cgw.commerce_id, GROUP_CONCAT(DISTINCT cur.isocode SEPARATOR ', ') as currencies
+      `SELECT cgw.commerce_id, cur.isocode as currency
        FROM commerce_gateway_withdrawal cgw
        JOIN currency cur ON cur.id = cgw.currency_id
-       WHERE cgw.deleted_at IS NULL AND cgw.status = 'active'
+       WHERE cgw.deleted_at IS NULL 
+       AND (cgw.status = 'active' OR cgw.status = '1' OR cgw.status = 1)
        AND cur.isocode IS NOT NULL
-       GROUP BY cgw.commerce_id`
+       AND cgw.id = (
+         SELECT MAX(cgw2.id) FROM commerce_gateway_withdrawal cgw2 
+         WHERE cgw2.commerce_id = cgw.commerce_id 
+         AND cgw2.deleted_at IS NULL 
+         AND (cgw2.status = 'active' OR cgw2.status = '1' OR cgw2.status = 1)
+       )`
     );
 
-    // Mapa: commerce_id → monedas únicas de pasarelas activas
+    // Mapa: commerce_id → moneda única de pasarela activa
     const currencyMap: Record<number, string> = {};
     for (const row of payinCurrencies as any[]) {
-      const existing = currencyMap[row.commerce_id] ? currencyMap[row.commerce_id].split(', ') : [];
-      const newOnes = (row.currencies || '').split(', ').filter(Boolean);
-      const merged = [...new Set([...existing, ...newOnes])];
-      currencyMap[row.commerce_id] = merged.join(', ');
+      if (row.currency) currencyMap[row.commerce_id] = row.currency;
     }
+    // Solo agregar payout si no hay payin
     for (const row of payoutCurrencies as any[]) {
-      const existing = currencyMap[row.commerce_id] ? currencyMap[row.commerce_id].split(', ') : [];
-      const newOnes = (row.currencies || '').split(', ').filter(Boolean);
-      const merged = [...new Set([...existing, ...newOnes])];
-      currencyMap[row.commerce_id] = merged.join(', ');
+      if (row.currency && !currencyMap[row.commerce_id]) {
+        currencyMap[row.commerce_id] = row.currency;
+      }
     }
 
     // Generar Excel
