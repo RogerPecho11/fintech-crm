@@ -410,6 +410,25 @@ router.get('/movements/:commerceId', async (req: AuthenticatedRequest, res: Resp
 // ─── GET /api/v1/transactions/history-export — Excel con historial de comercios
 router.get('/history-export', async (_req: AuthenticatedRequest, res: Response) => {
   try {
+    // Mapeo de código de país a nombre completo
+    const COUNTRY_NAMES: Record<string, string> = {
+      'PE': 'Perú', 'CL': 'Chile', 'BR': 'Brasil', 'MX': 'México', 'CO': 'Colombia',
+      'EC': 'Ecuador', 'AR': 'Argentina', 'UY': 'Uruguay', 'PY': 'Paraguay', 'BO': 'Bolivia',
+      'VE': 'Venezuela', 'PA': 'Panamá', 'CR': 'Costa Rica', 'GT': 'Guatemala', 'HN': 'Honduras',
+      'SV': 'El Salvador', 'NI': 'Nicaragua', 'DO': 'República Dominicana', 'CU': 'Cuba',
+      'US': 'Estados Unidos', 'CA': 'Canadá', 'ES': 'España', 'PT': 'Portugal',
+      'CW': 'Curazao', 'PR': 'Puerto Rico', 'JM': 'Jamaica', 'TT': 'Trinidad y Tobago',
+    };
+
+    // Mapeo de código de moneda a nombre completo
+    const CURRENCY_NAMES: Record<string, string> = {
+      'PEN': 'Sol Peruano', 'CLP': 'Peso Chileno', 'BRL': 'Real Brasileño', 'MXN': 'Peso Mexicano',
+      'COP': 'Peso Colombiano', 'USD': 'Dólar Americano', 'ARS': 'Peso Argentino', 'UYU': 'Peso Uruguayo',
+      'PYG': 'Guaraní', 'BOB': 'Boliviano', 'EUR': 'Euro', 'GBP': 'Libra Esterlina',
+      'VES': 'Bolívar', 'PAB': 'Balboa', 'CRC': 'Colón Costarricense', 'GTQ': 'Quetzal',
+      'HNL': 'Lempira', 'DOP': 'Peso Dominicano', 'NIO': 'Córdoba', 'ANG': 'Florín',
+    };
+
     // Query: comercios básicos
     const data = await mysqlQuery(
       `SELECT c.id, c.name, c.country, c.enabled
@@ -455,6 +474,13 @@ router.get('/history-export', async (_req: AuthenticatedRequest, res: Response) 
       currencyMap[row.commerce_id] = merged.join(', ');
     }
 
+    // Convertir códigos de moneda a nombres completos
+    const currencyFullMap: Record<number, string> = {};
+    for (const [id, codes] of Object.entries(currencyMap)) {
+      const names = codes.split(', ').map(code => CURRENCY_NAMES[code] || code).join(', ');
+      currencyFullMap[Number(id)] = names;
+    }
+
     // Generar Excel
     const ExcelJS = require('exceljs');
     const workbook = new ExcelJS.Workbook();
@@ -463,9 +489,9 @@ router.get('/history-export', async (_req: AuthenticatedRequest, res: Response) 
     sheet.columns = [
       { header: 'ID Comercio', key: 'id', width: 12 },
       { header: 'Comercio', key: 'name', width: 35 },
-      { header: 'País', key: 'country', width: 12 },
+      { header: 'País', key: 'country', width: 22 },
       { header: 'Estado del Comercio', key: 'status', width: 18 },
-      { header: 'Monedas de Pasarelas Activas', key: 'active_currencies', width: 30 },
+      { header: 'Monedas de Pasarelas Activas', key: 'active_currencies', width: 45 },
     ];
 
     sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -477,9 +503,9 @@ router.get('/history-export', async (_req: AuthenticatedRequest, res: Response) 
       const row = sheet.addRow({
         id: c.id,
         name: c.name,
-        country: c.country || '—',
+        country: COUNTRY_NAMES[c.country] || c.country || '—',
         status: c.enabled ? 'Habilitado' : 'Deshabilitado',
-        active_currencies: currencyMap[c.id] || '—',
+        active_currencies: currencyFullMap[c.id] || '—',
       });
       if (row.number % 2 === 0) {
         row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } };
