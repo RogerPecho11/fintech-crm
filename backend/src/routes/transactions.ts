@@ -410,37 +410,47 @@ router.get('/movements/:commerceId', async (req: AuthenticatedRequest, res: Resp
 // ─── GET /api/v1/transactions/history-export — Excel con historial de comercios
 router.get('/history-export', async (_req: AuthenticatedRequest, res: Response) => {
   try {
-    // Query: comercios + monedas configuradas
+    // Query: comercios básicos
     const data = await mysqlQuery(
-      `SELECT c.id, c.name, c.country, c.enabled,
-              GROUP_CONCAT(DISTINCT cc_cur.isocode SEPARATOR ', ') as currencies
+      `SELECT c.id, c.name, c.country, c.enabled
        FROM commerce c
-       LEFT JOIN commerce_currency cc ON cc.commerce_id = c.id
-       LEFT JOIN currency cc_cur ON cc_cur.id = cc.currency_id
        WHERE (c.is_deleted IS NULL OR c.is_deleted = 0)
-       GROUP BY c.id, c.name, c.country, c.enabled
        ORDER BY c.name ASC`
     );
 
-    // Query separada: moneda de la última transacción por comercio
-    const lastTxCurrencies = await mysqlQuery(
-      `SELECT p.commerce_id, cur.isocode as last_currency
-       FROM payment p
-       INNER JOIN (
-         SELECT commerce_id, MAX(id) as max_id
-         FROM payment
-         WHERE deleted_at IS NULL
-         GROUP BY commerce_id
-       ) latest ON p.id = latest.max_id
-       LEFT JOIN commerce_gateway cg ON cg.id = p.gateway_payment_id
-       LEFT JOIN currency cur ON cur.id = cg.currency_id
-       WHERE cur.isocode IS NOT NULL`
+    // Query: monedas de pasarelas ACTIVAS por comercio (Pay In)
+    const payinCurrencies = await mysqlQuery(
+      `SELECT cg.commerce_id, GROUP_CONCAT(DISTINCT cur.isocode SEPARATOR ', ') as currencies
+       FROM commerce_gateway cg
+       JOIN currency cur ON cur.id = cg.currency_id
+       WHERE cg.deleted_at IS NULL AND cg.status = 'active'
+       AND cur.isocode IS NOT NULL
+       GROUP BY cg.commerce_id`
     );
 
-    // Mapa de commerce_id → moneda última transacción
-    const txCurrencyMap: Record<number, string> = {};
-    for (const row of lastTxCurrencies as any[]) {
-      txCurrencyMap[row.commerce_id] = row.last_currency;
+    // Query: monedas de pasarelas ACTIVAS por comercio (Pay Out)
+    const payoutCurrencies = await mysqlQuery(
+      `SELECT cgw.commerce_id, GROUP_CONCAT(DISTINCT cur.isocode SEPARATOR ', ') as currencies
+       FROM commerce_gateway_withdrawal cgw
+       JOIN currency cur ON cur.id = cgw.currency_id
+       WHERE cgw.deleted_at IS NULL AND cgw.status = 'active'
+       AND cur.isocode IS NOT NULL
+       GROUP BY cgw.commerce_id`
+    );
+
+    // Mapa: commerce_id → monedas únicas de pasarelas activas
+    const currencyMap: Record<number, string> = {};
+    for (const row of payinCurrencies as any[]) {
+      const existing = currencyMap[row.commerce_id] ? currencyMap[row.commerce_id].split(', ') : [];
+      const newOnes = (row.currencies || '').split(', ').filter(Boolean);
+      const merged = [...new Set([...existing, ...newOnes])];
+      currencyMap[row.commerce_id] = merged.join(', ');
+    }
+    for (const row of payoutCurrencies as any[]) {
+      const existing = currencyMap[row.commerce_id] ? currencyMap[row.commerce_id].split(', ') : [];
+      const newOnes = (row.currencies || '').split(', ').filter(Boolean);
+      const merged = [...new Set([...existing, ...newOnes])];
+      currencyMap[row.commerce_id] = merged.join(', ');
     }
 
     // Generar Excel
@@ -451,10 +461,9 @@ router.get('/history-export', async (_req: AuthenticatedRequest, res: Response) 
     sheet.columns = [
       { header: 'ID Comercio', key: 'id', width: 12 },
       { header: 'Comercio', key: 'name', width: 35 },
-      { header: 'País', key: 'country', width: 15 },
+      { header: 'País', key: 'country', width: 12 },
       { header: 'Estado del Comercio', key: 'status', width: 18 },
-      { header: 'Monedas Configuradas', key: 'currencies', width: 25 },
-      { header: 'Monedas Utilizadas en Transacciones', key: 'tx_currencies', width: 35 },
+      { header: 'Monedas de Pasarelas Activas', key: 'active_currencies', width: 30 },
     ];
 
     sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -468,14 +477,11 @@ router.get('/history-export', async (_req: AuthenticatedRequest, res: Response) 
         name: c.name,
         country: c.country || '—',
         status: c.enabled ? 'Habilitado' : 'Deshabilitado',
-        currencies: c.currencies || '—',
-        tx_currencies: txCurrencyMap[c.id] || '—',
+        active_currencies: currencyMap[c.id] || '—',
       });
-      // Color alterno en filas
       if (row.number % 2 === 0) {
         row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } };
       }
-      // Color estado
       const statusCell = row.getCell('status');
       if (c.enabled) {
         statusCell.font = { color: { argb: 'FF16A34A' }, bold: true };
@@ -495,6 +501,11 @@ router.get('/history-export', async (_req: AuthenticatedRequest, res: Response) 
         };
       });
     });
+
+    // Auto-filtro
+    if ((data as any[]).length > 0) {
+      sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 5 } };
+    }
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename=historial_comercios_${new Date().toISOString().slice(0,10)}.xlsx`);
