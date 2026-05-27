@@ -906,7 +906,7 @@ router.get('/commerce-changes-export', async (req: AuthenticatedRequest, res: Re
 // ─── GET /api/v1/transactions/gateway-dashboard-export — Excel de pasarelas por comercio
 router.get('/gateway-dashboard-export', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { country } = req.query as Record<string, string>;
+    const { country, gateway, status, search } = req.query as Record<string, string>;
 
     let countryFilter = '';
     const params: any[] = [];
@@ -951,7 +951,35 @@ router.get('/gateway-dashboard-export', async (req: AuthenticatedRequest, res: R
       commerceMap.get(r.commerce_id).payout.push({ gateway: r.gateway_name, status: r.gateway_status });
     });
 
-    const commerces = Array.from(commerceMap.values());
+    // Aplicar filtros
+    let commerces = Array.from(commerceMap.values());
+
+    // Filtro por nombre de comercio
+    if (search) {
+      commerces = commerces.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
+    }
+
+    // Filtro por pasarela específica
+    if (gateway) {
+      commerces = commerces.filter(c => {
+        const hasPayin = c.payin.some((g: any) => g.gateway === gateway);
+        const hasPayout = c.payout.some((g: any) => g.gateway === gateway);
+        return hasPayin || hasPayout;
+      });
+    }
+
+    // Filtro por estado (activo/inactivo)
+    if (status === 'active') {
+      commerces = commerces.filter(c => {
+        return c.payin.some((g: any) => g.status === 'active' || g.status === '1' || g.status === 1)
+          || c.payout.some((g: any) => g.status === 'active' || g.status === '1' || g.status === 1);
+      });
+    } else if (status === 'inactive') {
+      commerces = commerces.filter(c => {
+        const allGws = [...c.payin, ...c.payout];
+        return allGws.length > 0 && allGws.every((g: any) => g.status !== 'active' && g.status !== '1' && g.status !== 1);
+      });
+    }
 
     // Generar Excel
     const ExcelJS = require('exceljs');

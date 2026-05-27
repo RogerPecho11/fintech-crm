@@ -935,6 +935,8 @@ function GatewayDashboard() {
   const [loading, setLoading] = useState(false);
   const [country, setCountry] = useState('');
   const [search, setSearch] = useState('');
+  const [gatewayFilter, setGatewayFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState(''); // 'active', 'inactive', ''
 
   const fetchData = async (countryFilter?: string) => {
     setLoading(true);
@@ -957,9 +959,40 @@ function GatewayDashboard() {
     fetchData(val);
   };
 
-  const filteredCommerces = (data?.commerces || []).filter((c: any) =>
-    !search || c.name.toLowerCase().includes(search.toLowerCase())
-  );
+  // Lista de todas las pasarelas disponibles (Pay In + Pay Out)
+  const allGateways = (() => {
+    const set = new Set<string>();
+    (data?.commerces || []).forEach((c: any) => {
+      c.payin.forEach((g: any) => { if (g.gateway) set.add(g.gateway); });
+      c.payout.forEach((g: any) => { if (g.gateway) set.add(g.gateway); });
+    });
+    return [...set].sort();
+  })();
+
+  // Filtrar comercios
+  const filteredCommerces = (data?.commerces || []).filter((c: any) => {
+    // Filtro por búsqueda
+    if (search && !c.name.toLowerCase().includes(search.toLowerCase())) return false;
+
+    // Filtro por pasarela
+    if (gatewayFilter) {
+      const hasPayin = c.payin.some((g: any) => g.gateway === gatewayFilter);
+      const hasPayout = c.payout.some((g: any) => g.gateway === gatewayFilter);
+      if (!hasPayin && !hasPayout) return false;
+    }
+
+    // Filtro por estado de pasarela
+    if (statusFilter === 'active') {
+      const hasActive = c.payin.some((g: any) => g.status === 'active' || g.status === '1' || g.status === 1)
+        || c.payout.some((g: any) => g.status === 'active' || g.status === '1' || g.status === 1);
+      if (!hasActive) return false;
+    } else if (statusFilter === 'inactive') {
+      const allInactive = [...c.payin, ...c.payout].every((g: any) => g.status !== 'active' && g.status !== '1' && g.status !== 1);
+      if (!allInactive) return false;
+    }
+
+    return true;
+  });
 
   const countries = [...new Set((data?.commerces || []).map((c: any) => c.country))].filter(Boolean).sort();
 
@@ -968,6 +1001,9 @@ function GatewayDashboard() {
     try {
       const params: any = {};
       if (country) params.country = country;
+      if (gatewayFilter) params.gateway = gatewayFilter;
+      if (statusFilter) params.status = statusFilter;
+      if (search) params.search = search;
       const response = await api.get('/transactions/gateway-dashboard-export', {
         params,
         responseType: 'blob',
@@ -1042,6 +1078,21 @@ function GatewayDashboard() {
           <select className="input text-sm" value={country} onChange={e => handleCountryChange(e.target.value)}>
             <option value="">Todos</option>
             {countries.map((c: any) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Pasarela</label>
+          <select className="input text-sm" value={gatewayFilter} onChange={e => setGatewayFilter(e.target.value)}>
+            <option value="">Todas</option>
+            {allGateways.map((g: string) => <option key={g} value={g}>{g}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Estado</label>
+          <select className="input text-sm" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+            <option value="">Todos</option>
+            <option value="active">Activos</option>
+            <option value="inactive">Desactivados</option>
           </select>
         </div>
         <div className="flex-1 min-w-[200px]">
