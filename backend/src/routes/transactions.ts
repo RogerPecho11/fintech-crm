@@ -439,7 +439,8 @@ router.get('/history-export', async (_req: AuthenticatedRequest, res: Response) 
 
     // Query: monedas de pasarelas ACTIVAS por comercio (Pay In)
     const payinCurrencies = await mysqlQuery(
-      `SELECT cg.commerce_id, GROUP_CONCAT(DISTINCT cur.isocode SEPARATOR ', ') as currencies
+      `SELECT cg.commerce_id, GROUP_CONCAT(DISTINCT cur.isocode SEPARATOR ', ') as currencies,
+              GROUP_CONCAT(DISTINCT cg.country SEPARATOR ', ') as countries
        FROM commerce_gateway cg
        JOIN currency cur ON cur.id = cg.currency_id
        WHERE cg.deleted_at IS NULL 
@@ -450,7 +451,8 @@ router.get('/history-export', async (_req: AuthenticatedRequest, res: Response) 
 
     // Query: monedas de pasarelas ACTIVAS por comercio (Pay Out)
     const payoutCurrencies = await mysqlQuery(
-      `SELECT cgw.commerce_id, GROUP_CONCAT(DISTINCT cur.isocode SEPARATOR ', ') as currencies
+      `SELECT cgw.commerce_id, GROUP_CONCAT(DISTINCT cur.isocode SEPARATOR ', ') as currencies,
+              GROUP_CONCAT(DISTINCT cgw.country SEPARATOR ', ') as countries
        FROM commerce_gateway_withdrawal cgw
        JOIN currency cur ON cur.id = cgw.currency_id
        WHERE cgw.deleted_at IS NULL 
@@ -461,17 +463,24 @@ router.get('/history-export', async (_req: AuthenticatedRequest, res: Response) 
 
     // Mapa: commerce_id → monedas únicas de pasarelas activas (sin repetir)
     const currencyMap: Record<number, string> = {};
+    const countryMap: Record<number, string> = {};
     for (const row of payinCurrencies as any[]) {
-      const existing = currencyMap[row.commerce_id] ? currencyMap[row.commerce_id].split(', ') : [];
-      const newOnes = (row.currencies || '').split(', ').filter(Boolean);
-      const merged = [...new Set([...existing, ...newOnes])];
-      currencyMap[row.commerce_id] = merged.join(', ');
+      const existingCur = currencyMap[row.commerce_id] ? currencyMap[row.commerce_id].split(', ') : [];
+      const newCur = (row.currencies || '').split(', ').filter(Boolean);
+      currencyMap[row.commerce_id] = [...new Set([...existingCur, ...newCur])].join(', ');
+
+      const existingCountry = countryMap[row.commerce_id] ? countryMap[row.commerce_id].split(', ') : [];
+      const newCountry = (row.countries || '').split(', ').filter(Boolean);
+      countryMap[row.commerce_id] = [...new Set([...existingCountry, ...newCountry])].join(', ');
     }
     for (const row of payoutCurrencies as any[]) {
-      const existing = currencyMap[row.commerce_id] ? currencyMap[row.commerce_id].split(', ') : [];
-      const newOnes = (row.currencies || '').split(', ').filter(Boolean);
-      const merged = [...new Set([...existing, ...newOnes])];
-      currencyMap[row.commerce_id] = merged.join(', ');
+      const existingCur = currencyMap[row.commerce_id] ? currencyMap[row.commerce_id].split(', ') : [];
+      const newCur = (row.currencies || '').split(', ').filter(Boolean);
+      currencyMap[row.commerce_id] = [...new Set([...existingCur, ...newCur])].join(', ');
+
+      const existingCountry = countryMap[row.commerce_id] ? countryMap[row.commerce_id].split(', ') : [];
+      const newCountry = (row.countries || '').split(', ').filter(Boolean);
+      countryMap[row.commerce_id] = [...new Set([...existingCountry, ...newCountry])].join(', ');
     }
 
     // Convertir códigos de moneda a nombres completos
@@ -479,6 +488,13 @@ router.get('/history-export', async (_req: AuthenticatedRequest, res: Response) 
     for (const [id, codes] of Object.entries(currencyMap)) {
       const names = codes.split(', ').map(code => CURRENCY_NAMES[code] || code).join(', ');
       currencyFullMap[Number(id)] = names;
+    }
+
+    // Convertir códigos de país a nombres completos
+    const countryFullMap: Record<number, string> = {};
+    for (const [id, codes] of Object.entries(countryMap)) {
+      const names = codes.split(', ').map(code => COUNTRY_NAMES[code] || code).filter(Boolean).join(', ');
+      countryFullMap[Number(id)] = names;
     }
 
     // Generar Excel
@@ -503,7 +519,7 @@ router.get('/history-export', async (_req: AuthenticatedRequest, res: Response) 
       const row = sheet.addRow({
         id: c.id,
         name: c.name,
-        country: COUNTRY_NAMES[c.country] || c.country || '—',
+        country: countryFullMap[c.id] || COUNTRY_NAMES[c.country] || c.country || '—',
         status: c.enabled ? 'Habilitado' : 'Deshabilitado',
         active_currencies: currencyFullMap[c.id] || '—',
       });
