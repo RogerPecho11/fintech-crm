@@ -1010,17 +1010,24 @@ router.get('/gateway-dashboard-export', async (req: AuthenticatedRequest, res: R
     sheet.getRow(1).height = 22;
 
     for (const c of commerces) {
-      const payinActive = c.payin.filter((g: any) => g.status === 'active' || g.status === '1' || g.status === 1);
-      const payoutActive = c.payout.filter((g: any) => g.status === 'active' || g.status === '1' || g.status === 1);
+      // Filtrar pasarelas por el filtro de gateway si existe
+      const gwFilter = gateway ? gateway.split(',').filter(Boolean) : [];
+      let payinFiltered = c.payin.filter((g: any) => g.status === 'active' || g.status === '1' || g.status === 1);
+      let payoutFiltered = c.payout.filter((g: any) => g.status === 'active' || g.status === '1' || g.status === 1);
+      
+      if (gwFilter.length > 0) {
+        payinFiltered = payinFiltered.filter((g: any) => gwFilter.includes(g.gateway));
+        payoutFiltered = payoutFiltered.filter((g: any) => gwFilter.includes(g.gateway));
+      }
 
       const row = sheet.addRow({
         id: c.id,
         name: c.name,
         country: c.country || '—',
-        payin: payinActive.map((g: any) => g.gateway).join(', ') || '—',
-        payout: payoutActive.map((g: any) => g.gateway).join(', ') || '—',
-        payin_count: payinActive.length,
-        payout_count: payoutActive.length,
+        payin: payinFiltered.map((g: any) => g.gateway).join(', ') || '—',
+        payout: payoutFiltered.map((g: any) => g.gateway).join(', ') || '—',
+        payin_count: payinFiltered.length,
+        payout_count: payoutFiltered.length,
       });
 
       if (row.number % 2 === 0) {

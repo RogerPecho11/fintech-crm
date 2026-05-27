@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -1085,48 +1085,22 @@ function GatewayDashboard() {
       {/* Filtros */}
       <div className="flex flex-wrap gap-3 items-end p-3 bg-gray-50 rounded-lg">
         <div>
-          <label className="text-xs text-gray-500 block mb-1">País (multi)</label>
-          <div className="relative">
-            <select
-              className="input text-sm"
-              multiple
-              size={3}
-              value={country}
-              onChange={e => {
-                const selected = Array.from(e.target.selectedOptions, o => o.value);
-                setCountry(selected);
-                setApplied(false);
-              }}
-              style={{ minWidth: 100 }}
-            >
-              {allCountries.map((c: string) => <option key={c} value={c}>{c}</option>)}
-            </select>
-            {country.length > 0 && (
-              <span className="absolute -top-2 -right-2 bg-blue-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">{country.length}</span>
-            )}
-          </div>
+          <label className="text-xs text-gray-500 block mb-1">País</label>
+          <MultiSelect
+            options={allCountries}
+            selected={country}
+            onChange={(val) => { setCountry(val); setApplied(false); }}
+            placeholder="Todos"
+          />
         </div>
         <div>
-          <label className="text-xs text-gray-500 block mb-1">Pasarela (multi)</label>
-          <div className="relative">
-            <select
-              className="input text-sm"
-              multiple
-              size={3}
-              value={gatewayFilter}
-              onChange={e => {
-                const selected = Array.from(e.target.selectedOptions, o => o.value);
-                setGatewayFilter(selected);
-                setApplied(false);
-              }}
-              style={{ minWidth: 150 }}
-            >
-              {allGateways.map((g: string) => <option key={g} value={g}>{g}</option>)}
-            </select>
-            {gatewayFilter.length > 0 && (
-              <span className="absolute -top-2 -right-2 bg-purple-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">{gatewayFilter.length}</span>
-            )}
-          </div>
+          <label className="text-xs text-gray-500 block mb-1">Pasarela</label>
+          <MultiSelect
+            options={allGateways}
+            selected={gatewayFilter}
+            onChange={(val) => { setGatewayFilter(val); setApplied(false); }}
+            placeholder="Todas"
+          />
         </div>
         <div>
           <label className="text-xs text-gray-500 block mb-1">Estado</label>
@@ -1253,6 +1227,63 @@ function GatewayDashboard() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Componente: MultiSelect dropdown con checkboxes ─────────────────────────
+function MultiSelect({ options, selected, onChange, placeholder }: {
+  options: string[];
+  selected: string[];
+  onChange: (val: string[]) => void;
+  placeholder: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const toggle = (val: string) => {
+    onChange(selected.includes(val) ? selected.filter(v => v !== val) : [...selected, val]);
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="input text-sm flex items-center gap-2 min-w-[140px] justify-between"
+      >
+        <span className="truncate">
+          {selected.length === 0 ? placeholder : `${selected.length} seleccionado${selected.length > 1 ? 's' : ''}`}
+        </span>
+        <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 w-56 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+          {options.length === 0 ? (
+            <div className="p-2 text-xs text-gray-400">Sin opciones</div>
+          ) : options.map(opt => (
+            <label key={opt} className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer text-sm">
+              <input
+                type="checkbox"
+                checked={selected.includes(opt)}
+                onChange={() => toggle(opt)}
+                className="rounded border-gray-300 text-pink-600 focus:ring-pink-500"
+              />
+              <span className="truncate">{opt}</span>
+            </label>
+          ))}
         </div>
       )}
     </div>
