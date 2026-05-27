@@ -1213,7 +1213,9 @@ function GatewayDashboard() {
                     <div className="flex flex-wrap gap-1">
                       {c.payin.length === 0 ? (
                         <span className="text-xs text-gray-400">—</span>
-                      ) : c.payin.map((g: any, i: number) => (
+                      ) : c.payin
+                        .filter((g: any) => gatewayFilter.length === 0 || gatewayFilter.includes(g.gateway))
+                        .map((g: any, i: number) => (
                         <span key={i} className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                           g.status === 'active' || g.status === '1' || g.status === 1
                             ? 'bg-green-100 text-green-700'
@@ -1222,13 +1224,18 @@ function GatewayDashboard() {
                           {g.gateway || 'N/A'}
                         </span>
                       ))}
+                      {gatewayFilter.length > 0 && c.payin.filter((g: any) => gatewayFilter.includes(g.gateway)).length === 0 && (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
                     </div>
                   </td>
                   <td className="p-2">
                     <div className="flex flex-wrap gap-1">
                       {c.payout.length === 0 ? (
                         <span className="text-xs text-gray-400">—</span>
-                      ) : c.payout.map((g: any, i: number) => (
+                      ) : c.payout
+                        .filter((g: any) => gatewayFilter.length === 0 || gatewayFilter.includes(g.gateway))
+                        .map((g: any, i: number) => (
                         <span key={i} className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                           g.status === 'active' || g.status === '1' || g.status === 1
                             ? 'bg-purple-100 text-purple-700'
@@ -1237,6 +1244,9 @@ function GatewayDashboard() {
                           {g.gateway || 'N/A'}
                         </span>
                       ))}
+                      {gatewayFilter.length > 0 && c.payout.filter((g: any) => gatewayFilter.includes(g.gateway)).length === 0 && (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
                     </div>
                   </td>
                 </tr>
