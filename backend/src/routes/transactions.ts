@@ -911,8 +911,14 @@ router.get('/gateway-dashboard-export', async (req: AuthenticatedRequest, res: R
     let countryFilter = '';
     const params: any[] = [];
     if (country) {
-      countryFilter = ' AND c.country = ?';
-      params.push(country);
+      const countries = country.split(',').filter(Boolean);
+      if (countries.length === 1) {
+        countryFilter = ' AND c.country = ?';
+        params.push(countries[0]);
+      } else if (countries.length > 1) {
+        countryFilter = ` AND c.country IN (${countries.map(() => '?').join(',')})`;
+        params.push(...countries);
+      }
     }
 
     const payinSql = `SELECT c.id as commerce_id, c.name as commerce_name, c.country,
@@ -959,11 +965,12 @@ router.get('/gateway-dashboard-export', async (req: AuthenticatedRequest, res: R
       commerces = commerces.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
     }
 
-    // Filtro por pasarela específica
+    // Filtro por pasarela específica (puede ser múltiple separado por coma)
     if (gateway) {
+      const gateways = gateway.split(',').filter(Boolean);
       commerces = commerces.filter(c => {
-        const hasPayin = c.payin.some((g: any) => g.gateway === gateway);
-        const hasPayout = c.payout.some((g: any) => g.gateway === gateway);
+        const hasPayin = c.payin.some((g: any) => gateways.includes(g.gateway));
+        const hasPayout = c.payout.some((g: any) => gateways.includes(g.gateway));
         return hasPayin || hasPayout;
       });
     }

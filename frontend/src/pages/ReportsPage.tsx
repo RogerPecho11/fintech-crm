@@ -933,16 +933,17 @@ function MonitoringSection() {
 function GatewayDashboard() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [country, setCountry] = useState('');
+  const [country, setCountry] = useState<string[]>([]);
   const [search, setSearch] = useState('');
-  const [gatewayFilter, setGatewayFilter] = useState('');
+  const [gatewayFilter, setGatewayFilter] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState(''); // 'active', 'inactive', ''
+  const [applied, setApplied] = useState(false); // controla si se aplicó el filtro
 
-  const fetchData = async (countryFilter?: string) => {
+  const fetchData = async () => {
     setLoading(true);
     try {
       const params: any = {};
-      if (countryFilter) params.country = countryFilter;
+      if (country.length) params.country = country.join(',');
       const res = await api.get('/transactions/gateway-dashboard', { params });
       setData(res.data);
     } catch {
@@ -954,9 +955,8 @@ function GatewayDashboard() {
 
   useEffect(() => { fetchData(); }, []);
 
-  const handleCountryChange = (val: string) => {
-    setCountry(val);
-    fetchData(val);
+  const handleApplyFilters = () => {
+    setApplied(true);
   };
 
   // Lista de todas las pasarelas disponibles (Pay In + Pay Out)
@@ -969,39 +969,40 @@ function GatewayDashboard() {
     return [...set].sort();
   })();
 
+  const allCountries = [...new Set((data?.commerces || []).map((c: any) => c.country))].filter(Boolean).sort() as string[];
+
   // Filtrar comercios
   const filteredCommerces = (data?.commerces || []).filter((c: any) => {
-    // Filtro por búsqueda
     if (search && !c.name.toLowerCase().includes(search.toLowerCase())) return false;
 
-    // Filtro por pasarela
-    if (gatewayFilter) {
-      const hasPayin = c.payin.some((g: any) => g.gateway === gatewayFilter);
-      const hasPayout = c.payout.some((g: any) => g.gateway === gatewayFilter);
+    if (country.length > 0 && !country.includes(c.country)) return false;
+
+    if (gatewayFilter.length > 0) {
+      const hasPayin = c.payin.some((g: any) => gatewayFilter.includes(g.gateway));
+      const hasPayout = c.payout.some((g: any) => gatewayFilter.includes(g.gateway));
       if (!hasPayin && !hasPayout) return false;
     }
 
-    // Filtro por estado de pasarela
     if (statusFilter === 'active') {
       const hasActive = c.payin.some((g: any) => g.status === 'active' || g.status === '1' || g.status === 1)
         || c.payout.some((g: any) => g.status === 'active' || g.status === '1' || g.status === 1);
       if (!hasActive) return false;
     } else if (statusFilter === 'inactive') {
-      const allInactive = [...c.payin, ...c.payout].every((g: any) => g.status !== 'active' && g.status !== '1' && g.status !== 1);
+      const allGws = [...c.payin, ...c.payout];
+      if (allGws.length === 0) return false;
+      const allInactive = allGws.every((g: any) => g.status !== 'active' && g.status !== '1' && g.status !== 1);
       if (!allInactive) return false;
     }
 
     return true;
   });
 
-  const countries = [...new Set((data?.commerces || []).map((c: any) => c.country))].filter(Boolean).sort();
-
   const handleExportExcel = async () => {
     const toastId = toast.loading('Generando Excel...');
     try {
       const params: any = {};
-      if (country) params.country = country;
-      if (gatewayFilter) params.gateway = gatewayFilter;
+      if (country.length) params.country = country.join(',');
+      if (gatewayFilter.length) params.gateway = gatewayFilter.join(',');
       if (statusFilter) params.status = statusFilter;
       if (search) params.search = search;
       const response = await api.get('/transactions/gateway-dashboard-export', {
@@ -1021,6 +1022,16 @@ function GatewayDashboard() {
     } catch {
       toast.error('Error al exportar', { id: toastId });
     }
+  };
+
+  const toggleCountry = (val: string) => {
+    setCountry(prev => prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val]);
+    setApplied(false);
+  };
+
+  const toggleGateway = (val: string) => {
+    setGatewayFilter(prev => prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val]);
+    setApplied(false);
   };
 
   return (
@@ -1072,39 +1083,76 @@ function GatewayDashboard() {
       )}
 
       {/* Filtros */}
-      <div className="flex flex-wrap gap-3 items-end">
+      <div className="flex flex-wrap gap-3 items-end p-3 bg-gray-50 rounded-lg">
         <div>
-          <label className="text-xs text-gray-500 block mb-1">País</label>
-          <select className="input text-sm" value={country} onChange={e => handleCountryChange(e.target.value)}>
-            <option value="">Todos</option>
-            {countries.map((c: any) => <option key={c} value={c}>{c}</option>)}
-          </select>
+          <label className="text-xs text-gray-500 block mb-1">País (multi)</label>
+          <div className="relative">
+            <select
+              className="input text-sm"
+              multiple
+              size={3}
+              value={country}
+              onChange={e => {
+                const selected = Array.from(e.target.selectedOptions, o => o.value);
+                setCountry(selected);
+                setApplied(false);
+              }}
+              style={{ minWidth: 100 }}
+            >
+              {allCountries.map((c: string) => <option key={c} value={c}>{c}</option>)}
+            </select>
+            {country.length > 0 && (
+              <span className="absolute -top-2 -right-2 bg-blue-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">{country.length}</span>
+            )}
+          </div>
         </div>
         <div>
-          <label className="text-xs text-gray-500 block mb-1">Pasarela</label>
-          <select className="input text-sm" value={gatewayFilter} onChange={e => setGatewayFilter(e.target.value)}>
-            <option value="">Todas</option>
-            {allGateways.map((g: string) => <option key={g} value={g}>{g}</option>)}
-          </select>
+          <label className="text-xs text-gray-500 block mb-1">Pasarela (multi)</label>
+          <div className="relative">
+            <select
+              className="input text-sm"
+              multiple
+              size={3}
+              value={gatewayFilter}
+              onChange={e => {
+                const selected = Array.from(e.target.selectedOptions, o => o.value);
+                setGatewayFilter(selected);
+                setApplied(false);
+              }}
+              style={{ minWidth: 150 }}
+            >
+              {allGateways.map((g: string) => <option key={g} value={g}>{g}</option>)}
+            </select>
+            {gatewayFilter.length > 0 && (
+              <span className="absolute -top-2 -right-2 bg-purple-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">{gatewayFilter.length}</span>
+            )}
+          </div>
         </div>
         <div>
           <label className="text-xs text-gray-500 block mb-1">Estado</label>
-          <select className="input text-sm" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+          <select className="input text-sm" value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setApplied(false); }}>
             <option value="">Todos</option>
             <option value="active">Activos</option>
             <option value="inactive">Desactivados</option>
           </select>
         </div>
-        <div className="flex-1 min-w-[200px]">
+        <div className="flex-1 min-w-[150px]">
           <label className="text-xs text-gray-500 block mb-1">Buscar comercio</label>
           <input
             type="text"
             className="input text-sm w-full"
-            placeholder="Nombre del comercio..."
+            placeholder="Nombre..."
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => { setSearch(e.target.value); setApplied(false); }}
           />
         </div>
+        <button
+          onClick={handleApplyFilters}
+          className="btn-primary flex items-center gap-2 text-sm"
+        >
+          <Filter className="w-4 h-4" />
+          Filtrar
+        </button>
         <button
           onClick={handleExportExcel}
           className="btn-secondary flex items-center gap-2 text-sm"
@@ -1112,7 +1160,31 @@ function GatewayDashboard() {
           <Download className="w-4 h-4" />
           Exportar Excel
         </button>
+        {(country.length > 0 || gatewayFilter.length > 0 || statusFilter || search) && (
+          <button
+            onClick={() => { setCountry([]); setGatewayFilter([]); setStatusFilter(''); setSearch(''); setApplied(false); }}
+            className="text-xs text-gray-400 hover:text-gray-600"
+          >
+            Limpiar
+          </button>
+        )}
       </div>
+
+      {/* Tags de filtros activos */}
+      {(country.length > 0 || gatewayFilter.length > 0) && (
+        <div className="flex flex-wrap gap-1.5">
+          {country.map(c => (
+            <span key={c} className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+              {c} <button onClick={() => toggleCountry(c)} className="hover:text-blue-900">×</button>
+            </span>
+          ))}
+          {gatewayFilter.map(g => (
+            <span key={g} className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+              {g} <button onClick={() => toggleGateway(g)} className="hover:text-purple-900">×</button>
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* Tabla de comercios con sus pasarelas */}
       {loading ? (
