@@ -17,6 +17,35 @@ router.get('/', async (_req: AuthenticatedRequest, res: Response) => {
   res.json(config);
 });
 
+// ─── GET /api/v1/config/risk-scores — Score de riesgo configurable ───────────
+router.get('/risk-scores', async (_req: AuthenticatedRequest, res: Response) => {
+  const row = await queryOne('SELECT value FROM app_config WHERE key = $1', ['risk_scores']);
+  if (!row) {
+    return res.json({ diamond: 10, gold: 8, silver: 6, bronze: 3, low: 10, medium: 7, high: 3, critical: 0 });
+  }
+  res.json(row.value);
+});
+
+// ─── PUT /api/v1/config/risk-scores — Guardar score de riesgo ────────────────
+router.put('/risk-scores', authorize('admin', 'onboarding'), async (req: AuthenticatedRequest, res: Response) => {
+  const value = req.body;
+  const user = req.user!;
+
+  if (!value || typeof value !== 'object') {
+    return res.status(400).json({ error: 'Formato inválido' });
+  }
+
+  await query(
+    `INSERT INTO app_config (key, value, updated_by, updated_at)
+     VALUES ($1, $2, $3, NOW())
+     ON CONFLICT (key)
+     DO UPDATE SET value = $2, updated_by = $3, updated_at = NOW()`,
+    ['risk_scores', JSON.stringify(value), user.id]
+  );
+
+  res.json({ message: 'Score de riesgo actualizado', value });
+});
+
 // ─── GET /api/v1/config/:key — todos los roles autenticados ──────────────────
 router.get('/:key', async (req: AuthenticatedRequest, res: Response) => {
   const { key } = req.params;
@@ -70,36 +99,6 @@ router.put('/', authorize('admin', 'onboarding'), async (req: AuthenticatedReque
   }
 
   res.json({ message: 'Configuración actualizada.' });
-});
-
-// ─── GET /api/v1/config/risk-scores — Score de riesgo configurable ───────────
-router.get('/risk-scores', async (_req: AuthenticatedRequest, res: Response) => {
-  const row = await queryOne('SELECT value FROM app_config WHERE key = $1', ['risk_scores']);
-  if (!row) {
-    // Valores por defecto
-    return res.json({ diamond: 10, gold: 8, silver: 6, bronze: 3, low: 10, medium: 7, high: 3, critical: 0 });
-  }
-  res.json(row.value);
-});
-
-// ─── PUT /api/v1/config/risk-scores — Guardar score de riesgo ────────────────
-router.put('/risk-scores', authorize('admin', 'onboarding'), async (req: AuthenticatedRequest, res: Response) => {
-  const value = req.body;
-  const user = req.user!;
-
-  if (!value || typeof value !== 'object') {
-    return res.status(400).json({ error: 'Formato inválido' });
-  }
-
-  await query(
-    `INSERT INTO app_config (key, value, updated_by, updated_at)
-     VALUES ($1, $2, $3, NOW())
-     ON CONFLICT (key)
-     DO UPDATE SET value = $2, updated_by = $3, updated_at = NOW()`,
-    ['risk_scores', JSON.stringify(value), user.id]
-  );
-
-  res.json({ message: 'Score de riesgo actualizado', value });
 });
 
 export default router;
