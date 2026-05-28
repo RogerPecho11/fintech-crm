@@ -51,7 +51,7 @@ const io = new SocketServer(httpServer, {
 setupSocketIO(io);
 
 // Middleware
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' }, xDownloadOptions: false }));
 app.use(cors({
   origin: (origin, callback) => {
     const allowed = [
@@ -72,10 +72,11 @@ app.use(compression());
 app.use(morgan('combined'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(rateLimiter);
 
-// Static files for uploads
+// Static files for uploads (antes del rate limiter para que no se bloquee)
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+app.use(rateLimiter);
 
 // Attach io to request
 app.use((req: any, _res, next) => {
