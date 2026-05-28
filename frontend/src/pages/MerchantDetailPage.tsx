@@ -536,14 +536,6 @@ export default function MerchantDetailPage() {
                 )}
                 <a
                   href={`${import.meta.env.VITE_API_URL || ''}/uploads/${doc.file_path}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-secondary text-xs py-1.5 px-3 flex-shrink-0"
-                >
-                  Ver
-                </a>
-                <a
-                  href={`${import.meta.env.VITE_API_URL || ''}/uploads/${doc.file_path}`}
                   download={doc.original_name || doc.name}
                   className="btn-secondary text-xs py-1.5 px-3 flex-shrink-0"
                 >
@@ -852,10 +844,6 @@ function ContractSection({ merchantId }: { merchantId: string }) {
               <p className="text-sm font-medium text-gray-900 truncate">{doc.name || doc.original_name}</p>
               <p className="text-xs text-gray-500">{doc.uploaded_by_name} · {new Date(doc.created_at).toLocaleDateString()}</p>
             </div>
-            <a href={`${baseUrl}/uploads/${doc.file_path}`} target="_blank" rel="noopener noreferrer"
-              className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-100">
-              Ver
-            </a>
             <a href={`${baseUrl}/uploads/${doc.file_path}`} download={doc.original_name}
               className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-100">
               Descargar
