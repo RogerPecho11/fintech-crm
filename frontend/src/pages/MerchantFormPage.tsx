@@ -627,7 +627,7 @@ export default function MerchantFormPage() {
                           <div>
                             <label className="text-xs text-gray-500 mb-0.5 block">Moneda</label>
                             <select className={ic} value={pc.pay4u.currency} onChange={e => updatePay4u(pc.country_code, 'currency', e.target.value)}>
-                              <option>USD</option><option>PEN</option><option>CLP</option><option>EUR</option>
+                              <option>USD</option><option>PEN</option><option>CLP</option><option>UF</option><option>EUR</option><option>BRL</option><option>MXN</option><option>COP</option><option>ARS</option>
                             </select>
                           </div>
                           <div className="flex items-end pb-1">
@@ -765,7 +765,7 @@ function PaySection({ title, entries, available, onAdd, onRemove, onUpdate, ic }
             <div className="col-span-2">
               <label className="text-xs text-gray-500 mb-0.5 block">Moneda</label>
               <select className={ic} value={entry.currency} onChange={e => onUpdate(entry.method_id, 'currency', e.target.value)}>
-                <option>USD</option><option>PEN</option><option>CLP</option><option>EUR</option>
+                <option>USD</option><option>PEN</option><option>CLP</option><option>UF</option><option>EUR</option><option>BRL</option><option>MXN</option><option>COP</option><option>ARS</option>
               </select>
             </div>
           </div>

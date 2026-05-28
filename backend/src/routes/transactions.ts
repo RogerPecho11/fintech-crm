@@ -427,6 +427,7 @@ router.get('/history-export', async (_req: AuthenticatedRequest, res: Response) 
       'PYG': 'Guaraní', 'BOB': 'Boliviano', 'EUR': 'Euro', 'GBP': 'Libra Esterlina',
       'VES': 'Bolívar', 'PAB': 'Balboa', 'CRC': 'Colón Costarricense', 'GTQ': 'Quetzal',
       'HNL': 'Lempira', 'DOP': 'Peso Dominicano', 'NIO': 'Córdoba', 'ANG': 'Florín',
+      'UF': 'Unidad de Fomento',
     };
 
     // Query: comercios básicos
@@ -484,9 +485,16 @@ router.get('/history-export', async (_req: AuthenticatedRequest, res: Response) 
     }
 
     // Convertir códigos de moneda a nombres completos
+    // Para pasarelas de Chile (CL), agregar UF como moneda adicional
     const currencyFullMap: Record<number, string> = {};
     for (const [id, codes] of Object.entries(currencyMap)) {
-      const names = codes.split(', ').map(code => CURRENCY_NAMES[code] || code).join(', ');
+      const codeList = codes.split(', ').filter(Boolean);
+      // Si tiene pasarelas en CL, agregar UF
+      const countries = (countryMap[Number(id)] || '').split(', ');
+      if (countries.includes('CL') && !codeList.includes('UF')) {
+        codeList.push('UF');
+      }
+      const names = codeList.map(code => CURRENCY_NAMES[code] || code).join(', ');
       currencyFullMap[Number(id)] = names;
     }
 
