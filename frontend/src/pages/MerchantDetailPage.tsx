@@ -59,6 +59,14 @@ export default function MerchantDetailPage() {
     enabled: tab === 'Documentos',
   });
 
+  // Score mínimo para finalizar (configurable)
+  const { data: riskScoresConfig } = useQuery({
+    queryKey: ['config', 'risk-scores'],
+    queryFn: () => api.get('/config/risk-scores').then(r => r.data),
+    staleTime: 5 * 60 * 1000,
+  });
+  const minScoreFinalized = riskScoresConfig?.min_score_finalized ?? 80;
+
   const { data: tasks } = useQuery({
     queryKey: ['tasks', id],
     queryFn: () => api.get('/tasks', { params: { merchant_id: id } }).then(r => r.data),
@@ -604,21 +612,21 @@ export default function MerchantDetailPage() {
               </div>
 
               {/* Score warning when selecting finalizado */}
-              {(isMerchantFinalized(newStatus)) && (merchant.score ?? 0) < 80 && (
+              {(isMerchantFinalized(newStatus)) && (merchant.score ?? 0) < minScoreFinalized && (
                 <div className="flex items-start gap-3 p-3 rounded-lg bg-orange-50 border border-orange-200">
                   <AlertTriangle className="w-4 h-4 text-orange-500 flex-shrink-0 mt-0.5" />
                   <div>
                     <p className="text-sm font-semibold text-orange-700">Score insuficiente</p>
                     <p className="text-xs text-orange-600 mt-0.5">
                       El comercio tiene un score de <strong>{merchant.score}/100</strong>.
-                      Se requiere mínimo <strong>80</strong> para finalizar.
+                      Se requiere mínimo <strong>{minScoreFinalized}</strong> para finalizar.
                     </p>
                   </div>
                 </div>
               )}
 
               {/* Confirmation when score is OK for finalizado */}
-              {isMerchantFinalized(newStatus) && (merchant.score ?? 0) >= 80 && (
+              {isMerchantFinalized(newStatus) && (merchant.score ?? 0) >= minScoreFinalized && (
                 <div className="flex items-start gap-3 p-3 rounded-lg bg-teal-50 border border-teal-200">
                   <CheckCircle className="w-4 h-4 text-teal-600 flex-shrink-0 mt-0.5" />
                   <div>
@@ -644,7 +652,7 @@ export default function MerchantDetailPage() {
               <button onClick={() => setStatusModal(false)} className="btn-secondary flex-1">Cancelar</button>
               <button
                 onClick={() => changeStatus.mutate()}
-                disabled={changeStatus.isPending || (isMerchantFinalized(newStatus) && (merchant.score ?? 0) < 80)}
+                disabled={changeStatus.isPending || (isMerchantFinalized(newStatus) && (merchant.score ?? 0) < minScoreFinalized)}
                 className="btn-primary flex-1 disabled:opacity-40"
               >
                 {changeStatus.isPending ? 'Guardando...' : 'Confirmar'}
