@@ -2,8 +2,18 @@ import { query, queryOne } from '../database/connection';
 import { Merchant } from '../types';
 import { isFinalized, FINALIZED_STATUSES } from '../lib/finalized';
 
-// Score mínimo garantizado al finalizar
-const MIN_SCORE_ON_FINALIZED = 80;
+// Score mínimo garantizado al finalizar — se lee de app_config
+let MIN_SCORE_ON_FINALIZED = 80;
+
+async function getMinScoreOnFinalized(): Promise<number> {
+  try {
+    const row = await queryOne<{ value: any }>('SELECT value FROM app_config WHERE key = $1', ['risk_scores']);
+    if (row?.value?.min_score_finalized !== undefined) {
+      return Number(row.value.min_score_finalized);
+    }
+  } catch { /* usar default */ }
+  return MIN_SCORE_ON_FINALIZED;
+}
 
 interface ScoreFactors {
   completeness:  number; // 0-30
@@ -22,15 +32,16 @@ export async function calculateMerchantScore(merchantId: string): Promise<number
 
   // ── Regla: comercio finalizado — el score se congela ────────────────────
   if (isFinalized(merchant.status)) {
+    const minScore = await getMinScoreOnFinalized();
     const currentScore = merchant.score ?? 0;
-    if (currentScore < MIN_SCORE_ON_FINALIZED) {
+    if (currentScore < minScore) {
       await query(
         'UPDATE merchants SET score = $1, updated_at = NOW() WHERE id = $2',
-        [MIN_SCORE_ON_FINALIZED, merchantId]
+        [minScore, merchantId]
       );
-      return MIN_SCORE_ON_FINALIZED;
+      return minScore;
     }
-    // Score ya es >= 80, no tocar
+    // Score ya es >= minScore, no tocar
     return currentScore;
   }
 

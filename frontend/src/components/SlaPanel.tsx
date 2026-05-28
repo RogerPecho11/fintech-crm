@@ -305,8 +305,7 @@ function RiskScoreConfig() {
       Object.entries(data).forEach(([key, val]) => { vals[key] = String(val); });
       setScores(vals);
     }).catch(() => {
-      // Valores por defecto
-      setScores({ diamond: '10', gold: '8', silver: '6', bronze: '3', low: '10', medium: '7', high: '3', critical: '0' });
+      setScores({ diamond: '10', gold: '8', silver: '6', bronze: '3', low: '10', medium: '7', high: '3', critical: '0', min_score_finalized: '80' });
     }).finally(() => setLoading(false));
   }, []);
 
@@ -336,6 +335,28 @@ function RiskScoreConfig() {
         Define cuántos puntos aporta cada nivel de riesgo al Score total del comercio (máximo 10 puntos).
         Un nivel más alto de confianza (diamond) debería tener más puntos.
       </p>
+
+      {/* Score mínimo para finalizar */}
+      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-amber-800">Score mínimo para finalizar</p>
+            <p className="text-xs text-amber-600">El comercio necesita este score mínimo para poder cambiar a estado "Finalizado"</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={0}
+              max={100}
+              className="input w-20 text-sm text-center font-bold"
+              value={scores['min_score_finalized'] ?? '80'}
+              onChange={e => setScores(prev => ({ ...prev, min_score_finalized: e.target.value }))}
+            />
+            <span className="text-sm text-amber-700">/ 100</span>
+          </div>
+        </div>
+      </div>
+
       <div className="border border-gray-100 rounded-xl overflow-hidden">
         <table className="w-full text-sm">
           <thead>

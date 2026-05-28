@@ -268,15 +268,24 @@ router.patch('/:id/status',
     const existing = await queryOne<any>('SELECT * FROM merchants WHERE id = $1', [id]);
     if (!existing) return res.status(404).json({ error: 'Merchant not found' });
 
-    // ── Regla: solo se puede finalizar si score >= 80 ─────────────────────
+    // ── Regla: solo se puede finalizar si score >= mínimo configurable ─────
     if (FINALIZED_STATUSES.includes(status.trim().toLowerCase()) && !isFinalized(existing.status)) {
       const currentScore = existing.score ?? 0;
-      if (currentScore < 80) {
+      // Leer score mínimo de la configuración
+      let requiredScore = 80;
+      try {
+        const configRow = await queryOne<{ value: any }>('SELECT value FROM app_config WHERE key = $1', ['risk_scores']);
+        if (configRow?.value?.min_score_finalized !== undefined) {
+          requiredScore = Number(configRow.value.min_score_finalized);
+        }
+      } catch { /* usar default 80 */ }
+
+      if (currentScore < requiredScore) {
         return res.status(422).json({
-          error: `No se puede cambiar a "${status}". El comercio necesita un Score mínimo de 80 (actual: ${currentScore}).`,
+          error: `No se puede cambiar a "${status}". El comercio necesita un Score mínimo de ${requiredScore} (actual: ${currentScore}).`,
           code: 'SCORE_TOO_LOW',
           currentScore,
-          requiredScore: 80,
+          requiredScore,
         });
       }
     }
