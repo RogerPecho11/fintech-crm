@@ -75,12 +75,17 @@ async function computeScoreFactors(merchant: Merchant): Promise<ScoreFactors> {
   if (merchant.ip_whitelist && merchant.ip_whitelist.length > 0) integrationScore += 2;
 
   // 5. Nivel de riesgo (0-10) — menor riesgo = mayor score
-  const riskScores: Record<string, number> = {
-    // Valores originales del enum
+  // Leer configuración dinámica de la BD
+  let riskScores: Record<string, number> = {
     low: 10, medium: 7, high: 3, critical: 0,
-    // Nuevos niveles dinámicos
     diamond: 10, gold: 8, silver: 6, bronze: 3,
   };
+  try {
+    const configRow = await queryOne<{ value: any }>('SELECT value FROM app_config WHERE key = $1', ['risk_scores']);
+    if (configRow?.value && typeof configRow.value === 'object') {
+      riskScores = { ...riskScores, ...configRow.value };
+    }
+  } catch { /* usar valores por defecto */ }
   const riskScore = riskScores[merchant.risk_level] ?? 5;
 
   return { completeness: completenessScore, activity: activityScore, documentation: documentationScore, integration: integrationScore, risk: riskScore };

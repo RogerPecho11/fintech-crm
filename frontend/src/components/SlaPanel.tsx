@@ -7,13 +7,14 @@ import { SlaConfigEntry } from '../types';
 import { getStatuses, getRiskLevels } from '../lib/config';
 import toast from 'react-hot-toast';
 
-type TabKey = 'merchant_status' | 'risk_level' | 'task_priority' | 'global';
+type TabKey = 'merchant_status' | 'risk_level' | 'task_priority' | 'global' | 'risk_score';
 
 const TAB_LABELS: Record<TabKey, string> = {
   merchant_status: 'SLA por Estado',
   risk_level:      'SLA por Nivel de Riesgo',
   task_priority:   'SLA por Prioridad de Tarea',
   global:          'Umbral de Alerta',
+  risk_score:      'Score de Riesgo',
 };
 
 const PRIORITY_LABELS: Record<string, string> = {
@@ -179,7 +180,10 @@ export default function SlaPanel() {
 
       {/* Tab content */}
       <div className="space-y-3">
-        {activeTab === 'global' ? (
+        {activeTab === 'risk_score' ? (
+          // Score de Riesgo — editable
+          <RiskScoreConfig />
+        ) : activeTab === 'global' ? (
           // Umbral de alerta — single field
           <div className="space-y-3">
             <p className="text-xs text-gray-500">
@@ -282,6 +286,97 @@ export default function SlaPanel() {
             Guardar cambios
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+
+// ─── Componente: Configuración de Score de Riesgo ────────────────────────────
+function RiskScoreConfig() {
+  const [scores, setScores] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    api.get('/config/risk-scores').then(res => {
+      const data = res.data || {};
+      const vals: Record<string, string> = {};
+      Object.entries(data).forEach(([key, val]) => { vals[key] = String(val); });
+      setScores(vals);
+    }).catch(() => {
+      // Valores por defecto
+      setScores({ diamond: '10', gold: '8', silver: '6', bronze: '3', low: '10', medium: '7', high: '3', critical: '0' });
+    }).finally(() => setLoading(false));
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const payload: Record<string, number> = {};
+      Object.entries(scores).forEach(([key, val]) => {
+        payload[key] = val === '' ? 0 : parseInt(val);
+      });
+      await api.put('/config/risk-scores', payload);
+      toast.success('Score de riesgo guardado');
+    } catch {
+      toast.error('Error al guardar');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div>;
+
+  const riskLevels = getRiskLevels();
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-gray-500">
+        Define cuántos puntos aporta cada nivel de riesgo al Score total del comercio (máximo 10 puntos).
+        Un nivel más alto de confianza (diamond) debería tener más puntos.
+      </p>
+      <div className="border border-gray-100 rounded-xl overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-100">
+              <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Nivel de Riesgo</th>
+              <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase w-40">Puntos (0-10)</th>
+              <th className="px-4 py-2.5 text-xs text-gray-400 text-right">Descripción</th>
+            </tr>
+          </thead>
+          <tbody>
+            {riskLevels.map((risk, i) => (
+              <tr key={risk.value} className={`border-b border-gray-50 ${i % 2 === 0 ? '' : 'bg-gray-50/50'}`}>
+                <td className="px-4 py-2.5 font-medium text-gray-800">
+                  {risk.icon} {risk.label}
+                </td>
+                <td className="px-4 py-2.5">
+                  <input
+                    type="number"
+                    min={0}
+                    max={10}
+                    className="input w-20 text-sm"
+                    value={scores[risk.value] ?? ''}
+                    onChange={e => setScores(prev => ({ ...prev, [risk.value]: e.target.value }))}
+                    placeholder="0"
+                  />
+                </td>
+                <td className="px-4 py-2.5 text-right text-xs text-gray-400">
+                  {parseInt(scores[risk.value] || '0') >= 8 ? 'Bajo riesgo' :
+                   parseInt(scores[risk.value] || '0') >= 5 ? 'Riesgo moderado' :
+                   'Alto riesgo'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="flex justify-end pt-2">
+        <button onClick={handleSave} disabled={saving} className="btn-primary flex items-center gap-2 text-sm disabled:opacity-50">
+          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+          Guardar Score de Riesgo
+        </button>
       </div>
     </div>
   );
