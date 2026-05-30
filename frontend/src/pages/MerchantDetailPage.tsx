@@ -773,6 +773,10 @@ function PayMethodCard({ method }: { method: any }) {
         {method.commission && <div>Com: {method.commission}%</div>}
         {method.fee && <div>Tarifa: {method.fee} {method.currency}</div>}
         {method.min_fee && <div>Mín: {method.min_fee}</div>}
+        {method.tarifa_td && <div>TD: {method.tarifa_td}%</div>}
+        {method.tarifa_tc && <div>TC: {method.tarifa_tc}%</div>}
+        {method.tarifa_tf && <div>TF: {method.tarifa_tf}</div>}
+        {method.currency && <div className="text-gray-400">{method.currency}</div>}
       </div>
     </div>
   );
