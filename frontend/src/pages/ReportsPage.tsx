@@ -634,12 +634,14 @@ function MerchantHoverCell({ name, merchantId }: { name: string; merchantId: str
   const [modalDateFrom, setModalDateFrom] = useState('');
   const [modalDateTo, setModalDateTo] = useState('');
 
+  const hasDateFilter = !!(modalDateFrom && modalDateTo);
+
   const { data, isLoading } = useQuery({
     queryKey: ['quick-summary', merchantId, modalDateFrom, modalDateTo],
     queryFn: () => api.get(`/transactions/quick-summary/${merchantId}`, {
       params: { date_from: modalDateFrom || undefined, date_to: modalDateTo || undefined }
     }).then(r => r.data),
-    enabled: open,
+    enabled: open && hasDateFilter,
     staleTime: 30000,
   });
 
@@ -648,7 +650,7 @@ function MerchantHoverCell({ name, merchantId }: { name: string; merchantId: str
     queryFn: () => api.get('/transactions/daily-trend', {
       params: { ids: merchantId, date_from: modalDateFrom || undefined, date_to: modalDateTo || undefined }
     }).then(r => r.data),
-    enabled: open,
+    enabled: open && hasDateFilter,
     staleTime: 30000,
   });
 
@@ -694,11 +696,15 @@ function MerchantHoverCell({ name, merchantId }: { name: string; merchantId: str
                 <button onClick={() => { setModalDateFrom(''); setModalDateTo(''); }} className="text-xs text-gray-400 hover:text-gray-600 pb-2">Limpiar</button>
               )}
               {!modalDateFrom && !modalDateTo && (
-                <span className="text-xs text-gray-400 pb-2">Últimos 30 días por defecto</span>
+                <span className="text-xs text-gray-400 pb-2">Selecciona un rango de fechas para consultar</span>
               )}
             </div>
 
-            {isLoading ? (
+            {!hasDateFilter ? (
+              <div className="text-center py-12 text-gray-400">
+                <p className="text-sm">Selecciona las fechas "Desde" y "Hasta" para consultar las transacciones</p>
+              </div>
+            ) : isLoading ? (
               <div className="text-center py-8 text-gray-400">Cargando transacciones...</div>
             ) : total === 0 ? (
               <div className="text-center py-8 text-gray-400">Sin transacciones en este período</div>
