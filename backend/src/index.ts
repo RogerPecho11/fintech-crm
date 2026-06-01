@@ -50,6 +50,22 @@ const io = new SocketServer(httpServer, {
 
 setupSocketIO(io);
 
+// Static files for uploads — ANTES de helmet/compression para no interferir con archivos
+app.use('/uploads', (req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  next();
+}, express.static(path.join(__dirname, '../uploads'), {
+  setHeaders: (res, filePath) => {
+    const ext = filePath.toLowerCase();
+    if (ext.endsWith('.pdf')) res.setHeader('Content-Type', 'application/pdf');
+    else if (ext.endsWith('.png')) res.setHeader('Content-Type', 'image/png');
+    else if (ext.endsWith('.jpg') || ext.endsWith('.jpeg')) res.setHeader('Content-Type', 'image/jpeg');
+    else if (ext.endsWith('.doc')) res.setHeader('Content-Type', 'application/msword');
+    else if (ext.endsWith('.docx')) res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    else if (ext.endsWith('.xlsx')) res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  }
+}));
+
 // Middleware
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' }, xDownloadOptions: false }));
 app.use(cors({
@@ -72,9 +88,6 @@ app.use(compression());
 app.use(morgan('combined'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// Static files for uploads (antes del rate limiter para que no se bloquee)
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 app.use(rateLimiter);
 
