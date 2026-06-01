@@ -66,6 +66,7 @@ export const AVAILABLE_COUNTRIES: Country[] = [
   { code: 'CH', name: 'Suiza', flag: '🇨🇭', currency: 'Franco Suizo', currencyCode: 'CHF', phonePrefix: '+41' },
   { code: 'TR', name: 'Turquía', flag: '🇹🇷', currency: 'Lira Turca', currencyCode: 'TRY', phonePrefix: '+90' },
   { code: 'UA', name: 'Ucrania', flag: '🇺🇦', currency: 'Grivna', currencyCode: 'UAH', phonePrefix: '+380' },
+  { code: 'MT', name: 'Malta', flag: '🇲🇹', currency: 'Euro', currencyCode: 'EUR', phonePrefix: '+356' },
   // Asia
   { code: 'CN', name: 'China', flag: '🇨🇳', currency: 'Yuan', currencyCode: 'CNY', phonePrefix: '+86' },
   { code: 'KR', name: 'Corea del Sur', flag: '🇰🇷', currency: 'Won', currencyCode: 'KRW', phonePrefix: '+82' },
