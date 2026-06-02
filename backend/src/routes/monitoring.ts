@@ -85,10 +85,17 @@ router.get('/daily-volume', async (req: AuthenticatedRequest, res: Response) => 
 
     const cid = Number(commerce_id);
 
-    // Obtener moneda del comercio (usa cache de commerces si existe)
+    // Obtener moneda de la pasarela activa del comercio
+    const gwCurRows = await mysqlQuery(
+      `SELECT cur.isocode FROM commerce_gateway cg
+       JOIN currency cur ON cur.id = cg.currency_id
+       WHERE cg.commerce_id = ? AND cg.deleted_at IS NULL 
+       AND (cg.status = 'active' OR cg.status = '1' OR cg.status = 1)
+       AND cur.isocode IS NOT NULL LIMIT 1`, [cid]
+    );
     const commerceRows = await mysqlQuery(`SELECT country FROM commerce WHERE id = ? LIMIT 1`, [cid]);
     const country = commerceRows[0]?.country || '';
-    const currency = COUNTRY_CURRENCY[country?.toUpperCase()] || 'USD';
+    const currency = gwCurRows[0]?.isocode || COUNTRY_CURRENCY[country?.toUpperCase()] || 'USD';
 
     const dateParams = [from + ' 00:00:00', to + ' 23:59:59', cid];
 
@@ -257,8 +264,20 @@ router.get('/report-pdf', async (req: AuthenticatedRequest, res: Response) => {
     const commerceRows = await mysqlQuery(`SELECT id, name, country FROM commerce WHERE id = ? LIMIT 1`, [cid]);
     if (!commerceRows.length) return res.status(404).json({ error: 'Comercio no encontrado' });
     const commerce = commerceRows[0];
-    const currency = COUNTRY_CURRENCY[commerce.country?.toUpperCase()] || 'USD';
-    const sym = currency === 'PEN' ? 'S/' : currency === 'CLP' ? '$' : currency === 'BRL' ? 'R$' : '$';
+
+    // Obtener moneda de la pasarela activa del comercio (no del país)
+    const gatewayCurrencyRows = await mysqlQuery(
+      `SELECT cur.isocode 
+       FROM commerce_gateway cg
+       JOIN currency cur ON cur.id = cg.currency_id
+       WHERE cg.commerce_id = ? AND cg.deleted_at IS NULL 
+       AND (cg.status = 'active' OR cg.status = '1' OR cg.status = 1)
+       AND cur.isocode IS NOT NULL
+       LIMIT 1`,
+      [cid]
+    );
+    const currency = gatewayCurrencyRows[0]?.isocode || COUNTRY_CURRENCY[commerce.country?.toUpperCase()] || 'USD';
+    const sym = currency === 'PEN' ? 'S/' : currency === 'CLP' ? '$' : currency === 'BRL' ? 'R$' : currency === 'MXN' ? '$' : currency === 'COP' ? '$' : '$';
 
     // Datos payin
     const payinSql = `SELECT method, status, COUNT(*) as cantidad
