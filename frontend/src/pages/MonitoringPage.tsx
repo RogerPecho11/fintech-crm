@@ -136,7 +136,7 @@ export default function MonitoringPage() {
           <p className="text-gray-500 text-sm">Datos en tiempo real desde producción</p>
         </div>
         <div className="flex gap-2">
-          {chartData.length > 0 && (
+          {(chartData.length > 0 || payinMethods.length > 0 || payoutMethods.length > 0) && (
             <button
               onClick={async () => {
                 const toastId = toast.loading('Generando PDF...');

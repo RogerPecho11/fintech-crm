@@ -70,12 +70,12 @@ router.get('/daily-volume', async (req: AuthenticatedRequest, res: Response) => 
     const rawFrom = date_from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const rawTo = date_to || new Date().toISOString().slice(0, 10);
 
-    // Limitar a máximo 60 días para proteger la réplica
+    // Limitar a máximo 365 días para proteger la réplica
     const toDate = new Date(rawTo);
     const fromDate = new Date(rawFrom);
     const diffDays = (toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24);
-    const from = diffDays > 60
-      ? new Date(toDate.getTime() - 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    const from = diffDays > 365
+      ? new Date(toDate.getTime() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
       : rawFrom;
     const to = rawTo;
 
