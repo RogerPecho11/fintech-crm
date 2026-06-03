@@ -957,12 +957,36 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
     if (!commerceRows.length) return res.status(404).json({ error: 'Comercio no encontrado' });
     const commerce = commerceRows[0];
 
-    // Pasarelas activas
+    // Pasarelas activas con ID y país
     const payinGateways = await mysqlQuery(
-      `SELECT gp.name FROM commerce_gateway cg JOIN gateway_payment gp ON gp.id = cg.gateway_payment_id
+      `SELECT cg.id as config_id, gp.name, cg.country as gw_country, cur.isocode as currency
+       FROM commerce_gateway cg
+       JOIN gateway_payment gp ON gp.id = cg.gateway_payment_id
+       LEFT JOIN currency cur ON cur.id = cg.currency_id
        WHERE cg.commerce_id = ? AND cg.deleted_at IS NULL AND (cg.status = 'active' OR cg.status = '1' OR cg.status = 1)`, [cid]);
     const payoutGateways = await mysqlQuery(
-      `SELECT gw.name FROM commerce_gateway_withdrawal cgw JOIN gateway_withdrawal gw ON gw.id = cgw.gateway_withdrawal_id
+      `SELECT cgw.id as config_id, gw.name, cgw.country as gw_country, cur.isocode as currency
+       FROM commerce_gateway_withdrawal cgw
+       JOIN gateway_withdrawal gw ON gw.id = cgw.gateway_withdrawal_id
+       LEFT JOIN currency cur ON cur.id = cgw.currency_id
+       WHERE cgw.commerce_id = ? AND cgw.deleted_at IS NULL AND (cgw.status = 'active' OR cgw.status = '1' OR cgw.status = 1)`, [cid]);
+
+    // País de las pasarelas
+    const gwCountries = [...new Set([
+      ...(payinGateways as any[]).map(g => g.gw_country),
+      ...(payoutGateways as any[]).map(g => g.gw_country),
+    ])].filter(Boolean).join(', ');
+
+    // Comisiones de pasarelas (commerce_gateway tiene commission fields)
+    const payinCommissions = await mysqlQuery(
+      `SELECT gp.name, cg.commission, cg.commission_type
+       FROM commerce_gateway cg
+       JOIN gateway_payment gp ON gp.id = cg.gateway_payment_id
+       WHERE cg.commerce_id = ? AND cg.deleted_at IS NULL AND (cg.status = 'active' OR cg.status = '1' OR cg.status = 1)`, [cid]);
+    const payoutCommissions = await mysqlQuery(
+      `SELECT gw.name, cgw.commission, cgw.commission_type
+       FROM commerce_gateway_withdrawal cgw
+       JOIN gateway_withdrawal gw ON gw.id = cgw.gateway_withdrawal_id
        WHERE cgw.commerce_id = ? AND cgw.deleted_at IS NULL AND (cgw.status = 'active' OR cgw.status = '1' OR cgw.status = 1)`, [cid]);
 
     // Resumen transacciones PayIn
@@ -985,7 +1009,7 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
     const firstTx = await mysqlQuery(
       `SELECT MIN(created_at) as first_tx FROM payment WHERE commerce_id = ? AND deleted_at IS NULL`, [cid]);
 
-    // Info del CRM (si existe)
+    // Info del CRM
     const { query: pgQuery } = require('../database/connection');
     const crmMerchant = await pgQuery(
       `SELECT m.*, u.first_name || ' ' || u.last_name as assigned_name,
@@ -995,6 +1019,13 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
        LEFT JOIN users ob ON m.onboarding_assigned_to = ob.id
        WHERE m.merchant_id = $1 LIMIT 1`, [String(cid)]);
     const crm = crmMerchant[0] || {};
+
+    // Documentos de certificación del CRM
+    const certDocs = crmMerchant[0]?.id ? await pgQuery(
+      `SELECT name, file_path FROM documents WHERE merchant_id = $1 AND document_type = 'certification' ORDER BY created_at DESC`,
+      [crmMerchant[0].id]) : [];
+    const sandboxCert = certDocs.find((d: any) => d.name?.toLowerCase().includes('sandbox'));
+    const prodCert = certDocs.find((d: any) => d.name?.toLowerCase().includes('productivo') || d.name?.toLowerCase().includes('production'));
 
     // Generar PDF
     const PDFDocument = require('pdfkit');
@@ -1017,7 +1048,7 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
       X, doc.y, { width: W });
     doc.moveDown(1.2);
 
-    // ─── Helpers ───
+    // Helpers
     const section = (title: string) => {
       if (doc.y > 710) doc.addPage();
       doc.moveDown(0.4);
@@ -1025,7 +1056,6 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
       doc.fontSize(9).fillColor('#FFFFFF').text('  ' + title, X, doc.y + 5, { lineBreak: false });
       doc.y += 24;
     };
-
     const field = (label: string, value: string) => {
       if (doc.y > 750) doc.addPage();
       const y = doc.y;
@@ -1039,54 +1069,69 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
     field('ID del Comercio', String(commerce.id));
     field('Comercio', commerce.name);
     field('URL', crm.website || commerce.slug || '');
-    field('Pais de operacion', commerce.country || '');
+    field('Pais de operacion', gwCountries || commerce.country || '');
     field('Razon social', crm.legal_name || commerce.name || '');
     field('RUT/RUC/NIT', commerce.rut || crm.tax_id || '');
-    field('Categoria Comercio', crm.business_type || crm.industry || '');
-    field('Rubro', crm.mcc_description || '');
+    field('Nivel de Riesgo', crm.risk_level || '');
+    field('Rubro', crm.mcc_description || crm.industry || '');
     field('Sales engineer', crm.onboarding_name || '');
     field('KAM', crm.assigned_name || '');
-    field('Canal de comunicacion', '');
+    field('Canal de comunicacion', crm.notes?.split('\n')[0] || '');
     field('Fecha salida a produccion', to);
 
-    // Métodos de pago
+    // Métodos de pago con ID
     doc.moveDown(0.3);
     doc.fontSize(8).fillColor('#6B7280').text('Metodos de pago:', X, doc.y);
     doc.y += 14;
-    const payinNames = (payinGateways as any[]).map(g => g.name).join(', ') || '-';
-    const payoutNames = (payoutGateways as any[]).map(g => g.name).join(', ') || '-';
+    const payinList = (payinGateways as any[]).map(g => `${g.name} (ID:${g.config_id})`).join(', ') || '-';
+    const payoutList = (payoutGateways as any[]).map(g => `${g.name} (ID:${g.config_id})`).join(', ') || '-';
     doc.fontSize(8).fillColor('#3B82F6').text('  Pay-In: ', X, doc.y, { continued: true });
-    doc.fillColor('#111827').text(payinNames);
+    doc.fillColor('#111827').text(payinList);
     doc.moveDown(0.3);
     doc.fontSize(8).fillColor('#8B5CF6').text('  Pay-Out: ', X, doc.y, { continued: true });
-    doc.fillColor('#111827').text(payoutNames);
+    doc.fillColor('#111827').text(payoutList);
     doc.moveDown(0.8);
 
-    // ─── Encuesta ───
-    section('Encuesta Post-Certificacion');
-    field('Link a la encuesta', '');
-    doc.moveDown(0.5);
+    // ─── Certificaciones (links a documentos subidos) ───
+    section('Certificaciones');
+    if (sandboxCert) {
+      doc.fontSize(8).fillColor('#F59E0B').text('  Sandbox: ', X, doc.y, { continued: true });
+      doc.fillColor('#3B82F6').text(sandboxCert.name || 'Certificacion Sandbox', { link: `/uploads/${sandboxCert.file_path}`, underline: true });
+    } else {
+      doc.fontSize(8).fillColor('#6B7280').text('  Sandbox: No disponible', X, doc.y);
+    }
+    doc.moveDown(0.4);
+    if (prodCert) {
+      doc.fontSize(8).fillColor('#10B981').text('  Produccion: ', X, doc.y, { continued: true });
+      doc.fillColor('#3B82F6').text(prodCert.name || 'Certificacion Produccion', { link: `/uploads/${prodCert.file_path}`, underline: true });
+    } else {
+      doc.fontSize(8).fillColor('#6B7280').text('  Produccion: No disponible', X, doc.y);
+    }
+    doc.moveDown(0.8);
 
-    // ─── Certificación Sandbox ───
-    section('Resumen de Certificacion - Sandbox');
-    field('Fecha de certificacion', '');
-    field('Link de reporte', '');
-    doc.moveDown(0.5);
-
-    // ─── Certificación Producción ───
-    section('Resumen de Certificacion - Produccion');
-    field('Fecha de certificacion', '');
-    field('Link de reporte', '');
-    doc.moveDown(0.5);
-
-    // ─── Comisiones ───
-    section('Evidencia de Comisiones');
-    doc.fontSize(8).fillColor('#6B7280').text('Comercial (segun contrato):', X, doc.y);
-    doc.y += 30;
-    doc.text('Onboarding (configuradas en produccion):', X, doc.y);
-    doc.y += 14;
-    doc.text('  PayIn:', X, doc.y); doc.y += 20;
-    doc.text('  PayOut:', X, doc.y); doc.y += 20;
+    // ─── Comisiones configuradas ───
+    section('Comisiones Configuradas en Produccion');
+    doc.fontSize(8).fillColor('#3B82F6').text('Pay-In:', X, doc.y);
+    doc.y += 12;
+    if ((payinCommissions as any[]).length > 0) {
+      (payinCommissions as any[]).forEach((g: any) => {
+        const comm = g.commission ? `${g.commission}${g.commission_type === 'percentage' ? '%' : ''}` : 'N/A';
+        field('  ' + (g.name || 'Sin nombre'), comm);
+      });
+    } else {
+      doc.fontSize(8).fillColor('#6B7280').text('  Sin comisiones configuradas', X, doc.y); doc.y += 14;
+    }
+    doc.moveDown(0.3);
+    doc.fontSize(8).fillColor('#8B5CF6').text('Pay-Out:', X, doc.y);
+    doc.y += 12;
+    if ((payoutCommissions as any[]).length > 0) {
+      (payoutCommissions as any[]).forEach((g: any) => {
+        const comm = g.commission ? `${g.commission}${g.commission_type === 'percentage' ? '%' : ''}` : 'N/A';
+        field('  ' + (g.name || 'Sin nombre'), comm);
+      });
+    } else {
+      doc.fontSize(8).fillColor('#6B7280').text('  Sin comisiones configuradas', X, doc.y); doc.y += 14;
+    }
     doc.moveDown(0.5);
 
     // ─── Monitoreo ───
@@ -1097,7 +1142,7 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
     field('Primera transaccion', firstDate);
     doc.moveDown(0.5);
 
-    // ─── Resumen Transacciones ───
+    // ─── Resumen Transacciones con gráfico ───
     section('Resumen de Transacciones');
     const pi = payinSummary[0] || { total: 0, exitosas: 0, rechazadas: 0 };
     const piTotal = Number(pi.total) || 0;
@@ -1108,14 +1153,46 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
     const piPctFail = piTotal > 0 ? (piRechazadas / piTotal * 100).toFixed(1) : '0';
     const piPctOther = piTotal > 0 ? (piOtros / piTotal * 100).toFixed(1) : '0';
 
-    doc.fontSize(9).fillColor('#3B82F6').text(`PayIn (${from} al ${to})`, X, doc.y);
+    // Gráfico circular PayIn
+    doc.fontSize(9).fillColor('#3B82F6').text(`PayIn (${from} al ${to}) - Total: ${piTotal.toLocaleString()}`, X, doc.y);
     doc.y += 14;
-    field('  Transacciones exitosas', `${piPctOk}% (${piExitosas.toLocaleString()})`);
-    field('  Transacciones rechazadas', `${piPctFail}% (${piRechazadas.toLocaleString()})`);
-    field('  Otros estados', `${piPctOther}% (${piOtros.toLocaleString()})`);
-    field('  Total procesadas', piTotal.toLocaleString());
+
+    if (piTotal > 0) {
+      const pieX = X + 60;
+      const pieY = doc.y + 40;
+      const pieR = 35;
+      const pieData = [
+        { value: piExitosas, color: '#10B981', label: `Exitosas ${piPctOk}%` },
+        { value: piRechazadas, color: '#EF4444', label: `Rechazadas ${piPctFail}%` },
+        { value: piOtros, color: '#F59E0B', label: `Otros ${piPctOther}%` },
+      ].filter(d => d.value > 0);
+
+      let startAngle = -Math.PI / 2;
+      pieData.forEach(slice => {
+        const sliceAngle = (slice.value / piTotal) * 2 * Math.PI;
+        const endAngle = startAngle + sliceAngle;
+        const x1 = pieX + pieR * Math.cos(startAngle);
+        const y1 = pieY + pieR * Math.sin(startAngle);
+        const x2 = pieX + pieR * Math.cos(endAngle);
+        const y2 = pieY + pieR * Math.sin(endAngle);
+        const largeArc = sliceAngle > Math.PI ? 1 : 0;
+        doc.path(`M ${pieX} ${pieY} L ${x1} ${y1} A ${pieR} ${pieR} 0 ${largeArc} 1 ${x2} ${y2} Z`).fill(slice.color);
+        startAngle = endAngle;
+      });
+
+      // Leyenda
+      let ly = pieY - 20;
+      pieData.forEach(slice => {
+        doc.rect(X + 130, ly, 8, 8).fill(slice.color);
+        doc.fontSize(7).fillColor('#374151').text(slice.label, X + 142, ly);
+        ly += 12;
+      });
+      doc.y = pieY + pieR + 15;
+    }
+
     doc.moveDown(0.5);
 
+    // Gráfico circular PayOut
     const po = payoutSummary[0] || { total: 0, exitosas: 0, rechazadas: 0 };
     const poTotal = Number(po.total) || 0;
     const poExitosas = Number(po.exitosas) || 0;
@@ -1125,12 +1202,42 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
     const poPctFail = poTotal > 0 ? (poRechazadas / poTotal * 100).toFixed(1) : '0';
     const poPctOther = poTotal > 0 ? (poOtros / poTotal * 100).toFixed(1) : '0';
 
-    doc.fontSize(9).fillColor('#8B5CF6').text(`PayOut (${from} al ${to})`, X, doc.y);
+    if (doc.y > 600) doc.addPage();
+    doc.fontSize(9).fillColor('#8B5CF6').text(`PayOut (${from} al ${to}) - Total: ${poTotal.toLocaleString()}`, X, doc.y);
     doc.y += 14;
-    field('  Transacciones exitosas', `${poPctOk}% (${poExitosas.toLocaleString()})`);
-    field('  Transacciones rechazadas', `${poPctFail}% (${poRechazadas.toLocaleString()})`);
-    field('  Otros estados', `${poPctOther}% (${poOtros.toLocaleString()})`);
-    field('  Total procesadas', poTotal.toLocaleString());
+
+    if (poTotal > 0) {
+      const pieX2 = X + 60;
+      const pieY2 = doc.y + 40;
+      const pieR2 = 35;
+      const pieData2 = [
+        { value: poExitosas, color: '#10B981', label: `Exitosas ${poPctOk}%` },
+        { value: poRechazadas, color: '#EF4444', label: `Rechazadas ${poPctFail}%` },
+        { value: poOtros, color: '#F59E0B', label: `Otros ${poPctOther}%` },
+      ].filter(d => d.value > 0);
+
+      let startAngle2 = -Math.PI / 2;
+      pieData2.forEach(slice => {
+        const sliceAngle = (slice.value / poTotal) * 2 * Math.PI;
+        const endAngle = startAngle2 + sliceAngle;
+        const x1 = pieX2 + pieR2 * Math.cos(startAngle2);
+        const y1 = pieY2 + pieR2 * Math.sin(startAngle2);
+        const x2 = pieX2 + pieR2 * Math.cos(endAngle);
+        const y2 = pieY2 + pieR2 * Math.sin(endAngle);
+        const largeArc = sliceAngle > Math.PI ? 1 : 0;
+        doc.path(`M ${pieX2} ${pieY2} L ${x1} ${y1} A ${pieR2} ${pieR2} 0 ${largeArc} 1 ${x2} ${y2} Z`).fill(slice.color);
+        startAngle2 = endAngle;
+      });
+
+      let ly2 = pieY2 - 20;
+      pieData2.forEach(slice => {
+        doc.rect(X + 130, ly2, 8, 8).fill(slice.color);
+        doc.fontSize(7).fillColor('#374151').text(slice.label, X + 142, ly2);
+        ly2 += 12;
+      });
+      doc.y = pieY2 + pieR2 + 15;
+    }
+
     doc.moveDown(0.5);
 
     // ─── Observaciones ───
