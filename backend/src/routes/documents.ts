@@ -246,21 +246,33 @@ router.post('/generate-cert-pdf', async (req: AuthenticatedRequest, res: Respons
         const txLabel = `${row[0]} - ${row[3]}`; // "Pay-In - 122331635"
         const txImgs = txImgBlocks.get(txLabel);
         if (txImgs && txImgs.length > 0) {
-          doc.y += 4;
-          let imgX = X + 10;
-          for (const src of txImgs) {
+          doc.y += 6;
+          let imgCol = 0;
+          const imgW = 240;
+          const imgH = 160;
+          const gap = 15;
+          const startImgY = doc.y;
+
+          for (let i = 0; i < txImgs.length; i++) {
             try {
-              if (doc.y > 620) { doc.addPage(); imgX = X + 10; }
-              const b64 = src.split(',')[1];
+              const col = imgCol % 2;
+              const rowNum = Math.floor(imgCol / 2);
+              const posX = X + 10 + col * (imgW + gap);
+              const posY = startImgY + rowNum * (imgH + 10);
+
+              if (posY + imgH > 750) { doc.addPage(); doc.y = 50; imgCol = 0; continue; }
+
+              const b64 = txImgs[i].split(',')[1];
               if (b64) {
                 const buf = Buffer.from(b64, 'base64');
-                doc.image(buf, imgX, doc.y, { width: 140, height: 95 });
-                imgX += 155;
-                if (imgX > X + W - 140) { doc.y += 105; imgX = X + 10; }
+                doc.image(buf, posX, posY, { width: imgW, height: imgH, fit: [imgW, imgH] });
+                imgCol++;
               }
             } catch { /* skip */ }
           }
-          doc.y += 105;
+          // Mover doc.y debajo de todas las imágenes
+          const totalRows = Math.ceil(txImgs.length / 2);
+          doc.y = startImgY + totalRows * (imgH + 10) + 5;
         }
       });
     }
@@ -278,22 +290,31 @@ router.post('/generate-cert-pdf', async (req: AuthenticatedRequest, res: Respons
 
     if (globalImages.length > 0) {
       section(`Evidencias adicionales (${globalImages.length})`);
-      let imgX = X;
-      let imgRow = 0;
-      for (const src of globalImages) {
+      const imgW = 240;
+      const imgH = 160;
+      const gap = 15;
+      let imgCol = 0;
+      const startY = doc.y;
+
+      for (let i = 0; i < globalImages.length; i++) {
         try {
-          if (doc.y > 580) { doc.addPage(); imgX = X; }
-          const b64 = src.split(',')[1];
+          const col = imgCol % 2;
+          const rowNum = Math.floor(imgCol / 2);
+          const posX = X + col * (imgW + gap);
+          const posY = startY + rowNum * (imgH + 10);
+
+          if (posY + imgH > 750) { doc.addPage(); doc.y = 50; imgCol = 0; continue; }
+
+          const b64 = globalImages[i].split(',')[1];
           if (b64) {
             const buf = Buffer.from(b64, 'base64');
-            doc.image(buf, imgX, doc.y, { width: 160, height: 110 });
-            imgX += 170;
-            imgRow++;
-            if (imgRow % 3 === 0) { doc.y += 120; imgX = X; }
+            doc.image(buf, posX, posY, { width: imgW, height: imgH, fit: [imgW, imgH] });
+            imgCol++;
           }
         } catch { /* skip */ }
       }
-      if (imgRow % 3 !== 0) doc.y += 120;
+      const totalRows = Math.ceil(globalImages.length / 2);
+      doc.y = startY + totalRows * (imgH + 10) + 5;
     }
 
     // ─── Comentarios ───
