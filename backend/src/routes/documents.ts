@@ -104,82 +104,201 @@ router.post('/generate-cert-pdf', async (req: AuthenticatedRequest, res: Respons
     const writeStream = fs.createWriteStream(filePath);
     doc.pipe(writeStream);
 
-    // Header
-    doc.rect(0, 0, 595, 60).fill('#FC2B5F');
-    doc.fontSize(18).fillColor('#FFFFFF').text('Certificación de Integraciones', 40, 18, { align: 'center' });
-    doc.fontSize(9).fillColor('#FFFFFF').text('ProntoPaga — Sistema avanzado de certificación digital', 40, 40, { align: 'center' });
-    doc.y = 75;
-
-    // Badge
-    const envLabel = env === 'sandbox' ? 'Ambiente Sandbox' : 'Ambiente Productivo';
-    const envColor = env === 'sandbox' ? '#F59E0B' : '#10B981';
-    doc.fontSize(9).fillColor(envColor).text(envLabel, 40, doc.y);
-    doc.moveDown(1);
-
-    // Info
-    doc.fontSize(12).fillColor('#111111').text(merchant_name || 'Sin nombre');
-    doc.fontSize(9).fillColor('#6B7280').text(`Fecha de revisión: ${review_date || new Date().toISOString().slice(0, 10)}`);
-    doc.moveDown(1);
-
-    // Parsear campos
-    const fields: { label: string; value: string }[] = [];
-    const regex1 = /<span class="label">(.*?)<\/span><span class="value">(.*?)<\/span>/g;
-    let m;
-    while ((m = regex1.exec(html)) !== null) fields.push({ label: m[1], value: m[2] });
-    const regex2 = /<span class="label">(.*?)<\/span><span class="(check|uncheck)">(.*?)<\/span>/g;
-    while ((m = regex2.exec(html)) !== null) fields.push({ label: m[1], value: m[3] });
-
     const startX = 40;
+    const pageWidth = 515;
+
+    // ─── Header ───
+    doc.rect(0, 0, 595, 65).fill('#FC2B5F');
+    doc.fontSize(20).fillColor('#FFFFFF').text('Certificación de Integraciones', 40, 15, { align: 'center' });
+    doc.fontSize(9).fillColor('#FFFFFF').text('ProntoPaga — Sistema avanzado de certificación digital', 40, 42, { align: 'center' });
+    doc.y = 80;
+
+    // Badge ambiente
+    const envLabel = env === 'sandbox' ? '🟡 Ambiente Sandbox' : '🟢 Ambiente Productivo';
+    doc.fontSize(10).fillColor(env === 'sandbox' ? '#92400E' : '#065F46').text(envLabel, startX);
+    doc.moveDown(0.8);
+
+    // Info comercio
+    doc.fontSize(14).fillColor('#111111').text(merchant_name || 'Sin nombre');
+    doc.fontSize(9).fillColor('#6B7280').text(`Fecha de revisión: ${review_date || new Date().toISOString().slice(0, 10)}`);
+    doc.moveDown(0.5);
+    doc.moveTo(startX, doc.y).lineTo(startX + pageWidth, doc.y).strokeColor('#E5E7EB').lineWidth(1).stroke();
+    doc.moveDown(0.8);
+
+    // ─── Función para dibujar sección ───
     const drawSection = (title: string) => {
-      if (doc.y > 720) doc.addPage();
+      if (doc.y > 700) doc.addPage();
       doc.moveDown(0.5);
-      doc.rect(startX, doc.y, 515, 18).fill('#F9FAFB');
-      doc.fontSize(10).fillColor('#374151').text('  ' + title, startX, doc.y + 4);
-      doc.y += 24;
+      doc.rect(startX, doc.y, pageWidth, 20).fill('#F3F4F6');
+      doc.fontSize(10).fillColor('#1F2937').text('  ' + title, startX, doc.y + 5);
+      doc.y += 26;
     };
 
-    drawSection('Información Básica');
-    fields.forEach(f => {
-      if (doc.y > 740) doc.addPage();
-      doc.fontSize(8).fillColor('#6B7280').text(f.label + ': ', startX, doc.y, { continued: true });
-      doc.fillColor('#111827').text(f.value);
-      doc.moveDown(0.1);
-    });
+    // ─── Función para campo ───
+    const drawField = (label: string, value: string) => {
+      if (doc.y > 750) doc.addPage();
+      doc.fontSize(8).fillColor('#6B7280').text(label, startX, doc.y, { width: 180, lineBreak: false });
+      doc.fillColor('#111827').text(value || '—', startX + 185, doc.y, { width: 330 });
+      doc.moveDown(0.6);
+    };
 
-    // Transacciones
-    const txRegex = /<tr>\s*<td[^>]*>(.*?)<\/td>\s*<td[^>]*>(.*?)<\/td>\s*<td[^>]*>(.*?)<\/td>\s*<td[^>]*>(.*?)<\/td>\s*<td[^>]*>(.*?)<\/td>\s*<\/tr>/g;
+    // ─── Parsear HTML ───
+    // Extraer campos con regex
+    const getFieldValue = (labelSearch: string): string => {
+      const regex = new RegExp(`<span class="label">${labelSearch}</span><span class="(?:value|check|uncheck)">(.*?)</span>`);
+      const match = html.match(regex);
+      return match ? match[1] : '';
+    };
+
+    // Extraer todos los campos div.field
+    const fieldRegex = /<div class="field"><span class="label">(.*?)<\/span><span class="(?:value|check|uncheck)">(.*?)<\/span><\/div>/g;
+    const allFields: { label: string; value: string }[] = [];
+    let fm;
+    while ((fm = fieldRegex.exec(html)) !== null) {
+      allFields.push({ label: fm[1], value: fm[2] });
+    }
+
+    // Extraer secciones h2
+    const h2Regex = /<h2>(.*?)<\/h2>/g;
+    const sections: string[] = [];
+    let h2m;
+    while ((h2m = h2Regex.exec(html)) !== null) {
+      sections.push(h2m[1].replace(/<[^>]+>/g, ''));
+    }
+
+    // ─── Información Básica ───
+    drawSection('Información Básica');
+    // Buscar campos específicos
+    const basicFields = allFields.slice(0, allFields.findIndex(f => 
+      f.label.toLowerCase().includes('min') || f.label.toLowerCase().includes('límite') || f.label.toLowerCase().includes('limit')
+    ) || allFields.length);
+    
+    if (basicFields.length > 0) {
+      basicFields.forEach(f => drawField(f.label, f.value));
+    } else {
+      // Fallback: mostrar todos los campos
+      allFields.forEach(f => drawField(f.label, f.value));
+    }
+
+    // ─── Límites (si hay) ───
+    const limitFields = allFields.filter(f => 
+      f.label.toLowerCase().includes('min') || f.label.toLowerCase().includes('max') || 
+      f.label.toLowerCase().includes('limit') || f.label.toLowerCase().includes('límite') ||
+      f.label.toLowerCase().includes('daily') || f.label.toLowerCase().includes('monthly')
+    );
+    if (limitFields.length > 0) {
+      drawSection('Límites');
+      limitFields.forEach(f => drawField(f.label, f.value));
+    }
+
+    // ─── Métodos de Pago / UX / Rendimiento ───
+    const paymentFields = allFields.filter(f => 
+      f.label.toLowerCase().includes('visib') || f.label.toLowerCase().includes('avail') ||
+      f.label.toLowerCase().includes('logo') || f.label.toLowerCase().includes('mobile') ||
+      f.label.toLowerCase().includes('compat')
+    );
+    if (paymentFields.length > 0) {
+      drawSection('Métodos de Pago');
+      paymentFields.forEach(f => drawField(f.label, f.value));
+    }
+
+    const uxFields = allFields.filter(f => 
+      f.label.toLowerCase().includes('redirect') || f.label.toLowerCase().includes('error') ||
+      f.label.toLowerCase().includes('success') || f.label.toLowerCase().includes('responsive')
+    );
+    if (uxFields.length > 0) {
+      drawSection('UX');
+      uxFields.forEach(f => drawField(f.label, f.value));
+    }
+
+    const perfFields = allFields.filter(f => 
+      f.label.toLowerCase().includes('response') || f.label.toLowerCase().includes('timeout') ||
+      f.label.toLowerCase().includes('retry')
+    );
+    if (perfFields.length > 0) {
+      drawSection('Rendimiento');
+      perfFields.forEach(f => drawField(f.label, f.value));
+    }
+
+    // ─── Transacciones ───
+    const txRegex2 = /<tr>\s*<td[^>]*>(.*?)<\/td>\s*<td[^>]*>(.*?)<\/td>\s*<td[^>]*>(.*?)<\/td>\s*<td[^>]*>(.*?)<\/td>\s*<td[^>]*>(.*?)<\/td>\s*<\/tr>/g;
     const txRows: string[][] = [];
     let txM;
-    while ((txM = txRegex.exec(html)) !== null) txRows.push([txM[1], txM[2], txM[3], txM[4], txM[5]]);
+    while ((txM = txRegex2.exec(html)) !== null) txRows.push([txM[1], txM[2], txM[3], txM[4], txM[5]]);
 
     if (txRows.length > 0) {
       drawSection(`Transacciones (${txRows.length})`);
+      
+      // Header tabla
+      const colWidths = [60, 100, 70, 130, 155];
+      const headers = ['Tipo', 'Método', 'Estado', 'Order ID', 'UID'];
+      let tx = startX;
       doc.fontSize(7).fillColor('#6B7280');
-      doc.text('Tipo          Método          Estado          Order ID          UID', startX, doc.y);
+      headers.forEach((h, i) => { doc.text(h, tx, doc.y, { width: colWidths[i], lineBreak: false }); tx += colWidths[i]; });
+      doc.moveDown(0.5);
+      doc.moveTo(startX, doc.y).lineTo(startX + pageWidth, doc.y).strokeColor('#E5E7EB').stroke();
       doc.moveDown(0.3);
-      doc.fillColor('#111827');
-      txRows.forEach(row => {
+
+      doc.fontSize(7).fillColor('#111827');
+      txRows.forEach((row, idx) => {
         if (doc.y > 740) doc.addPage();
-        doc.fontSize(7).text(`${row[0]}    ${row[1]}    ${row[2]}    ${row[3]}    ${row[4]}`, startX, doc.y);
-        doc.moveDown(0.5);
+        if (idx % 2 === 0) doc.rect(startX, doc.y - 2, pageWidth, 12).fill('#F9FAFB');
+        let x = startX;
+        row.forEach((cell, i) => {
+          doc.fillColor('#111827').text(cell || '—', x, doc.y, { width: colWidths[i], lineBreak: false });
+          x += colWidths[i];
+        });
+        doc.moveDown(0.7);
       });
     }
 
-    // Comentarios
-    const commentsMatch = html.match(/<h2>[^<]*[Cc]omentarios[^<]*<\/h2>\s*<p>(.*?)<\/p>/);
+    // ─── Comentarios ───
+    const commentsMatch = html.match(/<h2>[^<]*[Cc]omentarios[^<]*<\/h2>\s*<p>(.*?)<\/p>/s);
     if (commentsMatch && commentsMatch[1] && commentsMatch[1] !== '—') {
       drawSection('Comentarios Generales');
-      doc.fontSize(9).fillColor('#374151').text(commentsMatch[1]);
-    }
-    const recsMatch = html.match(/<h2>[^<]*[Rr]ecomendaciones[^<]*<\/h2>\s*<p>(.*?)<\/p>/);
-    if (recsMatch && recsMatch[1]) {
-      drawSection('Recomendaciones');
-      doc.fontSize(9).fillColor('#374151').text(recsMatch[1]);
+      doc.fontSize(9).fillColor('#374151').text(commentsMatch[1], startX, doc.y, { width: pageWidth });
+      doc.moveDown(0.5);
     }
 
-    // Footer
+    const recsMatch = html.match(/<h2>[^<]*[Rr]ecomendaciones[^<]*<\/h2>\s*<p>(.*?)<\/p>/s);
+    if (recsMatch && recsMatch[1]) {
+      drawSection('Recomendaciones');
+      doc.fontSize(9).fillColor('#374151').text(recsMatch[1], startX, doc.y, { width: pageWidth });
+    }
+
+    // ─── Imágenes (extraer base64 del HTML) ───
+    const imgRegex = /<img[^>]+src="(data:image\/[^"]+)"[^>]*>/g;
+    const images: string[] = [];
+    let imgM;
+    while ((imgM = imgRegex.exec(html)) !== null) images.push(imgM[1]);
+
+    if (images.length > 0) {
+      drawSection(`Evidencias (${images.length} imágenes)`);
+      let imgX = startX;
+      let imgCount = 0;
+      for (const imgSrc of images) {
+        try {
+          if (doc.y > 600) { doc.addPage(); imgX = startX; }
+          // Convertir base64 a buffer
+          const base64Data = imgSrc.split(',')[1];
+          if (base64Data) {
+            const imgBuffer = Buffer.from(base64Data, 'base64');
+            doc.image(imgBuffer, imgX, doc.y, { width: 150, height: 100 });
+            imgX += 160;
+            imgCount++;
+            if (imgCount % 3 === 0) { doc.y += 110; imgX = startX; }
+          }
+        } catch { /* ignorar imagen con error */ }
+      }
+      if (imgCount % 3 !== 0) doc.y += 110;
+    }
+
+    // ─── Footer ───
     doc.moveDown(2);
-    doc.fontSize(7).fillColor('#9CA3AF').text(`Generado por ProntoPaga CRM — ${new Date().toLocaleString('es-PE')}`, { align: 'center' });
+    doc.fontSize(7).fillColor('#9CA3AF').text(
+      `Generado por ProntoPaga CRM — ${new Date().toLocaleString('es-PE')}`,
+      startX, doc.y, { align: 'center', width: pageWidth }
+    );
 
     doc.end();
     writeStream.on('finish', resolve);
@@ -201,7 +320,6 @@ router.post('/generate-cert-pdf', async (req: AuthenticatedRequest, res: Respons
     ]
   );
 
-  // Devolver la URL del archivo para descarga
   res.json({
     message: 'Certificación PDF generada y guardada',
     document: savedDoc,
