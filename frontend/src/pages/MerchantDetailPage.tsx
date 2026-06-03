@@ -549,6 +549,21 @@ export default function MerchantDetailPage() {
                 >
                   Descargar
                 </a>
+                <button
+                  onClick={async () => {
+                    if (!confirm('¿Eliminar este documento?')) return;
+                    try {
+                      await api.delete(`/documents/${doc.id}`);
+                      queryClient.invalidateQueries({ queryKey: ['documents', id] });
+                      toast.success('Documento eliminado');
+                    } catch {
+                      toast.error('Error al eliminar');
+                    }
+                  }}
+                  className="text-xs py-1.5 px-3 flex-shrink-0 text-red-500 hover:bg-red-50 rounded-lg border border-red-200"
+                >
+                  Eliminar
+                </button>
               </div>
             ))}
             {(!documents || documents.length === 0) && (
