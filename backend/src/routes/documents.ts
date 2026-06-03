@@ -84,6 +84,140 @@ router.post('/upload', upload.single('file'), async (req: AuthenticatedRequest, 
   res.status(201).json(doc);
 });
 
+// POST /api/v1/documents/generate-cert-pdf — Genera PDF de certificación desde HTML
+router.post('/generate-cert-pdf', async (req: AuthenticatedRequest, res: Response) => {
+  const { html, merchant_name, env, review_date } = req.body;
+
+  if (!html) return res.status(400).json({ error: 'HTML requerido' });
+
+  const PDFDocument = require('pdfkit');
+  const doc = new PDFDocument({ size: 'A4', margin: 40 });
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename=certificacion_${(merchant_name || 'comercio').replace(/\s+/g, '_')}_${env || 'sandbox'}.pdf`);
+  doc.pipe(res);
+
+  // Parsear el HTML básico y renderizar como PDF
+  // Header
+  doc.rect(0, 0, 595, 60).fill('#FC2B5F');
+  doc.fontSize(18).fillColor('#FFFFFF').text('Certificación de Integraciones', 40, 18, { align: 'center' });
+  doc.fontSize(9).fillColor('#FFFFFF').text('ProntoPaga — Sistema avanzado de certificación digital para APIs', 40, 40, { align: 'center' });
+  doc.y = 75;
+
+  // Badge de ambiente
+  const envLabel = env === 'sandbox' ? 'Ambiente Sandbox' : 'Ambiente Productivo';
+  const envColor = env === 'sandbox' ? '#F59E0B' : '#10B981';
+  doc.fontSize(9).fillColor(envColor).text(envLabel, 40, doc.y);
+  doc.moveDown(1);
+
+  // Info básica
+  doc.fontSize(12).fillColor('#111111').text(merchant_name || 'Sin nombre');
+  doc.fontSize(9).fillColor('#6B7280').text(`Fecha de revisión: ${review_date || new Date().toISOString().slice(0, 10)}`);
+  doc.moveDown(1);
+
+  // Extraer contenido del HTML y renderizar
+  // Parseo simple: extraer los campos del HTML
+  const extractFields = (htmlStr: string): { label: string; value: string }[] => {
+    const fields: { label: string; value: string }[] = [];
+    const regex = /<span class="label">(.*?)<\/span><span class="value">(.*?)<\/span>/g;
+    let match;
+    while ((match = regex.exec(htmlStr)) !== null) {
+      fields.push({ label: match[1], value: match[2] });
+    }
+    // También extraer checks
+    const checkRegex = /<span class="label">(.*?)<\/span><span class="(check|uncheck)">(.*?)<\/span>/g;
+    while ((match = checkRegex.exec(htmlStr)) !== null) {
+      fields.push({ label: match[1], value: match[3] });
+    }
+    return fields;
+  };
+
+  const fields = extractFields(html);
+
+  // Extraer secciones h2
+  const sections = html.split('<h2>').slice(1).map((s: string) => {
+    const titleEnd = s.indexOf('</h2>');
+    const title = s.slice(0, titleEnd).replace(/<[^>]+>/g, '');
+    return title;
+  });
+
+  // Renderizar campos
+  let currentY = doc.y;
+  const startX = 40;
+
+  // Sección separadora
+  const drawSection = (title: string) => {
+    if (currentY > 720) { doc.addPage(); currentY = 50; }
+    doc.moveDown(0.5);
+    doc.rect(startX, doc.y, 515, 18).fill('#F9FAFB');
+    doc.fontSize(10).fillColor('#374151').text('  ' + title, startX, doc.y + 4);
+    doc.y += 24;
+    currentY = doc.y;
+  };
+
+  // Renderizar los campos
+  drawSection('Información Básica');
+  fields.forEach(f => {
+    if (doc.y > 740) { doc.addPage(); }
+    doc.fontSize(8).fillColor('#6B7280').text(f.label, startX, doc.y, { continued: true, width: 200 });
+    doc.fillColor('#111827').text('  ' + f.value, { width: 300 });
+    doc.moveDown(0.2);
+  });
+
+  // Extraer tabla de transacciones
+  const txRegex = /<tr>\s*<td[^>]*>(.*?)<\/td>\s*<td[^>]*>(.*?)<\/td>\s*<td[^>]*>(.*?)<\/td>\s*<td[^>]*>(.*?)<\/td>\s*<td[^>]*>(.*?)<\/td>\s*<\/tr>/g;
+  const txMatches: string[][] = [];
+  let txMatch;
+  while ((txMatch = txRegex.exec(html)) !== null) {
+    txMatches.push([txMatch[1], txMatch[2], txMatch[3], txMatch[4], txMatch[5]]);
+  }
+
+  if (txMatches.length > 0) {
+    drawSection('Transacciones (' + txMatches.length + ')');
+    // Header de tabla
+    doc.fontSize(7).fillColor('#6B7280');
+    doc.text('Tipo', startX, doc.y, { width: 80, continued: true });
+    doc.text('Método', { width: 100, continued: true });
+    doc.text('Estado', { width: 80, continued: true });
+    doc.text('Order ID', { width: 120, continued: true });
+    doc.text('UID', { width: 120 });
+    doc.moveDown(0.3);
+
+    doc.fontSize(7).fillColor('#111827');
+    txMatches.forEach(row => {
+      if (doc.y > 740) { doc.addPage(); }
+      doc.text(row[0], startX, doc.y, { width: 80, continued: true, lineBreak: false });
+      doc.text(row[1], { width: 100, continued: true, lineBreak: false });
+      doc.text(row[2], { width: 80, continued: true, lineBreak: false });
+      doc.text(row[3], { width: 120, continued: true, lineBreak: false });
+      doc.text(row[4], { width: 120, lineBreak: false });
+      doc.moveDown(0.8);
+    });
+  }
+
+  // Extraer comentarios generales
+  const commentsMatch = html.match(/<h2>.*?[Cc]omentarios.*?<\/h2>\s*<p>(.*?)<\/p>/);
+  if (commentsMatch) {
+    drawSection('Comentarios Generales');
+    doc.fontSize(9).fillColor('#374151').text(commentsMatch[1] || '—');
+  }
+
+  const recsMatch = html.match(/<h2>.*?[Rr]ecomendaciones.*?<\/h2>\s*<p>(.*?)<\/p>/);
+  if (recsMatch) {
+    drawSection('Recomendaciones');
+    doc.fontSize(9).fillColor('#374151').text(recsMatch[1] || '—');
+  }
+
+  // Footer
+  doc.moveDown(2);
+  doc.fontSize(7).fillColor('#9CA3AF').text(
+    `Generado por ProntoPaga CRM — ${new Date().toLocaleString('es-PE')}`,
+    { align: 'center' }
+  );
+
+  doc.end();
+});
+
 // PATCH /api/v1/documents/:id/verify
 router.patch('/:id/verify', authorize('admin', 'onboarding'), async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
