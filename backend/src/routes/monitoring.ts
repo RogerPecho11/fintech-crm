@@ -977,14 +977,14 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
       ...(payoutGateways as any[]).map(g => g.gw_country),
     ])].filter(Boolean).join(', ');
 
-    // Comisiones de pasarelas (commerce_gateway tiene commission fields)
+    // Comisiones de pasarelas
     const payinCommissions = await mysqlQuery(
-      `SELECT gp.name, cg.commission, cg.commission_type
+      `SELECT gp.name, cg.commission
        FROM commerce_gateway cg
        JOIN gateway_payment gp ON gp.id = cg.gateway_payment_id
        WHERE cg.commerce_id = ? AND cg.deleted_at IS NULL AND (cg.status = 'active' OR cg.status = '1' OR cg.status = 1)`, [cid]);
     const payoutCommissions = await mysqlQuery(
-      `SELECT gw.name, cgw.commission, cgw.commission_type
+      `SELECT gw.name, cgw.commission
        FROM commerce_gateway_withdrawal cgw
        JOIN gateway_withdrawal gw ON gw.id = cgw.gateway_withdrawal_id
        WHERE cgw.commerce_id = ? AND cgw.deleted_at IS NULL AND (cgw.status = 'active' OR cgw.status = '1' OR cgw.status = 1)`, [cid]);
@@ -1115,7 +1115,7 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
     doc.y += 12;
     if ((payinCommissions as any[]).length > 0) {
       (payinCommissions as any[]).forEach((g: any) => {
-        const comm = g.commission ? `${g.commission}${g.commission_type === 'percentage' ? '%' : ''}` : 'N/A';
+        const comm = g.commission ? `${g.commission}%` : 'N/A';
         field('  ' + (g.name || 'Sin nombre'), comm);
       });
     } else {
@@ -1126,7 +1126,7 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
     doc.y += 12;
     if ((payoutCommissions as any[]).length > 0) {
       (payoutCommissions as any[]).forEach((g: any) => {
-        const comm = g.commission ? `${g.commission}${g.commission_type === 'percentage' ? '%' : ''}` : 'N/A';
+        const comm = g.commission ? `${g.commission}%` : 'N/A';
         field('  ' + (g.name || 'Sin nombre'), comm);
       });
     } else {
