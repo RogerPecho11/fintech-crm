@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { authenticate } from '../middleware/auth';
 import { AuthenticatedRequest } from '../types';
 import { mysqlQuery, mysqlQueryCached, MysqlCache, getMysqlStats } from '../database/mysqlConnection';
+import { query as pgQuery } from '../database/connection';
 
 const router = Router();
 router.use(authenticate);
@@ -1013,7 +1014,6 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
       `SELECT MIN(created_at) as first_tx FROM payment WHERE commerce_id = ? AND deleted_at IS NULL`, [cid]);
 
     // Info del CRM
-    const { query: pgQuery } = require('../database/connection');
     const crmMerchant = await pgQuery(
       `SELECT m.*, u.first_name || ' ' || u.last_name as assigned_name,
               ob.first_name || ' ' || ob.last_name as onboarding_name
