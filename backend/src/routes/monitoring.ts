@@ -977,38 +977,35 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
       ...(payoutGateways as any[]).map(g => g.gw_country),
     ])].filter(Boolean).join(', ');
 
-    // Comisiones de pasarelas (con fallback si no existe la columna)
-    let payinCommissions: any[] = [];
-    let payoutCommissions: any[] = [];
-    try {
-      payinCommissions = await mysqlQuery(
-        `SELECT gp.name, cg.commission
-         FROM commerce_gateway cg
-         JOIN gateway_payment gp ON gp.id = cg.gateway_payment_id
-         WHERE cg.commerce_id = ? AND cg.deleted_at IS NULL AND (cg.status = 'active' OR cg.status = '1' OR cg.status = 1)`, [cid]);
-    } catch { /* columna commission no existe */ }
-    try {
-      payoutCommissions = await mysqlQuery(
-        `SELECT gw.name, cgw.commission
-         FROM commerce_gateway_withdrawal cgw
-         JOIN gateway_withdrawal gw ON gw.id = cgw.gateway_withdrawal_id
-         WHERE cgw.commerce_id = ? AND cgw.deleted_at IS NULL AND (cgw.status = 'active' OR cgw.status = '1' OR cgw.status = 1)`, [cid]);
-    } catch { /* columna commission no existe */ }
+    // Comisiones del CRM (payment_methods_detail)
+    const paymentConfig = crm.payment_methods_detail || [];
 
-    // Resumen transacciones PayIn
-    const payinSummary = await mysqlQuery(
-      `SELECT COUNT(*) as total,
-        SUM(CASE WHEN status IN ('success','completed') THEN 1 ELSE 0 END) as exitosas,
-        SUM(CASE WHEN status IN ('error','bank_error','rejected','authentication_error') THEN 1 ELSE 0 END) as rechazadas
-       FROM payment WHERE commerce_id = ? AND deleted_at IS NULL AND created_at BETWEEN ? AND ?`,
+    // Resumen transacciones PayIn - desglosado por status
+    const payinByStatus = await mysqlQuery(
+      `SELECT status, COUNT(*) as cantidad
+       FROM payment WHERE commerce_id = ? AND deleted_at IS NULL AND created_at BETWEEN ? AND ?
+       GROUP BY status ORDER BY cantidad DESC`,
       [cid, from + ' 00:00:00', to + ' 23:59:59']);
 
-    // Resumen transacciones PayOut
-    const payoutSummary = await mysqlQuery(
-      `SELECT COUNT(*) as total,
-        SUM(CASE WHEN status IN ('success','completed') THEN 1 ELSE 0 END) as exitosas,
-        SUM(CASE WHEN status IN ('error','bank_error','rejected') THEN 1 ELSE 0 END) as rechazadas
-       FROM withdrawal WHERE commerce_id = ? AND deleted_at IS NULL AND created_at BETWEEN ? AND ?`,
+    // Resumen transacciones PayOut - desglosado por status
+    const payoutByStatus = await mysqlQuery(
+      `SELECT status, COUNT(*) as cantidad
+       FROM withdrawal WHERE commerce_id = ? AND deleted_at IS NULL AND created_at BETWEEN ? AND ?
+       GROUP BY status ORDER BY cantidad DESC`,
+      [cid, from + ' 00:00:00', to + ' 23:59:59']);
+
+    // Resumen transacciones PayIn - desglosado por status
+    const payinByStatus = await mysqlQuery(
+      `SELECT status, COUNT(*) as cantidad
+       FROM payment WHERE commerce_id = ? AND deleted_at IS NULL AND created_at BETWEEN ? AND ?
+       GROUP BY status ORDER BY cantidad DESC`,
+      [cid, from + ' 00:00:00', to + ' 23:59:59']);
+
+    // Resumen transacciones PayOut - desglosado por status
+    const payoutByStatus = await mysqlQuery(
+      `SELECT status, COUNT(*) as cantidad
+       FROM withdrawal WHERE commerce_id = ? AND deleted_at IS NULL AND created_at BETWEEN ? AND ?
+       GROUP BY status ORDER BY cantidad DESC`,
       [cid, from + ' 00:00:00', to + ' 23:59:59']);
 
     // Primera transacción
@@ -1082,7 +1079,7 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
     field('Rubro', crm.mcc_description || crm.industry || '');
     field('Sales engineer', crm.onboarding_name || '');
     field('KAM', crm.assigned_name || '');
-    field('Canal de comunicacion', crm.notes?.split('\n')[0] || '');
+    field('Canal de comunicacion', crm.secondary_contact_phone || crm.contact_phone || '');
     field('Fecha salida a produccion', to);
 
     // Métodos de pago con ID
@@ -1102,46 +1099,60 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
     section('Certificaciones');
     if (sandboxCert) {
       doc.fontSize(8).fillColor('#F59E0B').text('  Sandbox: ', X, doc.y, { continued: true });
-      doc.fillColor('#3B82F6').text(sandboxCert.name || 'Certificacion Sandbox', { link: `/uploads/${sandboxCert.file_path}`, underline: true });
+      doc.fillColor('#111827').text(sandboxCert.name || 'Certificacion Sandbox');
+      doc.fontSize(7).fillColor('#3B82F6').text(`    Descargar: /uploads/${sandboxCert.file_path}`, X, doc.y);
+      doc.y += 10;
     } else {
       doc.fontSize(8).fillColor('#6B7280').text('  Sandbox: No disponible', X, doc.y);
+      doc.y += 12;
     }
-    doc.moveDown(0.4);
+    doc.moveDown(0.3);
     if (prodCert) {
       doc.fontSize(8).fillColor('#10B981').text('  Produccion: ', X, doc.y, { continued: true });
-      doc.fillColor('#3B82F6').text(prodCert.name || 'Certificacion Produccion', { link: `/uploads/${prodCert.file_path}`, underline: true });
+      doc.fillColor('#111827').text(prodCert.name || 'Certificacion Produccion');
+      doc.fontSize(7).fillColor('#3B82F6').text(`    Descargar: /uploads/${prodCert.file_path}`, X, doc.y);
+      doc.y += 10;
     } else {
       doc.fontSize(8).fillColor('#6B7280').text('  Produccion: No disponible', X, doc.y);
+      doc.y += 12;
     }
     doc.moveDown(0.8);
 
-    // ─── Comisiones configuradas ───
-    section('Comisiones Configuradas en Produccion');
-    doc.fontSize(8).fillColor('#3B82F6').text('Pay-In:', X, doc.y);
-    doc.y += 12;
-    if ((payinCommissions as any[]).length > 0) {
-      (payinCommissions as any[]).forEach((g: any) => {
-        const comm = g.commission ? `${g.commission}%` : 'N/A';
-        field('  ' + (g.name || 'Sin nombre'), comm);
+    // ─── Comisiones del CRM ───
+    section('Comisiones Configuradas');
+    if (paymentConfig.length > 0) {
+      paymentConfig.forEach((pc: any) => {
+        doc.fontSize(8).fillColor('#111827').text(`  ${pc.country_code || ''} ${pc.country_name || ''}`, X, doc.y);
+        doc.y += 12;
+        if (pc.pay_in?.length > 0) {
+          doc.fontSize(7).fillColor('#3B82F6').text('    Pay-In:', X, doc.y); doc.y += 10;
+          pc.pay_in.forEach((m: any) => {
+            if (doc.y > 750) doc.addPage();
+            const comm = m.commission ? `Com: ${m.commission}%` : '';
+            const fee = m.fee ? `Fee: ${m.fee}` : '';
+            const minFee = m.min_fee ? `Min: ${m.min_fee}` : '';
+            const cur = m.currency || '';
+            const detail = [comm, fee, minFee, cur].filter(Boolean).join(' | ');
+            doc.fontSize(7).fillColor('#374151').text(`      ${m.method_name || 'N/A'}: ${detail || 'Sin datos'}`, X, doc.y);
+            doc.y += 10;
+          });
+        }
+        if (pc.pay_out?.length > 0) {
+          doc.fontSize(7).fillColor('#8B5CF6').text('    Pay-Out:', X, doc.y); doc.y += 10;
+          pc.pay_out.forEach((m: any) => {
+            if (doc.y > 750) doc.addPage();
+            const comm = m.commission ? `Com: ${m.commission}%` : '';
+            const fee = m.fee ? `Fee: ${m.fee}` : '';
+            const detail = [comm, fee, m.currency].filter(Boolean).join(' | ');
+            doc.fontSize(7).fillColor('#374151').text(`      ${m.method_name || 'N/A'}: ${detail || 'Sin datos'}`, X, doc.y);
+            doc.y += 10;
+          });
+        }
+        doc.moveDown(0.3);
       });
     } else {
-      // Usar nombres de pasarelas sin comisión
-      (payinGateways as any[]).forEach((g: any) => {
-        field('  ' + (g.name || 'Sin nombre'), 'Sin datos');
-      });
-    }
-    doc.moveDown(0.3);
-    doc.fontSize(8).fillColor('#8B5CF6').text('Pay-Out:', X, doc.y);
-    doc.y += 12;
-    if ((payoutCommissions as any[]).length > 0) {
-      (payoutCommissions as any[]).forEach((g: any) => {
-        const comm = g.commission ? `${g.commission}%` : 'N/A';
-        field('  ' + (g.name || 'Sin nombre'), comm);
-      });
-    } else {
-      (payoutGateways as any[]).forEach((g: any) => {
-        field('  ' + (g.name || 'Sin nombre'), 'Sin datos');
-      });
+      doc.fontSize(8).fillColor('#6B7280').text('  Sin configuracion de comisiones en el CRM', X, doc.y);
+      doc.y += 14;
     }
     doc.moveDown(0.5);
 
@@ -1153,67 +1164,62 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
     field('Primera transaccion', firstDate);
     doc.moveDown(0.5);
 
-    // ─── Resumen Transacciones con gráfico ───
+    // ─── Resumen Transacciones desglosado con gráfico ───
     section('Resumen de Transacciones');
-    const pi = payinSummary[0] || { total: 0, exitosas: 0, rechazadas: 0 };
-    const piTotal = Number(pi.total) || 0;
-    const piExitosas = Number(pi.exitosas) || 0;
-    const piRechazadas = Number(pi.rechazadas) || 0;
-    const piOtros = piTotal - piExitosas - piRechazadas;
-    const piPctOk = piTotal > 0 ? (piExitosas / piTotal * 100).toFixed(1) : '0';
-    const piPctFail = piTotal > 0 ? (piRechazadas / piTotal * 100).toFixed(1) : '0';
-    const piPctOther = piTotal > 0 ? (piOtros / piTotal * 100).toFixed(1) : '0';
 
-    // Gráfico circular PayIn
+    // PayIn
+    const piByStatus = payinByStatus as any[];
+    const piTotal = piByStatus.reduce((a: number, r: any) => a + Number(r.cantidad), 0);
+
     doc.fontSize(9).fillColor('#3B82F6').text(`PayIn (${from} al ${to}) - Total: ${piTotal.toLocaleString()}`, X, doc.y);
     doc.y += 14;
 
     if (piTotal > 0) {
+      // Gráfico circular PayIn
       const pieX = X + 60;
       const pieY = doc.y + 40;
       const pieR = 35;
-      const pieData = [
-        { value: piExitosas, color: '#10B981', label: `Exitosas ${piPctOk}%` },
-        { value: piRechazadas, color: '#EF4444', label: `Rechazadas ${piPctFail}%` },
-        { value: piOtros, color: '#F59E0B', label: `Otros ${piPctOther}%` },
-      ].filter(d => d.value > 0);
+
+      const STATUS_PIE_COLORS: Record<string, string> = {
+        success: '#10B981', completed: '#10B981',
+        expired: '#F97316', rejected: '#EF4444', error: '#EF4444',
+        bank_error: '#DC2626', canceled: '#F59E0B', pending: '#6B7280',
+        new: '#9CA3AF', processing: '#3B82F6', authentication_error: '#B91C1C',
+      };
 
       let startAngle = -Math.PI / 2;
-      pieData.forEach(slice => {
-        const sliceAngle = (slice.value / piTotal) * 2 * Math.PI;
+      piByStatus.forEach((s: any) => {
+        const val = Number(s.cantidad);
+        const sliceAngle = (val / piTotal) * 2 * Math.PI;
         const endAngle = startAngle + sliceAngle;
+        const color = STATUS_PIE_COLORS[s.status] || '#6B7280';
         const x1 = pieX + pieR * Math.cos(startAngle);
         const y1 = pieY + pieR * Math.sin(startAngle);
         const x2 = pieX + pieR * Math.cos(endAngle);
         const y2 = pieY + pieR * Math.sin(endAngle);
         const largeArc = sliceAngle > Math.PI ? 1 : 0;
-        doc.path(`M ${pieX} ${pieY} L ${x1} ${y1} A ${pieR} ${pieR} 0 ${largeArc} 1 ${x2} ${y2} Z`).fill(slice.color);
+        doc.path(`M ${pieX} ${pieY} L ${x1} ${y1} A ${pieR} ${pieR} 0 ${largeArc} 1 ${x2} ${y2} Z`).fill(color);
         startAngle = endAngle;
       });
 
-      // Leyenda
-      let ly = pieY - 20;
-      pieData.forEach(slice => {
-        doc.rect(X + 130, ly, 8, 8).fill(slice.color);
-        doc.fontSize(7).fillColor('#374151').text(slice.label, X + 142, ly);
-        ly += 12;
+      // Leyenda con desglose
+      let ly = pieY - (piByStatus.length * 6);
+      piByStatus.forEach((s: any) => {
+        const pct = (Number(s.cantidad) / piTotal * 100).toFixed(1);
+        const color = STATUS_PIE_COLORS[s.status] || '#6B7280';
+        doc.rect(X + 120, ly, 8, 8).fill(color);
+        doc.fontSize(7).fillColor('#374151').text(`${s.status}: ${pct}% (${Number(s.cantidad).toLocaleString()})`, X + 132, ly);
+        ly += 11;
       });
-      doc.y = pieY + pieR + 15;
+      doc.y = Math.max(pieY + pieR + 10, ly + 5);
     }
+    doc.moveDown(0.8);
 
-    doc.moveDown(0.5);
+    // PayOut
+    if (doc.y > 550) doc.addPage();
+    const poByStatus = payoutByStatus as any[];
+    const poTotal = poByStatus.reduce((a: number, r: any) => a + Number(r.cantidad), 0);
 
-    // Gráfico circular PayOut
-    const po = payoutSummary[0] || { total: 0, exitosas: 0, rechazadas: 0 };
-    const poTotal = Number(po.total) || 0;
-    const poExitosas = Number(po.exitosas) || 0;
-    const poRechazadas = Number(po.rechazadas) || 0;
-    const poOtros = poTotal - poExitosas - poRechazadas;
-    const poPctOk = poTotal > 0 ? (poExitosas / poTotal * 100).toFixed(1) : '0';
-    const poPctFail = poTotal > 0 ? (poRechazadas / poTotal * 100).toFixed(1) : '0';
-    const poPctOther = poTotal > 0 ? (poOtros / poTotal * 100).toFixed(1) : '0';
-
-    if (doc.y > 600) doc.addPage();
     doc.fontSize(9).fillColor('#8B5CF6').text(`PayOut (${from} al ${to}) - Total: ${poTotal.toLocaleString()}`, X, doc.y);
     doc.y += 14;
 
@@ -1221,34 +1227,38 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
       const pieX2 = X + 60;
       const pieY2 = doc.y + 40;
       const pieR2 = 35;
-      const pieData2 = [
-        { value: poExitosas, color: '#10B981', label: `Exitosas ${poPctOk}%` },
-        { value: poRechazadas, color: '#EF4444', label: `Rechazadas ${poPctFail}%` },
-        { value: poOtros, color: '#F59E0B', label: `Otros ${poPctOther}%` },
-      ].filter(d => d.value > 0);
+
+      const STATUS_PIE_COLORS2: Record<string, string> = {
+        success: '#10B981', completed: '#10B981',
+        expired: '#F97316', rejected: '#EF4444', error: '#EF4444',
+        bank_error: '#DC2626', canceled: '#F59E0B', pending: '#6B7280',
+      };
 
       let startAngle2 = -Math.PI / 2;
-      pieData2.forEach(slice => {
-        const sliceAngle = (slice.value / poTotal) * 2 * Math.PI;
+      poByStatus.forEach((s: any) => {
+        const val = Number(s.cantidad);
+        const sliceAngle = (val / poTotal) * 2 * Math.PI;
         const endAngle = startAngle2 + sliceAngle;
+        const color = STATUS_PIE_COLORS2[s.status] || '#6B7280';
         const x1 = pieX2 + pieR2 * Math.cos(startAngle2);
         const y1 = pieY2 + pieR2 * Math.sin(startAngle2);
         const x2 = pieX2 + pieR2 * Math.cos(endAngle);
         const y2 = pieY2 + pieR2 * Math.sin(endAngle);
         const largeArc = sliceAngle > Math.PI ? 1 : 0;
-        doc.path(`M ${pieX2} ${pieY2} L ${x1} ${y1} A ${pieR2} ${pieR2} 0 ${largeArc} 1 ${x2} ${y2} Z`).fill(slice.color);
+        doc.path(`M ${pieX2} ${pieY2} L ${x1} ${y1} A ${pieR2} ${pieR2} 0 ${largeArc} 1 ${x2} ${y2} Z`).fill(color);
         startAngle2 = endAngle;
       });
 
-      let ly2 = pieY2 - 20;
-      pieData2.forEach(slice => {
-        doc.rect(X + 130, ly2, 8, 8).fill(slice.color);
-        doc.fontSize(7).fillColor('#374151').text(slice.label, X + 142, ly2);
-        ly2 += 12;
+      let ly2 = pieY2 - (poByStatus.length * 6);
+      poByStatus.forEach((s: any) => {
+        const pct = (Number(s.cantidad) / poTotal * 100).toFixed(1);
+        const color = STATUS_PIE_COLORS2[s.status] || '#6B7280';
+        doc.rect(X + 120, ly2, 8, 8).fill(color);
+        doc.fontSize(7).fillColor('#374151').text(`${s.status}: ${pct}% (${Number(s.cantidad).toLocaleString()})`, X + 132, ly2);
+        ly2 += 11;
       });
-      doc.y = pieY2 + pieR2 + 15;
+      doc.y = Math.max(pieY2 + pieR2 + 10, ly2 + 5);
     }
-
     doc.moveDown(0.5);
 
     // ─── Observaciones ───
