@@ -995,20 +995,6 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
        GROUP BY status ORDER BY cantidad DESC`,
       [cid, from + ' 00:00:00', to + ' 23:59:59']);
 
-    // Resumen transacciones PayIn - desglosado por status
-    const payinByStatus = await mysqlQuery(
-      `SELECT status, COUNT(*) as cantidad
-       FROM payment WHERE commerce_id = ? AND deleted_at IS NULL AND created_at BETWEEN ? AND ?
-       GROUP BY status ORDER BY cantidad DESC`,
-      [cid, from + ' 00:00:00', to + ' 23:59:59']);
-
-    // Resumen transacciones PayOut - desglosado por status
-    const payoutByStatus = await mysqlQuery(
-      `SELECT status, COUNT(*) as cantidad
-       FROM withdrawal WHERE commerce_id = ? AND deleted_at IS NULL AND created_at BETWEEN ? AND ?
-       GROUP BY status ORDER BY cantidad DESC`,
-      [cid, from + ' 00:00:00', to + ' 23:59:59']);
-
     // Primera transacción
     const firstTx = await mysqlQuery(
       `SELECT MIN(created_at) as first_tx FROM payment WHERE commerce_id = ? AND deleted_at IS NULL`, [cid]);
