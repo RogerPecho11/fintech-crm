@@ -977,17 +977,23 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
       ...(payoutGateways as any[]).map(g => g.gw_country),
     ])].filter(Boolean).join(', ');
 
-    // Comisiones de pasarelas
-    const payinCommissions = await mysqlQuery(
-      `SELECT gp.name, cg.commission
-       FROM commerce_gateway cg
-       JOIN gateway_payment gp ON gp.id = cg.gateway_payment_id
-       WHERE cg.commerce_id = ? AND cg.deleted_at IS NULL AND (cg.status = 'active' OR cg.status = '1' OR cg.status = 1)`, [cid]);
-    const payoutCommissions = await mysqlQuery(
-      `SELECT gw.name, cgw.commission
-       FROM commerce_gateway_withdrawal cgw
-       JOIN gateway_withdrawal gw ON gw.id = cgw.gateway_withdrawal_id
-       WHERE cgw.commerce_id = ? AND cgw.deleted_at IS NULL AND (cgw.status = 'active' OR cgw.status = '1' OR cgw.status = 1)`, [cid]);
+    // Comisiones de pasarelas (con fallback si no existe la columna)
+    let payinCommissions: any[] = [];
+    let payoutCommissions: any[] = [];
+    try {
+      payinCommissions = await mysqlQuery(
+        `SELECT gp.name, cg.commission
+         FROM commerce_gateway cg
+         JOIN gateway_payment gp ON gp.id = cg.gateway_payment_id
+         WHERE cg.commerce_id = ? AND cg.deleted_at IS NULL AND (cg.status = 'active' OR cg.status = '1' OR cg.status = 1)`, [cid]);
+    } catch { /* columna commission no existe */ }
+    try {
+      payoutCommissions = await mysqlQuery(
+        `SELECT gw.name, cgw.commission
+         FROM commerce_gateway_withdrawal cgw
+         JOIN gateway_withdrawal gw ON gw.id = cgw.gateway_withdrawal_id
+         WHERE cgw.commerce_id = ? AND cgw.deleted_at IS NULL AND (cgw.status = 'active' OR cgw.status = '1' OR cgw.status = 1)`, [cid]);
+    } catch { /* columna commission no existe */ }
 
     // Resumen transacciones PayIn
     const payinSummary = await mysqlQuery(
@@ -1119,7 +1125,10 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
         field('  ' + (g.name || 'Sin nombre'), comm);
       });
     } else {
-      doc.fontSize(8).fillColor('#6B7280').text('  Sin comisiones configuradas', X, doc.y); doc.y += 14;
+      // Usar nombres de pasarelas sin comisión
+      (payinGateways as any[]).forEach((g: any) => {
+        field('  ' + (g.name || 'Sin nombre'), 'Sin datos');
+      });
     }
     doc.moveDown(0.3);
     doc.fontSize(8).fillColor('#8B5CF6').text('Pay-Out:', X, doc.y);
@@ -1130,7 +1139,9 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
         field('  ' + (g.name || 'Sin nombre'), comm);
       });
     } else {
-      doc.fontSize(8).fillColor('#6B7280').text('  Sin comisiones configuradas', X, doc.y); doc.y += 14;
+      (payoutGateways as any[]).forEach((g: any) => {
+        field('  ' + (g.name || 'Sin nombre'), 'Sin datos');
+      });
     }
     doc.moveDown(0.5);
 
