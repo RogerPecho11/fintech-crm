@@ -84,138 +84,129 @@ router.post('/upload', upload.single('file'), async (req: AuthenticatedRequest, 
   res.status(201).json(doc);
 });
 
-// POST /api/v1/documents/generate-cert-pdf — Genera PDF de certificación desde HTML
+// POST /api/v1/documents/generate-cert-pdf — Genera PDF y lo guarda directamente
 router.post('/generate-cert-pdf', async (req: AuthenticatedRequest, res: Response) => {
-  const { html, merchant_name, env, review_date } = req.body;
+  const { html, merchant_id, merchant_name, env, review_date } = req.body;
+  const user = req.user!;
 
-  if (!html) return res.status(400).json({ error: 'HTML requerido' });
+  if (!html || !merchant_id) return res.status(400).json({ error: 'html y merchant_id requeridos' });
 
   const PDFDocument = require('pdfkit');
-  const doc = new PDFDocument({ size: 'A4', margin: 40 });
+  const { v4: uuidv4 } = require('uuid');
 
-  res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename=certificacion_${(merchant_name || 'comercio').replace(/\s+/g, '_')}_${env || 'sandbox'}.pdf`);
-  doc.pipe(res);
+  const fileName = `${uuidv4()}.pdf`;
+  const uploadDir = process.env.UPLOAD_DIR || 'uploads';
+  const filePath = path.join(uploadDir, fileName);
 
-  // Parsear el HTML básico y renderizar como PDF
-  // Header
-  doc.rect(0, 0, 595, 60).fill('#FC2B5F');
-  doc.fontSize(18).fillColor('#FFFFFF').text('Certificación de Integraciones', 40, 18, { align: 'center' });
-  doc.fontSize(9).fillColor('#FFFFFF').text('ProntoPaga — Sistema avanzado de certificación digital para APIs', 40, 40, { align: 'center' });
-  doc.y = 75;
+  // Generar PDF y guardarlo en disco
+  await new Promise<void>((resolve, reject) => {
+    const doc = new PDFDocument({ size: 'A4', margin: 40 });
+    const writeStream = fs.createWriteStream(filePath);
+    doc.pipe(writeStream);
 
-  // Badge de ambiente
-  const envLabel = env === 'sandbox' ? 'Ambiente Sandbox' : 'Ambiente Productivo';
-  const envColor = env === 'sandbox' ? '#F59E0B' : '#10B981';
-  doc.fontSize(9).fillColor(envColor).text(envLabel, 40, doc.y);
-  doc.moveDown(1);
+    // Header
+    doc.rect(0, 0, 595, 60).fill('#FC2B5F');
+    doc.fontSize(18).fillColor('#FFFFFF').text('Certificación de Integraciones', 40, 18, { align: 'center' });
+    doc.fontSize(9).fillColor('#FFFFFF').text('ProntoPaga — Sistema avanzado de certificación digital', 40, 40, { align: 'center' });
+    doc.y = 75;
 
-  // Info básica
-  doc.fontSize(12).fillColor('#111111').text(merchant_name || 'Sin nombre');
-  doc.fontSize(9).fillColor('#6B7280').text(`Fecha de revisión: ${review_date || new Date().toISOString().slice(0, 10)}`);
-  doc.moveDown(1);
+    // Badge
+    const envLabel = env === 'sandbox' ? 'Ambiente Sandbox' : 'Ambiente Productivo';
+    const envColor = env === 'sandbox' ? '#F59E0B' : '#10B981';
+    doc.fontSize(9).fillColor(envColor).text(envLabel, 40, doc.y);
+    doc.moveDown(1);
 
-  // Extraer contenido del HTML y renderizar
-  // Parseo simple: extraer los campos del HTML
-  const extractFields = (htmlStr: string): { label: string; value: string }[] => {
+    // Info
+    doc.fontSize(12).fillColor('#111111').text(merchant_name || 'Sin nombre');
+    doc.fontSize(9).fillColor('#6B7280').text(`Fecha de revisión: ${review_date || new Date().toISOString().slice(0, 10)}`);
+    doc.moveDown(1);
+
+    // Parsear campos
     const fields: { label: string; value: string }[] = [];
-    const regex = /<span class="label">(.*?)<\/span><span class="value">(.*?)<\/span>/g;
-    let match;
-    while ((match = regex.exec(htmlStr)) !== null) {
-      fields.push({ label: match[1], value: match[2] });
-    }
-    // También extraer checks
-    const checkRegex = /<span class="label">(.*?)<\/span><span class="(check|uncheck)">(.*?)<\/span>/g;
-    while ((match = checkRegex.exec(htmlStr)) !== null) {
-      fields.push({ label: match[1], value: match[3] });
-    }
-    return fields;
-  };
+    const regex1 = /<span class="label">(.*?)<\/span><span class="value">(.*?)<\/span>/g;
+    let m;
+    while ((m = regex1.exec(html)) !== null) fields.push({ label: m[1], value: m[2] });
+    const regex2 = /<span class="label">(.*?)<\/span><span class="(check|uncheck)">(.*?)<\/span>/g;
+    while ((m = regex2.exec(html)) !== null) fields.push({ label: m[1], value: m[3] });
 
-  const fields = extractFields(html);
+    const startX = 40;
+    const drawSection = (title: string) => {
+      if (doc.y > 720) doc.addPage();
+      doc.moveDown(0.5);
+      doc.rect(startX, doc.y, 515, 18).fill('#F9FAFB');
+      doc.fontSize(10).fillColor('#374151').text('  ' + title, startX, doc.y + 4);
+      doc.y += 24;
+    };
 
-  // Extraer secciones h2
-  const sections = html.split('<h2>').slice(1).map((s: string) => {
-    const titleEnd = s.indexOf('</h2>');
-    const title = s.slice(0, titleEnd).replace(/<[^>]+>/g, '');
-    return title;
-  });
-
-  // Renderizar campos
-  let currentY = doc.y;
-  const startX = 40;
-
-  // Sección separadora
-  const drawSection = (title: string) => {
-    if (currentY > 720) { doc.addPage(); currentY = 50; }
-    doc.moveDown(0.5);
-    doc.rect(startX, doc.y, 515, 18).fill('#F9FAFB');
-    doc.fontSize(10).fillColor('#374151').text('  ' + title, startX, doc.y + 4);
-    doc.y += 24;
-    currentY = doc.y;
-  };
-
-  // Renderizar los campos
-  drawSection('Información Básica');
-  fields.forEach(f => {
-    if (doc.y > 740) { doc.addPage(); }
-    doc.fontSize(8).fillColor('#6B7280').text(f.label, startX, doc.y, { continued: true, width: 200 });
-    doc.fillColor('#111827').text('  ' + f.value, { width: 300 });
-    doc.moveDown(0.2);
-  });
-
-  // Extraer tabla de transacciones
-  const txRegex = /<tr>\s*<td[^>]*>(.*?)<\/td>\s*<td[^>]*>(.*?)<\/td>\s*<td[^>]*>(.*?)<\/td>\s*<td[^>]*>(.*?)<\/td>\s*<td[^>]*>(.*?)<\/td>\s*<\/tr>/g;
-  const txMatches: string[][] = [];
-  let txMatch;
-  while ((txMatch = txRegex.exec(html)) !== null) {
-    txMatches.push([txMatch[1], txMatch[2], txMatch[3], txMatch[4], txMatch[5]]);
-  }
-
-  if (txMatches.length > 0) {
-    drawSection('Transacciones (' + txMatches.length + ')');
-    // Header de tabla
-    doc.fontSize(7).fillColor('#6B7280');
-    doc.text('Tipo', startX, doc.y, { width: 80, continued: true });
-    doc.text('Método', { width: 100, continued: true });
-    doc.text('Estado', { width: 80, continued: true });
-    doc.text('Order ID', { width: 120, continued: true });
-    doc.text('UID', { width: 120 });
-    doc.moveDown(0.3);
-
-    doc.fontSize(7).fillColor('#111827');
-    txMatches.forEach(row => {
-      if (doc.y > 740) { doc.addPage(); }
-      doc.text(row[0], startX, doc.y, { width: 80, continued: true, lineBreak: false });
-      doc.text(row[1], { width: 100, continued: true, lineBreak: false });
-      doc.text(row[2], { width: 80, continued: true, lineBreak: false });
-      doc.text(row[3], { width: 120, continued: true, lineBreak: false });
-      doc.text(row[4], { width: 120, lineBreak: false });
-      doc.moveDown(0.8);
+    drawSection('Información Básica');
+    fields.forEach(f => {
+      if (doc.y > 740) doc.addPage();
+      doc.fontSize(8).fillColor('#6B7280').text(f.label + ': ', startX, doc.y, { continued: true });
+      doc.fillColor('#111827').text(f.value);
+      doc.moveDown(0.1);
     });
-  }
 
-  // Extraer comentarios generales
-  const commentsMatch = html.match(/<h2>.*?[Cc]omentarios.*?<\/h2>\s*<p>(.*?)<\/p>/);
-  if (commentsMatch) {
-    drawSection('Comentarios Generales');
-    doc.fontSize(9).fillColor('#374151').text(commentsMatch[1] || '—');
-  }
+    // Transacciones
+    const txRegex = /<tr>\s*<td[^>]*>(.*?)<\/td>\s*<td[^>]*>(.*?)<\/td>\s*<td[^>]*>(.*?)<\/td>\s*<td[^>]*>(.*?)<\/td>\s*<td[^>]*>(.*?)<\/td>\s*<\/tr>/g;
+    const txRows: string[][] = [];
+    let txM;
+    while ((txM = txRegex.exec(html)) !== null) txRows.push([txM[1], txM[2], txM[3], txM[4], txM[5]]);
 
-  const recsMatch = html.match(/<h2>.*?[Rr]ecomendaciones.*?<\/h2>\s*<p>(.*?)<\/p>/);
-  if (recsMatch) {
-    drawSection('Recomendaciones');
-    doc.fontSize(9).fillColor('#374151').text(recsMatch[1] || '—');
-  }
+    if (txRows.length > 0) {
+      drawSection(`Transacciones (${txRows.length})`);
+      doc.fontSize(7).fillColor('#6B7280');
+      doc.text('Tipo          Método          Estado          Order ID          UID', startX, doc.y);
+      doc.moveDown(0.3);
+      doc.fillColor('#111827');
+      txRows.forEach(row => {
+        if (doc.y > 740) doc.addPage();
+        doc.fontSize(7).text(`${row[0]}    ${row[1]}    ${row[2]}    ${row[3]}    ${row[4]}`, startX, doc.y);
+        doc.moveDown(0.5);
+      });
+    }
 
-  // Footer
-  doc.moveDown(2);
-  doc.fontSize(7).fillColor('#9CA3AF').text(
-    `Generado por ProntoPaga CRM — ${new Date().toLocaleString('es-PE')}`,
-    { align: 'center' }
+    // Comentarios
+    const commentsMatch = html.match(/<h2>[^<]*[Cc]omentarios[^<]*<\/h2>\s*<p>(.*?)<\/p>/);
+    if (commentsMatch && commentsMatch[1] && commentsMatch[1] !== '—') {
+      drawSection('Comentarios Generales');
+      doc.fontSize(9).fillColor('#374151').text(commentsMatch[1]);
+    }
+    const recsMatch = html.match(/<h2>[^<]*[Rr]ecomendaciones[^<]*<\/h2>\s*<p>(.*?)<\/p>/);
+    if (recsMatch && recsMatch[1]) {
+      drawSection('Recomendaciones');
+      doc.fontSize(9).fillColor('#374151').text(recsMatch[1]);
+    }
+
+    // Footer
+    doc.moveDown(2);
+    doc.fontSize(7).fillColor('#9CA3AF').text(`Generado por ProntoPaga CRM — ${new Date().toLocaleString('es-PE')}`, { align: 'center' });
+
+    doc.end();
+    writeStream.on('finish', resolve);
+    writeStream.on('error', reject);
+  });
+
+  // Registrar en la base de datos
+  const fileStats = fs.statSync(filePath);
+  const docName = `Certificación ${env === 'sandbox' ? 'Sandbox' : 'Productivo'} - ${merchant_name}`;
+
+  const [savedDoc] = await query(
+    `INSERT INTO documents (merchant_id, uploaded_by, name, original_name, file_path, file_size, mime_type, document_type, description)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+    [
+      merchant_id, user.id, docName,
+      `certificacion_${(merchant_name || '').replace(/\s+/g, '_')}_${env}.pdf`,
+      fileName, fileStats.size, 'application/pdf', 'certification',
+      `Certificación ${env === 'sandbox' ? 'Sandbox' : 'Productivo'} - ${review_date}`,
+    ]
   );
 
-  doc.end();
+  // Devolver la URL del archivo para descarga
+  res.json({
+    message: 'Certificación PDF generada y guardada',
+    document: savedDoc,
+    downloadUrl: `/uploads/${fileName}`,
+  });
 });
 
 // PATCH /api/v1/documents/:id/verify

@@ -268,40 +268,23 @@ export default function CertificationForm({ merchant, onClose }: Props) {
         ${form.recommendations ? `<h2>${t('recommendations')}</h2><p>${form.recommendations}</p>` : ''}
       </body></html>`;
 
-      // Create blob and upload as PDF document
-      // Usamos el HTML para generar PDF en el servidor
-      const pdfResponse = await api.post('/documents/generate-cert-pdf', {
+      // Generar PDF en el servidor y guardarlo directamente
+      const certResponse = await api.post('/documents/generate-cert-pdf', {
         html,
         merchant_id: merchant.id,
-        env,
         merchant_name: form.merchant_name,
+        env,
         review_date: form.review_date,
-      }, { responseType: 'blob' });
-
-      // Subir el PDF generado
-      const pdfBlob = new Blob([pdfResponse.data], { type: 'application/pdf' });
-      const pdfFile = new File([pdfBlob], `certificacion_${form.merchant_name.replace(/\s+/g, '_')}_${env}.pdf`, { type: 'application/pdf' });
-
-      const formData = new FormData();
-      formData.append('file', pdfFile);
-      formData.append('merchant_id', merchant.id);
-      formData.append('document_type', 'certification');
-      formData.append('description', `Certificación ${env === 'sandbox' ? 'Sandbox' : 'Productivo'} - ${form.review_date}`);
-      formData.append('name', `Certificación ${env === 'sandbox' ? 'Sandbox' : 'Productivo'} - ${form.merchant_name}`);
-
-      await api.post('/documents/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      // También descargar el PDF localmente
-      const url = URL.createObjectURL(pdfBlob);
+      // Descargar el PDF
+      const downloadUrl = certResponse.data.downloadUrl;
       const link = document.createElement('a');
-      link.href = url;
+      link.href = `${import.meta.env.VITE_API_URL || ''}${downloadUrl}`;
       link.download = `certificacion_${form.merchant_name.replace(/\s+/g, '_')}_${env}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      URL.revokeObjectURL(url);
 
       toast.success('Certificación generada y guardada en documentos');
     } catch (err: any) {
