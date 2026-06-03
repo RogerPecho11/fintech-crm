@@ -942,6 +942,214 @@ router.get('/report-pdf', async (req: AuthenticatedRequest, res: Response) => {
   }
 });
 
+// ─── GET /acta-entrega-pdf — Genera Acta de Entrega de Certificación
+router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { commerce_id, date_from, date_to } = req.query as any;
+    if (!commerce_id) return res.status(400).json({ error: 'commerce_id requerido' });
+
+    const cid = Number(commerce_id);
+    const from = date_from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const to = date_to || new Date().toISOString().slice(0, 10);
+
+    // Info del comercio
+    const commerceRows = await mysqlQuery(`SELECT id, name, country, slug, rut FROM commerce WHERE id = ? LIMIT 1`, [cid]);
+    if (!commerceRows.length) return res.status(404).json({ error: 'Comercio no encontrado' });
+    const commerce = commerceRows[0];
+
+    // Pasarelas activas
+    const payinGateways = await mysqlQuery(
+      `SELECT gp.name FROM commerce_gateway cg JOIN gateway_payment gp ON gp.id = cg.gateway_payment_id
+       WHERE cg.commerce_id = ? AND cg.deleted_at IS NULL AND (cg.status = 'active' OR cg.status = '1' OR cg.status = 1)`, [cid]);
+    const payoutGateways = await mysqlQuery(
+      `SELECT gw.name FROM commerce_gateway_withdrawal cgw JOIN gateway_withdrawal gw ON gw.id = cgw.gateway_withdrawal_id
+       WHERE cgw.commerce_id = ? AND cgw.deleted_at IS NULL AND (cgw.status = 'active' OR cgw.status = '1' OR cgw.status = 1)`, [cid]);
+
+    // Resumen transacciones PayIn
+    const payinSummary = await mysqlQuery(
+      `SELECT COUNT(*) as total,
+        SUM(CASE WHEN status IN ('success','completed') THEN 1 ELSE 0 END) as exitosas,
+        SUM(CASE WHEN status IN ('error','bank_error','rejected','authentication_error') THEN 1 ELSE 0 END) as rechazadas
+       FROM payment WHERE commerce_id = ? AND deleted_at IS NULL AND created_at BETWEEN ? AND ?`,
+      [cid, from + ' 00:00:00', to + ' 23:59:59']);
+
+    // Resumen transacciones PayOut
+    const payoutSummary = await mysqlQuery(
+      `SELECT COUNT(*) as total,
+        SUM(CASE WHEN status IN ('success','completed') THEN 1 ELSE 0 END) as exitosas,
+        SUM(CASE WHEN status IN ('error','bank_error','rejected') THEN 1 ELSE 0 END) as rechazadas
+       FROM withdrawal WHERE commerce_id = ? AND deleted_at IS NULL AND created_at BETWEEN ? AND ?`,
+      [cid, from + ' 00:00:00', to + ' 23:59:59']);
+
+    // Primera transacción
+    const firstTx = await mysqlQuery(
+      `SELECT MIN(created_at) as first_tx FROM payment WHERE commerce_id = ? AND deleted_at IS NULL`, [cid]);
+
+    // Info del CRM (si existe)
+    const { query: pgQuery } = require('../database/connection');
+    const crmMerchant = await pgQuery(
+      `SELECT m.*, u.first_name || ' ' || u.last_name as assigned_name,
+              ob.first_name || ' ' || ob.last_name as onboarding_name
+       FROM merchants m
+       LEFT JOIN users u ON m.assigned_to = u.id
+       LEFT JOIN users ob ON m.onboarding_assigned_to = ob.id
+       WHERE m.merchant_id = $1 LIMIT 1`, [String(cid)]);
+    const crm = crmMerchant[0] || {};
+
+    // Generar PDF
+    const PDFDocument = require('pdfkit');
+    const doc = new PDFDocument({ size: 'A4', margin: 50 });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=acta_entrega_${commerce.name.replace(/\s+/g, '_')}_${to}.pdf`);
+    doc.pipe(res);
+
+    const X = 50;
+    const W = 495;
+
+    // Header
+    doc.rect(0, 0, 595, 70).fill('#FC2B5F');
+    doc.fontSize(18).fillColor('#FFFFFF').text('Acta de Entrega de Certificacion', X, 18, { align: 'center' });
+    doc.fontSize(9).text('ProntoPaga - Onboarding', X, 42, { align: 'center' });
+    doc.y = 85;
+
+    doc.fontSize(8).fillColor('#6B7280').text(
+      'En la presente acta se deja constancia de la entrega del resultado del proceso de certificacion tecnica del comercio, el cual ha sido integrado y monitoreado de acuerdo con los estandares establecidos por el area de Onboarding.',
+      X, doc.y, { width: W });
+    doc.moveDown(1.2);
+
+    // ─── Helpers ───
+    const section = (title: string) => {
+      if (doc.y > 710) doc.addPage();
+      doc.moveDown(0.4);
+      doc.rect(X, doc.y, W, 18).fill('#1F2937');
+      doc.fontSize(9).fillColor('#FFFFFF').text('  ' + title, X, doc.y + 5, { lineBreak: false });
+      doc.y += 24;
+    };
+
+    const field = (label: string, value: string) => {
+      if (doc.y > 750) doc.addPage();
+      const y = doc.y;
+      doc.fontSize(8).fillColor('#6B7280').text(label + ':', X, y, { width: 180, lineBreak: false });
+      doc.fontSize(8).fillColor('#111827').text(value || '___________________', X + 185, y, { width: 310, lineBreak: false });
+      doc.y = y + 15;
+    };
+
+    // ─── Datos Generales ───
+    section('Datos Generales del Comercio');
+    field('ID del Comercio', String(commerce.id));
+    field('Comercio', commerce.name);
+    field('URL', crm.website || commerce.slug || '');
+    field('Pais de operacion', commerce.country || '');
+    field('Razon social', crm.legal_name || commerce.name || '');
+    field('RUT/RUC/NIT', commerce.rut || crm.tax_id || '');
+    field('Categoria Comercio', crm.business_type || crm.industry || '');
+    field('Rubro', crm.mcc_description || '');
+    field('Sales engineer', crm.onboarding_name || '');
+    field('KAM', crm.assigned_name || '');
+    field('Canal de comunicacion', '');
+    field('Fecha salida a produccion', to);
+
+    // Métodos de pago
+    doc.moveDown(0.3);
+    doc.fontSize(8).fillColor('#6B7280').text('Metodos de pago:', X, doc.y);
+    doc.y += 14;
+    const payinNames = (payinGateways as any[]).map(g => g.name).join(', ') || '-';
+    const payoutNames = (payoutGateways as any[]).map(g => g.name).join(', ') || '-';
+    doc.fontSize(8).fillColor('#3B82F6').text('  Pay-In: ', X, doc.y, { continued: true });
+    doc.fillColor('#111827').text(payinNames);
+    doc.moveDown(0.3);
+    doc.fontSize(8).fillColor('#8B5CF6').text('  Pay-Out: ', X, doc.y, { continued: true });
+    doc.fillColor('#111827').text(payoutNames);
+    doc.moveDown(0.8);
+
+    // ─── Encuesta ───
+    section('Encuesta Post-Certificacion');
+    field('Link a la encuesta', '');
+    doc.moveDown(0.5);
+
+    // ─── Certificación Sandbox ───
+    section('Resumen de Certificacion - Sandbox');
+    field('Fecha de certificacion', '');
+    field('Link de reporte', '');
+    doc.moveDown(0.5);
+
+    // ─── Certificación Producción ───
+    section('Resumen de Certificacion - Produccion');
+    field('Fecha de certificacion', '');
+    field('Link de reporte', '');
+    doc.moveDown(0.5);
+
+    // ─── Comisiones ───
+    section('Evidencia de Comisiones');
+    doc.fontSize(8).fillColor('#6B7280').text('Comercial (segun contrato):', X, doc.y);
+    doc.y += 30;
+    doc.text('Onboarding (configuradas en produccion):', X, doc.y);
+    doc.y += 14;
+    doc.text('  PayIn:', X, doc.y); doc.y += 20;
+    doc.text('  PayOut:', X, doc.y); doc.y += 20;
+    doc.moveDown(0.5);
+
+    // ─── Monitoreo ───
+    section('Monitoreo en Produccion');
+    field('Fecha inicio monitoreo', from);
+    field('Fecha termino monitoreo', to);
+    const firstDate = firstTx[0]?.first_tx ? new Date(firstTx[0].first_tx).toISOString().slice(0, 10) : '';
+    field('Primera transaccion', firstDate);
+    doc.moveDown(0.5);
+
+    // ─── Resumen Transacciones ───
+    section('Resumen de Transacciones');
+    const pi = payinSummary[0] || { total: 0, exitosas: 0, rechazadas: 0 };
+    const piTotal = Number(pi.total) || 0;
+    const piExitosas = Number(pi.exitosas) || 0;
+    const piRechazadas = Number(pi.rechazadas) || 0;
+    const piOtros = piTotal - piExitosas - piRechazadas;
+    const piPctOk = piTotal > 0 ? (piExitosas / piTotal * 100).toFixed(1) : '0';
+    const piPctFail = piTotal > 0 ? (piRechazadas / piTotal * 100).toFixed(1) : '0';
+    const piPctOther = piTotal > 0 ? (piOtros / piTotal * 100).toFixed(1) : '0';
+
+    doc.fontSize(9).fillColor('#3B82F6').text(`PayIn (${from} al ${to})`, X, doc.y);
+    doc.y += 14;
+    field('  Transacciones exitosas', `${piPctOk}% (${piExitosas.toLocaleString()})`);
+    field('  Transacciones rechazadas', `${piPctFail}% (${piRechazadas.toLocaleString()})`);
+    field('  Otros estados', `${piPctOther}% (${piOtros.toLocaleString()})`);
+    field('  Total procesadas', piTotal.toLocaleString());
+    doc.moveDown(0.5);
+
+    const po = payoutSummary[0] || { total: 0, exitosas: 0, rechazadas: 0 };
+    const poTotal = Number(po.total) || 0;
+    const poExitosas = Number(po.exitosas) || 0;
+    const poRechazadas = Number(po.rechazadas) || 0;
+    const poOtros = poTotal - poExitosas - poRechazadas;
+    const poPctOk = poTotal > 0 ? (poExitosas / poTotal * 100).toFixed(1) : '0';
+    const poPctFail = poTotal > 0 ? (poRechazadas / poTotal * 100).toFixed(1) : '0';
+    const poPctOther = poTotal > 0 ? (poOtros / poTotal * 100).toFixed(1) : '0';
+
+    doc.fontSize(9).fillColor('#8B5CF6').text(`PayOut (${from} al ${to})`, X, doc.y);
+    doc.y += 14;
+    field('  Transacciones exitosas', `${poPctOk}% (${poExitosas.toLocaleString()})`);
+    field('  Transacciones rechazadas', `${poPctFail}% (${poRechazadas.toLocaleString()})`);
+    field('  Otros estados', `${poPctOther}% (${poOtros.toLocaleString()})`);
+    field('  Total procesadas', poTotal.toLocaleString());
+    doc.moveDown(0.5);
+
+    // ─── Observaciones ───
+    section('Observaciones');
+    doc.fontSize(8).fillColor('#6B7280').text('', X, doc.y);
+    doc.y += 40;
+
+    // Footer
+    doc.moveDown(2);
+    doc.fontSize(7).fillColor('#9CA3AF').text(
+      `Generado por ProntoPaga CRM - ${new Date().toLocaleString('es-PE')}`, X, doc.y, { align: 'center', width: W });
+
+    doc.end();
+  } catch (err: any) {
+    console.error('[Monitoring] acta-entrega-pdf error:', err.message);
+    res.status(500).json({ error: 'Error al generar Acta: ' + err.message });
+  }
+});
+
 // ─── GET /cache-stats — Estadísticas del cache y rate limiter
 router.get('/cache-stats', async (_req: AuthenticatedRequest, res: Response) => {
   try {

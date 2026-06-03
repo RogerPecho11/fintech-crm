@@ -137,6 +137,34 @@ export default function MonitoringPage() {
         </div>
         <div className="flex gap-2">
           {(chartData.length > 0 || payinMethods.length > 0 || payoutMethods.length > 0) && (
+            <>
+            <button
+              onClick={async () => {
+                const toastId = toast.loading('Generando Acta...');
+                try {
+                  const response = await api.get('/monitoring/acta-entrega-pdf', {
+                    params: { commerce_id: commerceId, date_from: dateFrom, date_to: dateTo },
+                    responseType: 'blob',
+                  });
+                  const blob = new Blob([response.data], { type: 'application/pdf' });
+                  const url = URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.href = url;
+                  const name = commerces.find(c => String(c.id) === commerceId)?.name || 'comercio';
+                  link.download = `acta_entrega_${name.replace(/\s+/g, '_')}_${dateTo}.pdf`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  URL.revokeObjectURL(url);
+                  toast.success('Acta descargada', { id: toastId });
+                } catch {
+                  toast.error('Error al generar Acta', { id: toastId });
+                }
+              }}
+              className="btn-secondary flex items-center gap-2"
+            >
+              <FileText className="w-4 h-4" /> Acta de Entrega
+            </button>
             <button
               onClick={async () => {
                 const toastId = toast.loading('Generando PDF...');
@@ -164,6 +192,7 @@ export default function MonitoringPage() {
             >
               <FileText className="w-4 h-4" /> PDF
             </button>
+            </>
           )}
           <button onClick={fetchData} disabled={loading} className="btn-primary flex items-center gap-2">
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
