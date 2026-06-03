@@ -170,7 +170,22 @@ router.post('/generate-cert-pdf', async (req: AuthenticatedRequest, res: Respons
 
     if (limitFields.length > 0) {
       section('Limites');
-      limitFields.forEach(f => field(f.label, f.value));
+      // Mostrar como Pay In (min/max) y Pay Out (daily/monthly)
+      const minF = limitFields.find(f => /min/i.test(f.label));
+      const maxF = limitFields.find(f => /max/i.test(f.label));
+      const dailyF = limitFields.find(f => /daily/i.test(f.label));
+      const monthlyF = limitFields.find(f => /monthly/i.test(f.label));
+      
+      if (minF || maxF) {
+        doc.fontSize(8).fillColor('#3B82F6').text('Pay In', X, doc.y); doc.y += 12;
+        if (minF) field('  Monto Minimo', minF.value);
+        if (maxF) field('  Monto Maximo', maxF.value);
+      }
+      if (dailyF || monthlyF) {
+        doc.fontSize(8).fillColor('#8B5CF6').text('Pay Out', X, doc.y); doc.y += 12;
+        if (dailyF) field('  Limite Diario', dailyF.value);
+        if (monthlyF) field('  Limite Mensual', monthlyF.value);
+      }
     }
 
     if (payFields.length > 0) {
@@ -188,39 +203,97 @@ router.post('/generate-cert-pdf', async (req: AuthenticatedRequest, res: Respons
       perfFields.forEach(f => field(f.label, f.value));
     }
 
-    // ─── Transacciones ───
+    // ─── Transacciones con imagenes debajo de cada una ───
+    // Parsear transacciones del HTML incluyendo sus imágenes
+    // Las imágenes están en bloques: <div><p>tipo - order_id</p><div><img>...</div></div>
     const txRegex2 = /<tr>\s*<td[^>]*>(.*?)<\/td>\s*<td[^>]*>(.*?)<\/td>\s*<td[^>]*>(.*?)<\/td>\s*<td[^>]*>(.*?)<\/td>\s*<td[^>]*>(.*?)<\/td>\s*<\/tr>/g;
     const txRows: string[][] = [];
     let txM;
     while ((txM = txRegex2.exec(html)) !== null) txRows.push([txM[1], txM[2], txM[3], txM[4], txM[5]]);
 
+    // Parsear bloques de imágenes por transacción
+    const txImgBlocks: Map<string, string[]> = new Map();
+    const txImgRegex = /<div[^>]*>\s*<p[^>]*>(.*?)<\/p>\s*<div[^>]*>(.*?)<\/div>\s*<\/div>/gs;
+    let txImgM;
+    while ((txImgM = txImgRegex.exec(html)) !== null) {
+      const label = txImgM[1].trim();
+      const imgBlock = txImgM[2];
+      const imgs: string[] = [];
+      const singleImgRegex = /src="(data:image\/[^"]+)"/g;
+      let singleM;
+      while ((singleM = singleImgRegex.exec(imgBlock)) !== null) imgs.push(singleM[1]);
+      if (imgs.length > 0) txImgBlocks.set(label, imgs);
+    }
+
     if (txRows.length > 0) {
       section(`Transacciones (${txRows.length})`);
 
-      // Posiciones fijas de columnas
-      const cols = [X, X + 55, X + 160, X + 240, X + 320];
-      const colW = [55, 105, 80, 80, 195];
-
-      // Header
-      doc.fontSize(7).fillColor('#6B7280');
-      ['Tipo', 'Metodo', 'Estado', 'Order ID', 'UID'].forEach((h, i) => {
-        doc.text(h, cols[i], doc.y, { width: colW[i], lineBreak: false });
-      });
-      doc.y += 12;
-      doc.moveTo(X, doc.y).lineTo(X + W, doc.y).strokeColor('#E5E7EB').stroke();
-      doc.y += 4;
-
-      // Filas
       txRows.forEach((row, idx) => {
-        if (doc.y > 740) doc.addPage();
+        if (doc.y > 650) doc.addPage();
+
+        // Fila de la transacción
         const y = doc.y;
-        if (idx % 2 === 0) doc.rect(X, y - 2, W, 13).fill('#F9FAFB');
+        doc.rect(X, y, W, 14).fill(idx % 2 === 0 ? '#F9FAFB' : '#FFFFFF');
         doc.fontSize(7).fillColor('#111827');
+        const cols2 = [X, X + 55, X + 160, X + 240, X + 320];
+        const colW2 = [55, 105, 80, 80, 195];
         row.forEach((cell, i) => {
-          doc.text(cell || '-', cols[i], y, { width: colW[i], lineBreak: false });
+          doc.text(cell || '-', cols2[i], y + 3, { width: colW2[i], lineBreak: false });
         });
-        doc.y = y + 14;
+        doc.y = y + 16;
+
+        // Buscar imágenes asociadas a esta transacción
+        const txLabel = `${row[0]} - ${row[3]}`; // "Pay-In - 122331635"
+        const txImgs = txImgBlocks.get(txLabel);
+        if (txImgs && txImgs.length > 0) {
+          doc.y += 4;
+          let imgX = X + 10;
+          for (const src of txImgs) {
+            try {
+              if (doc.y > 620) { doc.addPage(); imgX = X + 10; }
+              const b64 = src.split(',')[1];
+              if (b64) {
+                const buf = Buffer.from(b64, 'base64');
+                doc.image(buf, imgX, doc.y, { width: 140, height: 95 });
+                imgX += 155;
+                if (imgX > X + W - 140) { doc.y += 105; imgX = X + 10; }
+              }
+            } catch { /* skip */ }
+          }
+          doc.y += 105;
+        }
       });
+    }
+
+    // ─── Imagenes globales (las que no están asociadas a transacciones) ───
+    const allImgRegex = /<img[^>]+src="(data:image\/[^"]+)"[^>]*>/g;
+    const allImages: string[] = [];
+    let aImgM;
+    while ((aImgM = allImgRegex.exec(html)) !== null) allImages.push(aImgM[1]);
+
+    // Restar las que ya se mostraron en transacciones
+    const shownImages = new Set<string>();
+    txImgBlocks.forEach(imgs => imgs.forEach(img => shownImages.add(img)));
+    const globalImages = allImages.filter(img => !shownImages.has(img));
+
+    if (globalImages.length > 0) {
+      section(`Evidencias adicionales (${globalImages.length})`);
+      let imgX = X;
+      let imgRow = 0;
+      for (const src of globalImages) {
+        try {
+          if (doc.y > 580) { doc.addPage(); imgX = X; }
+          const b64 = src.split(',')[1];
+          if (b64) {
+            const buf = Buffer.from(b64, 'base64');
+            doc.image(buf, imgX, doc.y, { width: 160, height: 110 });
+            imgX += 170;
+            imgRow++;
+            if (imgRow % 3 === 0) { doc.y += 120; imgX = X; }
+          }
+        } catch { /* skip */ }
+      }
+      if (imgRow % 3 !== 0) doc.y += 120;
     }
 
     // ─── Comentarios ───
@@ -235,32 +308,6 @@ router.post('/generate-cert-pdf', async (req: AuthenticatedRequest, res: Respons
     if (recMatch && recMatch[1] && recMatch[1].trim() !== '') {
       section('Recomendaciones');
       doc.fontSize(8).fillColor('#374151').text(recMatch[1].trim(), X, doc.y, { width: W });
-    }
-
-    // ─── Imagenes ───
-    const imgRegex = /<img[^>]+src="(data:image\/[^"]+)"[^>]*>/g;
-    const images: string[] = [];
-    let imgM;
-    while ((imgM = imgRegex.exec(html)) !== null) images.push(imgM[1]);
-
-    if (images.length > 0) {
-      section(`Evidencias (${images.length} imagenes)`);
-      let imgX = X;
-      let imgRow = 0;
-      for (const src of images) {
-        try {
-          if (doc.y > 580) { doc.addPage(); imgX = X; }
-          const b64 = src.split(',')[1];
-          if (b64) {
-            const buf = Buffer.from(b64, 'base64');
-            doc.image(buf, imgX, doc.y, { width: 160, height: 110 });
-            imgX += 170;
-            imgRow++;
-            if (imgRow % 3 === 0) { doc.y += 120; imgX = X; }
-          }
-        } catch { /* skip */ }
-      }
-      if (imgRow % 3 !== 0) doc.y += 120;
     }
 
     // Footer
