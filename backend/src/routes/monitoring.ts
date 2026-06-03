@@ -978,9 +978,6 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
       ...(payoutGateways as any[]).map(g => g.gw_country),
     ])].filter(Boolean).join(', ');
 
-    // Comisiones del CRM (payment_methods_detail)
-    const paymentConfig = crm.payment_methods_detail || [];
-
     // Resumen transacciones PayIn - desglosado por status
     const payinByStatus = await mysqlQuery(
       `SELECT status, COUNT(*) as cantidad
@@ -1008,6 +1005,7 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
        LEFT JOIN users ob ON m.onboarding_assigned_to = ob.id
        WHERE m.merchant_id = $1 LIMIT 1`, [String(cid)]);
     const crm = crmMerchant[0] || {};
+    const paymentConfig = crm.payment_methods_detail || [];
 
     // Documentos de certificación del CRM
     const certDocs = crmMerchant[0]?.id ? await pgQuery(
