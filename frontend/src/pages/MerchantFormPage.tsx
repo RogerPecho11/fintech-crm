@@ -68,6 +68,7 @@ const defaultForm = {
   has_iva: '',
   accepts_third_party: '',
   communication_channel: '',
+  integration_partner: '',
   category: '',
   industry: '',
   origin_country: '',
@@ -137,6 +138,7 @@ export default function MerchantFormPage() {
         has_iva:               meta.has_iva               || '',
         accepts_third_party:   meta.accepts_third_party   || '',
         communication_channel: meta.communication_channel || '',
+        integration_partner:   meta.integration_partner   || '',
         category:              meta.category              || '',
         origin_country:        meta.origin_country        || '',
         risk_level:            meta.risk_label || merchant.risk_level || 'diamond',
@@ -278,6 +280,7 @@ export default function MerchantFormPage() {
       has_iva:               form.has_iva,
       accepts_third_party:   form.accepts_third_party,
       communication_channel: form.communication_channel,
+      integration_partner:   form.integration_partner,
       category:              form.category,
       origin_country:        form.origin_country,
       risk_label:            form.risk_level,   // keep display label
@@ -494,6 +497,11 @@ export default function MerchantFormPage() {
                   <option value="">Seleccionar</option>
                   {['Email','WhatsApp','Teléfono','Slack','Teams','Otro'].map(v => <option key={v}>{v}</option>)}
                 </select>
+              </div>
+
+              <div>
+                <label className={lc}>Integration Partner</label>
+                <input className={ic} value={form.integration_partner} onChange={e => set('integration_partner', e.target.value)} placeholder="Nombre del partner (opcional)" />
               </div>
 
               <div>

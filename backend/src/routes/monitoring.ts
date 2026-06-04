@@ -1132,10 +1132,26 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
     const baseUrl = (process.env.FRONTEND_URL && !process.env.FRONTEND_URL.includes('localhost')) 
       ? process.env.FRONTEND_URL 
       : 'https://crm-onboarding.online';
+
+    // Obtener integration_partner del meta
+    let integrationPartner = '';
+    try {
+      const notesStr = crm.notes || '';
+      const metaMatch = notesStr.match(/^\{\"_meta\":true.*?\}/s);
+      if (metaMatch) {
+        const meta = JSON.parse(metaMatch[0]);
+        integrationPartner = meta.integration_partner || '';
+      }
+    } catch {}
+
     if (sandboxCert) {
       doc.fontSize(8).fillColor('#F59E0B').text('  Sandbox: ', X, doc.y, { continued: true });
       doc.fillColor('#111827').text(sandboxCert.name || 'Certificacion Sandbox');
       doc.fontSize(7).fillColor('#3B82F6').text(`    ${baseUrl}/uploads/${sandboxCert.file_path}`, X, doc.y, { link: `${baseUrl}/uploads/${sandboxCert.file_path}`, underline: true });
+      doc.y += 12;
+    } else if (integrationPartner) {
+      doc.fontSize(8).fillColor('#F59E0B').text('  Sandbox: ', X, doc.y, { continued: true });
+      doc.fillColor('#6B7280').text(`No se genera certificacion Sandbox - Integration Partner: ${integrationPartner}`);
       doc.y += 12;
     } else {
       doc.fontSize(8).fillColor('#6B7280').text('  Sandbox: No disponible', X, doc.y);
