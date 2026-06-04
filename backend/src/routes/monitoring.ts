@@ -1063,7 +1063,18 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
     field('Rubro', crm.mcc_description || crm.industry || '');
     field('Sales engineer', crm.onboarding_name || '');
     field('KAM', crm.assigned_name || '');
-    field('Canal de comunicacion', crm.secondary_contact_phone || crm.contact_phone || '');
+    field('Canal de comunicacion', (() => {
+      // Parsear del bloque _meta en notes
+      try {
+        const notesStr = crm.notes || '';
+        const metaMatch = notesStr.match(/^\{\"_meta\":true.*?\}/s);
+        if (metaMatch) {
+          const meta = JSON.parse(metaMatch[0]);
+          return meta.communication_channel || '';
+        }
+      } catch {}
+      return '';
+    })());
     field('Fecha salida a produccion', to);
 
     // Métodos de pago con ID
