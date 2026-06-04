@@ -1147,7 +1147,7 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
     if (sandboxCert) {
       doc.fontSize(8).fillColor('#F59E0B').text('  Sandbox: ', X, doc.y, { continued: true });
       doc.fillColor('#111827').text(sandboxCert.name || 'Certificacion Sandbox');
-      doc.fontSize(7).fillColor('#3B82F6').text(`    ${baseUrl}/uploads/${sandboxCert.file_path}`, X, doc.y, { link: `${baseUrl}/uploads/${sandboxCert.file_path}`, underline: true });
+      doc.fontSize(7).fillColor('#3B82F6').text(`    ${baseUrl}/uploads/${sandboxCert.file_path}`, X, doc.y, { link: `${baseUrl}/uploads/${sandboxCert.file_path}` });
       doc.y += 12;
     } else if (integrationPartner) {
       doc.fontSize(8).fillColor('#F59E0B').text('  Sandbox: ', X, doc.y, { continued: true });
@@ -1161,7 +1161,7 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
     if (prodCert) {
       doc.fontSize(8).fillColor('#10B981').text('  Produccion: ', X, doc.y, { continued: true });
       doc.fillColor('#111827').text(prodCert.name || 'Certificacion Produccion');
-      doc.fontSize(7).fillColor('#3B82F6').text(`    ${baseUrl}/uploads/${prodCert.file_path}`, X, doc.y, { link: `${baseUrl}/uploads/${prodCert.file_path}`, underline: true });
+      doc.fontSize(7).fillColor('#3B82F6').text(`    ${baseUrl}/uploads/${prodCert.file_path}`, X, doc.y, { link: `${baseUrl}/uploads/${prodCert.file_path}` });
       doc.y += 12;
     } else {
       doc.fontSize(8).fillColor('#6B7280').text('  Produccion: No disponible', X, doc.y);

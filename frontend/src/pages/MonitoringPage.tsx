@@ -190,7 +190,7 @@ export default function MonitoringPage() {
               }}
               className="btn-secondary flex items-center gap-2"
             >
-              <FileText className="w-4 h-4" /> PDF
+              <FileText className="w-4 h-4" /> Monitoreo
             </button>
             </>
           )}
