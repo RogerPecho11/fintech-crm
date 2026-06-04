@@ -1150,12 +1150,15 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
           doc.fontSize(7).fillColor('#3B82F6').text('    Pay-In:', X, doc.y); doc.y += 10;
           pc.pay_in.forEach((m: any) => {
             if (doc.y > 750) doc.addPage();
-            const comm = m.commission ? `Com: ${m.commission}%` : '';
-            const fee = m.fee ? `Fee: ${m.fee}` : '';
-            const minFee = m.min_fee ? `Min: ${m.min_fee}` : '';
-            const cur = m.currency || '';
-            const detail = [comm, fee, minFee, cur].filter(Boolean).join(' | ');
-            doc.fontSize(7).fillColor('#374151').text(`      ${m.method_name || 'N/A'}: ${detail || 'Sin datos'}`, X, doc.y);
+            const parts: string[] = [];
+            if (m.commission) parts.push(`${m.commission}%`);
+            if (m.tarifa_td) parts.push(`TD: ${m.tarifa_td}%`);
+            if (m.tarifa_tc) parts.push(`TC: ${m.tarifa_tc}%`);
+            if (m.tarifa_tf) parts.push(`TF: ${m.tarifa_tf}`);
+            if (m.fee) parts.push(`Fee: ${m.fee}`);
+            if (m.min_fee) parts.push(`Min: ${m.min_fee}`);
+            const detail = parts.length > 0 ? parts.join(' | ') : 'Sin tarifa';
+            doc.fontSize(7).fillColor('#374151').text(`      ${m.method_name || 'N/A'}: ${detail}`, X, doc.y);
             doc.y += 10;
           });
         }
@@ -1163,10 +1166,12 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
           doc.fontSize(7).fillColor('#8B5CF6').text('    Pay-Out:', X, doc.y); doc.y += 10;
           pc.pay_out.forEach((m: any) => {
             if (doc.y > 750) doc.addPage();
-            const comm = m.commission ? `Com: ${m.commission}%` : '';
-            const fee = m.fee ? `Fee: ${m.fee}` : '';
-            const detail = [comm, fee, m.currency].filter(Boolean).join(' | ');
-            doc.fontSize(7).fillColor('#374151').text(`      ${m.method_name || 'N/A'}: ${detail || 'Sin datos'}`, X, doc.y);
+            const parts: string[] = [];
+            if (m.commission) parts.push(`${m.commission}%`);
+            if (m.fee) parts.push(`Fee: ${m.fee}`);
+            if (m.min_fee) parts.push(`Min: ${m.min_fee}`);
+            const detail = parts.length > 0 ? parts.join(' | ') : 'Sin tarifa';
+            doc.fontSize(7).fillColor('#374151').text(`      ${m.method_name || 'N/A'}: ${detail}`, X, doc.y);
             doc.y += 10;
           });
         }
