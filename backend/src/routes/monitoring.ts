@@ -1067,16 +1067,55 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
     field('Fecha salida a produccion', to);
 
     // Métodos de pago con ID
+    // Métodos de pago - agrupados por nombre, sin duplicados
     doc.moveDown(0.3);
     doc.fontSize(8).fillColor('#6B7280').text('Metodos de pago:', X, doc.y);
     doc.y += 14;
-    const payinList = (payinGateways as any[]).map(g => `${g.name} (ID:${g.config_id})`).join(', ') || '-';
-    const payoutList = (payoutGateways as any[]).map(g => `${g.name} (ID:${g.config_id})`).join(', ') || '-';
-    doc.fontSize(8).fillColor('#3B82F6').text('  Pay-In: ', X, doc.y, { continued: true });
-    doc.fillColor('#111827').text(payinList);
+
+    // Agrupar Pay-In por nombre
+    const payinGrouped = new Map<string, number[]>();
+    (payinGateways as any[]).forEach(g => {
+      const name = g.name || 'Sin nombre';
+      if (!payinGrouped.has(name)) payinGrouped.set(name, []);
+      payinGrouped.get(name)!.push(g.config_id);
+    });
+
+    // Agrupar Pay-Out por nombre
+    const payoutGrouped = new Map<string, number[]>();
+    (payoutGateways as any[]).forEach(g => {
+      const name = g.name || 'Sin nombre';
+      if (!payoutGrouped.has(name)) payoutGrouped.set(name, []);
+      payoutGrouped.get(name)!.push(g.config_id);
+    });
+
+    doc.fontSize(8).fillColor('#3B82F6').text('  Pay-In:', X, doc.y);
+    doc.y += 12;
+    if (payinGrouped.size > 0) {
+      payinGrouped.forEach((ids, name) => {
+        if (doc.y > 750) doc.addPage();
+        const idStr = ids.length === 1 ? `ID:${ids[0]}` : `IDs: ${ids.join(', ')}`;
+        doc.fontSize(7).fillColor('#374151').text(`    - ${name} (${idStr})`, X, doc.y);
+        doc.y += 11;
+      });
+    } else {
+      doc.fontSize(7).fillColor('#6B7280').text('    Sin pasarelas activas', X, doc.y);
+      doc.y += 11;
+    }
+
     doc.moveDown(0.3);
-    doc.fontSize(8).fillColor('#8B5CF6').text('  Pay-Out: ', X, doc.y, { continued: true });
-    doc.fillColor('#111827').text(payoutList);
+    doc.fontSize(8).fillColor('#8B5CF6').text('  Pay-Out:', X, doc.y);
+    doc.y += 12;
+    if (payoutGrouped.size > 0) {
+      payoutGrouped.forEach((ids, name) => {
+        if (doc.y > 750) doc.addPage();
+        const idStr = ids.length === 1 ? `ID:${ids[0]}` : `IDs: ${ids.join(', ')}`;
+        doc.fontSize(7).fillColor('#374151').text(`    - ${name} (${idStr})`, X, doc.y);
+        doc.y += 11;
+      });
+    } else {
+      doc.fontSize(7).fillColor('#6B7280').text('    Sin pasarelas activas', X, doc.y);
+      doc.y += 11;
+    }
     doc.moveDown(0.8);
 
     // ─── Certificaciones (links a documentos subidos) ───
