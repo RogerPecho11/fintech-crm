@@ -1093,8 +1093,7 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
     if (payinGrouped.size > 0) {
       payinGrouped.forEach((ids, name) => {
         if (doc.y > 750) doc.addPage();
-        const idStr = ids.length === 1 ? `ID:${ids[0]}` : `IDs: ${ids.join(', ')}`;
-        doc.fontSize(7).fillColor('#374151').text(`    - ${name} (${idStr})`, X, doc.y);
+        doc.fontSize(7).fillColor('#374151').text(`    - ${name}`, X, doc.y);
         doc.y += 11;
       });
     } else {
@@ -1108,8 +1107,7 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
     if (payoutGrouped.size > 0) {
       payoutGrouped.forEach((ids, name) => {
         if (doc.y > 750) doc.addPage();
-        const idStr = ids.length === 1 ? `ID:${ids[0]}` : `IDs: ${ids.join(', ')}`;
-        doc.fontSize(7).fillColor('#374151').text(`    - ${name} (${idStr})`, X, doc.y);
+        doc.fontSize(7).fillColor('#374151').text(`    - ${name}`, X, doc.y);
         doc.y += 11;
       });
     } else {
