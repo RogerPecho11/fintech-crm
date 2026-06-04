@@ -25,6 +25,7 @@ export const AVAILABLE_COUNTRIES: Country[] = [
   { code: 'CR', name: 'Costa Rica', flag: '🇨🇷', currency: 'Colón', currencyCode: 'CRC', phonePrefix: '+506' },
   { code: 'CU', name: 'Cuba', flag: '🇨🇺', currency: 'Peso Cubano', currencyCode: 'CUP', phonePrefix: '+53' },
   { code: 'CW', name: 'Curazao', flag: '🇨🇼', currency: 'Florín', currencyCode: 'ANG', phonePrefix: '+599' },
+  { code: 'BZ', name: 'Belice', flag: '🇧🇿', currency: 'Dólar Beliceño', currencyCode: 'BZD', phonePrefix: '+501' },
   { code: 'DO', name: 'Rep. Dominicana', flag: '🇩🇴', currency: 'Peso Dominicano', currencyCode: 'DOP', phonePrefix: '+1' },
   { code: 'GT', name: 'Guatemala', flag: '🇬🇹', currency: 'Quetzal', currencyCode: 'GTQ', phonePrefix: '+502' },
   { code: 'HN', name: 'Honduras', flag: '🇭🇳', currency: 'Lempira', currencyCode: 'HNL', phonePrefix: '+504' },
