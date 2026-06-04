@@ -1129,7 +1129,9 @@ router.get('/acta-entrega-pdf', async (req: AuthenticatedRequest, res: Response)
 
     // ─── Certificaciones (links a documentos subidos) ───
     section('Certificaciones');
-    const baseUrl = process.env.FRONTEND_URL || 'https://crm-onboarding.online';
+    const baseUrl = (process.env.FRONTEND_URL && !process.env.FRONTEND_URL.includes('localhost')) 
+      ? process.env.FRONTEND_URL 
+      : 'https://crm-onboarding.online';
     if (sandboxCert) {
       doc.fontSize(8).fillColor('#F59E0B').text('  Sandbox: ', X, doc.y, { continued: true });
       doc.fillColor('#111827').text(sandboxCert.name || 'Certificacion Sandbox');
