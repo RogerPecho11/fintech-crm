@@ -7,7 +7,7 @@ import { SlaConfigEntry } from '../types';
 import { getStatuses, getRiskLevels } from '../lib/config';
 import toast from 'react-hot-toast';
 
-type TabKey = 'merchant_status' | 'risk_level' | 'task_priority' | 'global' | 'risk_score';
+type TabKey = 'merchant_status' | 'risk_level' | 'task_priority' | 'global' | 'risk_score' | 'alerts';
 
 const TAB_LABELS: Record<TabKey, string> = {
   merchant_status: 'SLA por Estado',
@@ -15,6 +15,7 @@ const TAB_LABELS: Record<TabKey, string> = {
   task_priority:   'SLA por Prioridad de Tarea',
   global:          'Umbral de Alerta',
   risk_score:      'Score de Riesgo',
+  alerts:          'Alertas Monitoreo',
 };
 
 const PRIORITY_LABELS: Record<string, string> = {
@@ -180,7 +181,9 @@ export default function SlaPanel() {
 
       {/* Tab content */}
       <div className="space-y-3">
-        {activeTab === 'risk_score' ? (
+        {activeTab === 'alerts' ? (
+          <AlertConfig />
+        ) : activeTab === 'risk_score' ? (
           // Score de Riesgo — editable
           <RiskScoreConfig />
         ) : activeTab === 'global' ? (
@@ -397,6 +400,91 @@ function RiskScoreConfig() {
         <button onClick={handleSave} disabled={saving} className="btn-primary flex items-center gap-2 text-sm disabled:opacity-50">
           {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
           Guardar Score de Riesgo
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
+// ─── Componente: Configuración de Alertas de Monitoreo ───────────────────────
+function AlertConfig() {
+  const [config, setConfig] = useState({ inactivity_hours: '3', drop_percentage: '40' });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    api.get('/config/alert-config').then(res => {
+      setConfig({
+        inactivity_hours: String(res.data.inactivity_hours || 3),
+        drop_percentage: String(res.data.drop_percentage || 40),
+      });
+    }).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await api.put('/config/alert-config', {
+        inactivity_hours: parseInt(config.inactivity_hours) || 3,
+        drop_percentage: parseInt(config.drop_percentage) || 40,
+      });
+      toast.success('Configuracion de alertas guardada');
+    } catch {
+      toast.error('Error al guardar');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div>;
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-gray-500">
+        Configura los umbrales de las alertas que aparecen en el Monitoreo de Transacciones.
+      </p>
+
+      <div className="border border-gray-100 rounded-xl p-4 space-y-4">
+        <div>
+          <label className="text-sm font-medium text-gray-700 block mb-1">Horas de inactividad para alerta</label>
+          <p className="text-xs text-gray-400 mb-2">Si un metodo de pago no tiene transacciones en este tiempo, se muestra alerta.</p>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={1}
+              max={168}
+              className="input w-24 text-sm"
+              value={config.inactivity_hours}
+              onChange={e => setConfig(prev => ({ ...prev, inactivity_hours: e.target.value }))}
+            />
+            <span className="text-sm text-gray-500">horas</span>
+            <span className="text-xs text-gray-400 ml-2">(actual: {config.inactivity_hours}h)</span>
+          </div>
+        </div>
+
+        <div>
+          <label className="text-sm font-medium text-gray-700 block mb-1">Porcentaje de error para alerta de caida</label>
+          <p className="text-xs text-gray-400 mb-2">Si un metodo tiene mas de este % de errores en la ultima hora, se muestra alerta.</p>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={10}
+              max={100}
+              className="input w-24 text-sm"
+              value={config.drop_percentage}
+              onChange={e => setConfig(prev => ({ ...prev, drop_percentage: e.target.value }))}
+            />
+            <span className="text-sm text-gray-500">%</span>
+            <span className="text-xs text-gray-400 ml-2">(actual: {config.drop_percentage}%)</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <button onClick={handleSave} disabled={saving} className="btn-primary flex items-center gap-2 text-sm disabled:opacity-50">
+          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+          Guardar Alertas
         </button>
       </div>
     </div>

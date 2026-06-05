@@ -17,6 +17,28 @@ router.get('/', async (_req: AuthenticatedRequest, res: Response) => {
   res.json(config);
 });
 
+// ─── GET /api/v1/config/alert-config — Configuración de alertas ───────────
+router.get('/alert-config', async (_req: AuthenticatedRequest, res: Response) => {
+  const row = await queryOne('SELECT value FROM app_config WHERE key = $1', ['alert_config']);
+  if (!row) {
+    return res.json({ inactivity_hours: 3, drop_percentage: 40 });
+  }
+  res.json(row.value);
+});
+
+// ─── PUT /api/v1/config/alert-config — Guardar configuración de alertas ──────
+router.put('/alert-config', authorize('admin', 'onboarding'), async (req: AuthenticatedRequest, res: Response) => {
+  const value = req.body;
+  const user = req.user!;
+  await query(
+    `INSERT INTO app_config (key, value, updated_by, updated_at)
+     VALUES ($1, $2, $3, NOW())
+     ON CONFLICT (key) DO UPDATE SET value = $2, updated_by = $3, updated_at = NOW()`,
+    ['alert_config', JSON.stringify(value), user.id]
+  );
+  res.json({ message: 'Configuración de alertas guardada', value });
+});
+
 // ─── GET /api/v1/config/risk-scores — Score de riesgo configurable ───────────
 router.get('/risk-scores', async (_req: AuthenticatedRequest, res: Response) => {
   const row = await queryOne('SELECT value FROM app_config WHERE key = $1', ['risk_scores']);

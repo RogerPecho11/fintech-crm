@@ -215,17 +215,29 @@ router.get('/alerts', async (req: AuthenticatedRequest, res: Response) => {
     const cached = getCached(cacheKey);
     if (cached) return res.json(cached);
 
-    // Inactividad: métodos sin transacciones en últimas 3 horas
+    // Leer configuración de alertas desde app_config
+    let alertHours = 3;
+    let alertDropPct = 40;
+    try {
+      const alertConfig = await pgQuery('SELECT value FROM app_config WHERE key = $1', ['alert_config']);
+      if (alertConfig[0]?.value) {
+        const cfg = alertConfig[0].value;
+        if (cfg.inactivity_hours) alertHours = Number(cfg.inactivity_hours);
+        if (cfg.drop_percentage) alertDropPct = Number(cfg.drop_percentage);
+      }
+    } catch { /* usar defaults */ }
+
+    // Inactividad: métodos sin transacciones en últimas N horas
     const inactivitySql = `SELECT method, MAX(created_at) as ultima_transaccion,
       TIMESTAMPDIFF(HOUR, MAX(created_at), NOW()) as horas_inactivo
       FROM payment
       WHERE commerce_id = ? AND deleted_at IS NULL AND method IS NOT NULL
-      AND created_at >= DATE_SUB(NOW(), INTERVAL 48 HOUR)
+      AND created_at >= DATE_SUB(NOW(), INTERVAL 72 HOUR)
       GROUP BY method
-      HAVING horas_inactivo >= 3
+      HAVING horas_inactivo >= ${alertHours}
       ORDER BY horas_inactivo DESC`;
 
-    // Caídas: tasa error > 40% en última hora
+    // Caídas: tasa error > N% en última hora
     const dropSql = `SELECT method,
       COUNT(*) as total,
       SUM(CASE WHEN status IN ('error','bank_error','authentication_error','rejected') THEN 1 ELSE 0 END) as errores,
@@ -234,7 +246,7 @@ router.get('/alerts', async (req: AuthenticatedRequest, res: Response) => {
       WHERE commerce_id = ? AND deleted_at IS NULL AND method IS NOT NULL
       AND created_at >= DATE_SUB(NOW(), INTERVAL 1 HOUR)
       GROUP BY method
-      HAVING total >= 3 AND tasa_error > 40
+      HAVING total >= 3 AND tasa_error > ${alertDropPct}
       ORDER BY tasa_error DESC`;
 
     const [inactivity, drops] = await Promise.all([
