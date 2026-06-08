@@ -117,7 +117,7 @@ export default function CertificationForm({ merchant, onClose }: Props) {
   });
 
   const commercials = (users || []).filter(u => u.role === 'commercial');
-  const onboardingUsers = (users || []).filter(u => u.role === 'onboarding');
+  const onboardingUsers = (users || []).filter(u => u.role === 'onboarding' || u.role === 'admin');
 
   const [form, setForm] = useState({
     review_date: new Date().toISOString().split('T')[0],
