@@ -946,7 +946,7 @@ router.get('/gateway-dashboard-export', async (req: AuthenticatedRequest, res: R
     }
 
     const payinSql = `SELECT c.id as commerce_id, c.name as commerce_name, c.country,
-      gp.name as gateway_name, cg.status as gateway_status
+      gp.name as gateway_name, gp.id as gateway_id, cg.status as gateway_status
       FROM commerce_gateway cg
       JOIN commerce c ON c.id = cg.commerce_id
       LEFT JOIN gateway_payment gp ON gp.id = cg.gateway_payment_id
@@ -954,7 +954,7 @@ router.get('/gateway-dashboard-export', async (req: AuthenticatedRequest, res: R
       ORDER BY c.name, gp.name`;
 
     const payoutSql = `SELECT c.id as commerce_id, c.name as commerce_name, c.country,
-      gw.name as gateway_name, cgw.status as gateway_status
+      gw.name as gateway_name, gw.id as gateway_id, cgw.status as gateway_status
       FROM commerce_gateway_withdrawal cgw
       JOIN commerce c ON c.id = cgw.commerce_id
       LEFT JOIN gateway_withdrawal gw ON gw.id = cgw.gateway_withdrawal_id
@@ -972,13 +972,13 @@ router.get('/gateway-dashboard-export', async (req: AuthenticatedRequest, res: R
       if (!commerceMap.has(r.commerce_id)) {
         commerceMap.set(r.commerce_id, { id: r.commerce_id, name: r.commerce_name, country: r.country, payin: [], payout: [] });
       }
-      commerceMap.get(r.commerce_id).payin.push({ gateway: r.gateway_name, status: r.gateway_status });
+      commerceMap.get(r.commerce_id).payin.push({ gateway: r.gateway_name, gateway_id: r.gateway_id, status: r.gateway_status });
     });
     (payoutData as any[]).forEach((r: any) => {
       if (!commerceMap.has(r.commerce_id)) {
         commerceMap.set(r.commerce_id, { id: r.commerce_id, name: r.commerce_name, country: r.country, payin: [], payout: [] });
       }
-      commerceMap.get(r.commerce_id).payout.push({ gateway: r.gateway_name, status: r.gateway_status });
+      commerceMap.get(r.commerce_id).payout.push({ gateway: r.gateway_name, gateway_id: r.gateway_id, status: r.gateway_status });
     });
 
     // Aplicar filtros
@@ -1048,8 +1048,8 @@ router.get('/gateway-dashboard-export', async (req: AuthenticatedRequest, res: R
         id: c.id,
         name: c.name,
         country: c.country || '—',
-        payin: payinFiltered.map((g: any) => g.gateway).join(', ') || '—',
-        payout: payoutFiltered.map((g: any) => g.gateway).join(', ') || '—',
+        payin: payinFiltered.map((g: any) => `${g.gateway} #${g.gateway_id || ''}`).join(', ') || '—',
+        payout: payoutFiltered.map((g: any) => `${g.gateway} #${g.gateway_id || ''}`).join(', ') || '—',
         payin_count: payinFiltered.length,
         payout_count: payoutFiltered.length,
       });
