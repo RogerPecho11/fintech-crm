@@ -1102,8 +1102,8 @@ router.get('/gateway-dashboard', async (req: AuthenticatedRequest, res: Response
     }
 
     // Pay In: pasarelas activas por comercio
-    const payinSql = `SELECT c.id as commerce_id, c.name as commerce_name, c.country,
-      gp.name as gateway_name, cg.status as gateway_status, cg.created_at
+    const payinSql = `SELECT c.id as commerce_id, c.name as commerce_name, c.country, c.enabled,
+      gp.name as gateway_name, gp.id as gateway_id, cg.status as gateway_status, cg.created_at
       FROM commerce_gateway cg
       JOIN commerce c ON c.id = cg.commerce_id
       LEFT JOIN gateway_payment gp ON gp.id = cg.gateway_payment_id
@@ -1111,8 +1111,8 @@ router.get('/gateway-dashboard', async (req: AuthenticatedRequest, res: Response
       ORDER BY c.name, gp.name`;
 
     // Pay Out: pasarelas activas por comercio
-    const payoutSql = `SELECT c.id as commerce_id, c.name as commerce_name, c.country,
-      gw.name as gateway_name, cgw.status as gateway_status, cgw.created_at
+    const payoutSql = `SELECT c.id as commerce_id, c.name as commerce_name, c.country, c.enabled,
+      gw.name as gateway_name, gw.id as gateway_id, cgw.status as gateway_status, cgw.created_at
       FROM commerce_gateway_withdrawal cgw
       JOIN commerce c ON c.id = cgw.commerce_id
       LEFT JOIN gateway_withdrawal gw ON gw.id = cgw.gateway_withdrawal_id
@@ -1133,12 +1133,14 @@ router.get('/gateway-dashboard', async (req: AuthenticatedRequest, res: Response
           id: r.commerce_id,
           name: r.commerce_name,
           country: r.country,
+          enabled: r.enabled,
           payin: [],
           payout: [],
         });
       }
       commerceMap.get(r.commerce_id).payin.push({
         gateway: r.gateway_name,
+        gateway_id: r.gateway_id,
         status: r.gateway_status,
         created_at: r.created_at,
       });
@@ -1150,12 +1152,14 @@ router.get('/gateway-dashboard', async (req: AuthenticatedRequest, res: Response
           id: r.commerce_id,
           name: r.commerce_name,
           country: r.country,
+          enabled: r.enabled,
           payin: [],
           payout: [],
         });
       }
       commerceMap.get(r.commerce_id).payout.push({
         gateway: r.gateway_name,
+        gateway_id: r.gateway_id,
         status: r.gateway_status,
         created_at: r.created_at,
       });

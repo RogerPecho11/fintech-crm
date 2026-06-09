@@ -290,10 +290,10 @@ router.patch('/:id/status',
       }
     }
 
-    // ── Regla: comercio ya finalizado — no se puede cambiar estado ────────
-    if (isFinalized(existing.status)) {
+    // ── Regla: comercio ya finalizado — solo admin puede reabrir ────────
+    if (isFinalized(existing.status) && user.role !== 'admin') {
       return res.status(403).json({
-        error: 'Este comercio está finalizado. No se puede cambiar su estado.',
+        error: 'Este comercio está finalizado. Solo un administrador puede reabrir.',
         code: 'MERCHANT_FINALIZED',
       });
     }

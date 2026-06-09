@@ -223,6 +223,14 @@ export default function MerchantDetailPage() {
               Cambiar Estado
             </button>
           )}
+          {isFinalized && user?.role === 'admin' && (
+            <button
+              onClick={() => { setNewStatus('lead'); setStatusModal(true); }}
+              className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg border border-orange-200 text-orange-700 hover:bg-orange-50 transition-colors"
+            >
+              Reabrir Comercio
+            </button>
+          )}
           {canEdit && !isFinalized && (
             <Link to={`/merchants/${id}/edit`} className="btn-primary flex items-center gap-2 text-sm">
               <Edit className="w-4 h-4" />

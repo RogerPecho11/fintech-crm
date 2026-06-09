@@ -943,6 +943,7 @@ function GatewayDashboard() {
   const [search, setSearch] = useState('');
   const [gatewayFilter, setGatewayFilter] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState(''); // 'active', 'inactive', ''
+  const [commerceStatusFilter, setCommerceStatusFilter] = useState(''); // 'enabled', 'disabled', ''
   const [applied, setApplied] = useState(false); // controla si se aplicó el filtro
 
   const fetchData = async () => {
@@ -999,6 +1000,10 @@ function GatewayDashboard() {
       const allInactive = allGws.every((g: any) => g.status !== 'active' && g.status !== '1' && g.status !== 1);
       if (!allInactive) return false;
     }
+
+    // Filtro por comercio habilitado/deshabilitado
+    if (commerceStatusFilter === 'enabled' && !c.enabled) return false;
+    if (commerceStatusFilter === 'disabled' && c.enabled) return false;
 
     return true;
   });
@@ -1109,11 +1114,19 @@ function GatewayDashboard() {
           />
         </div>
         <div>
-          <label className="text-xs text-gray-500 block mb-1">Estado</label>
+          <label className="text-xs text-gray-500 block mb-1">Estado Pasarela</label>
           <select className="input text-sm" value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setApplied(false); }}>
             <option value="">Todos</option>
             <option value="active">Activos</option>
             <option value="inactive">Desactivados</option>
+          </select>
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Comercio</label>
+          <select className="input text-sm" value={commerceStatusFilter} onChange={e => { setCommerceStatusFilter(e.target.value); setApplied(false); }}>
+            <option value="">Todos</option>
+            <option value="enabled">Habilitados</option>
+            <option value="disabled">Deshabilitados</option>
           </select>
         </div>
         <div className="flex-1 min-w-[150px]">
@@ -1201,7 +1214,7 @@ function GatewayDashboard() {
                             ? 'bg-green-100 text-green-700'
                             : 'bg-gray-100 text-gray-500'
                         }`}>
-                          {g.gateway || 'N/A'}
+                          {g.gateway || 'N/A'}{g.gateway_id ? ` #${g.gateway_id}` : ''}
                         </span>
                       ))}
                       {gatewayFilter.length > 0 && c.payin.filter((g: any) => gatewayFilter.includes(g.gateway)).length === 0 && (
@@ -1221,7 +1234,7 @@ function GatewayDashboard() {
                             ? 'bg-purple-100 text-purple-700'
                             : 'bg-gray-100 text-gray-500'
                         }`}>
-                          {g.gateway || 'N/A'}
+                          {g.gateway || 'N/A'}{g.gateway_id ? ` #${g.gateway_id}` : ''}
                         </span>
                       ))}
                       {gatewayFilter.length > 0 && c.payout.filter((g: any) => gatewayFilter.includes(g.gateway)).length === 0 && (
