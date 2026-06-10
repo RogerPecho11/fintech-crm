@@ -3,14 +3,16 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Globe, RefreshCw, TrendingUp, TrendingDown, AlertTriangle, Zap, DollarSign, Activity, Calendar, Filter } from 'lucide-react';
 import api from '../lib/api';
 import toast from 'react-hot-toast';
+import MultiSelect from '../components/MultiSelect';
+import type { MultiSelectOption } from '../components/MultiSelect';
 
 const PIE_COLORS = ['#10B981', '#EF4444', '#F59E0B', '#F97316', '#6B7280'];
 
 export default function WorldMonitoringPage() {
   const [dateFrom] = useState('2026-06-08');
   const [dateTo, setDateTo] = useState(() => new Date().toISOString().slice(0, 10));
-  const [commerceIds, setCommerceIds] = useState('');
-  const [gatewayFilter, setGatewayFilter] = useState('');
+  const [commerceIds, setCommerceIds] = useState<string[]>([]);
+  const [gatewayFilter, setGatewayFilter] = useState<string[]>([]);
   const [overview, setOverview] = useState<any>(null);
   const [timeline, setTimeline] = useState<any[]>([]);
   const [topCommerces, setTopCommerces] = useState<{ payin: any[]; payout: any[] }>({ payin: [], payout: [] });
@@ -19,17 +21,26 @@ export default function WorldMonitoringPage() {
   const [errors, setErrors] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(0);
-  const [methods, setMethods] = useState<string[]>([]);
-  const [commerceList, setCommerceList] = useState<any[]>([]);
+  const [gatewayOptions, setGatewayOptions] = useState<MultiSelectOption[]>([]);
+  const [commerceOptions, setCommerceOptions] = useState<MultiSelectOption[]>([]);
 
   // Cargar pasarelas y comercios disponibles
   useEffect(() => {
     api.get('/transactions/gateways').then(r => {
-      const gws = (r.data || []).map((g: any) => g.name).filter(Boolean) as string[];
-      setMethods(gws.sort());
+      const gws = (r.data || []).filter((g: any) => g.name);
+      const opts: MultiSelectOption[] = gws.map((g: any) => ({
+        value: g.name,
+        label: `[${g.id}] ${g.name} (${g.type === 'payin' ? 'Pay In' : 'Pay Out'})`,
+      }));
+      setGatewayOptions(opts.sort((a, b) => a.label.localeCompare(b.label)));
     }).catch(() => {});
     api.get('/transactions/commerces').then(r => {
-      setCommerceList(r.data || []);
+      const list = r.data || [];
+      const opts: MultiSelectOption[] = list.map((c: any) => ({
+        value: String(c.id),
+        label: `${c.name} (${c.country || 'N/A'})`,
+      }));
+      setCommerceOptions(opts);
     }).catch(() => {});
   }, []);
 
@@ -37,8 +48,8 @@ export default function WorldMonitoringPage() {
     setLoading(true);
     try {
       const params: any = { period: '24h' };
-      if (commerceIds) params.commerce_ids = commerceIds;
-      if (gatewayFilter) params.gateway = gatewayFilter;
+      if (commerceIds.length) params.commerce_ids = commerceIds.join(',');
+      if (gatewayFilter.length) params.gateway = gatewayFilter.join(',');
 
       const [ov, tl, cmPi, cmPo, gwPi, gwPo, ct, er] = await Promise.all([
         api.get('/world-monitoring/overview', { params }),
@@ -105,18 +116,22 @@ export default function WorldMonitoringPage() {
             <input type="date" className="input text-sm" value={dateTo} onChange={e => setDateTo(e.target.value)} />
           </div>
           <div className="flex-1 min-w-[200px]">
-            <label className="text-xs text-gray-500 block mb-1">Pasarela</label>
-            <select className="input text-sm w-full" value={gatewayFilter} onChange={e => setGatewayFilter(e.target.value)}>
-              <option value="">Todas las pasarelas</option>
-              {methods.map(m => <option key={m} value={m}>{m}</option>)}
-            </select>
+            <label className="text-xs text-gray-500 block mb-1">Pasarelas</label>
+            <MultiSelect
+              options={gatewayOptions}
+              selected={gatewayFilter}
+              onChange={setGatewayFilter}
+              placeholder="Todas las pasarelas"
+            />
           </div>
           <div className="flex-1 min-w-[200px]">
-            <label className="text-xs text-gray-500 block mb-1">Comercio</label>
-            <select className="input text-sm w-full" value={commerceIds} onChange={e => setCommerceIds(e.target.value)}>
-              <option value="">Todos los comercios</option>
-              {commerceList.map((c: any) => <option key={c.id} value={String(c.id)}>{c.name} ({c.country})</option>)}
-            </select>
+            <label className="text-xs text-gray-500 block mb-1">Comercios</label>
+            <MultiSelect
+              options={commerceOptions}
+              selected={commerceIds}
+              onChange={setCommerceIds}
+              placeholder="Todos los comercios"
+            />
           </div>
         </div>
       </div>

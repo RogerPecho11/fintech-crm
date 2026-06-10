@@ -83,29 +83,21 @@ router.get('/gateways', async (_req: AuthenticatedRequest, res: Response) => {
     const cached = getCached(cacheKey);
     if (cached) return res.json(cached);
 
-    // Obtener pasarelas Pay In (gateway_payment) y Pay Out (gateway_withdrawal)
     const [payinGateways, payoutGateways] = await Promise.all([
       mysqlQuery(
-        `SELECT DISTINCT gp.name
-         FROM gateway_payment gp
-         WHERE gp.name IS NOT NULL AND gp.name != ''
-         ORDER BY gp.name ASC`
+        `SELECT id, name FROM gateway_payment WHERE name IS NOT NULL AND name != '' ORDER BY name ASC`
       ),
       mysqlQuery(
-        `SELECT DISTINCT gw.name
-         FROM gateway_withdrawal gw
-         WHERE gw.name IS NOT NULL AND gw.name != ''
-         ORDER BY gw.name ASC`
+        `SELECT id, name FROM gateway_withdrawal WHERE name IS NOT NULL AND name != '' ORDER BY name ASC`
       ),
     ]);
 
-    // Unificar nombres únicos
-    const allNames = new Set<string>();
-    (payinGateways as any[]).forEach((g: any) => allNames.add(g.name));
-    (payoutGateways as any[]).forEach((g: any) => allNames.add(g.name));
+    const gateways = [
+      ...(payinGateways as any[]).map(g => ({ id: g.id, name: g.name, type: 'payin' })),
+      ...(payoutGateways as any[]).map(g => ({ id: g.id, name: g.name, type: 'payout' })),
+    ];
 
-    const gateways = [...allNames].sort().map(name => ({ name }));
-    setCache(cacheKey, gateways, MysqlCache.TTL_STATIC); // 30 min
+    setCache(cacheKey, gateways, MysqlCache.TTL_STATIC);
     res.json(gateways);
   } catch (err: any) {
     console.error('[Transactions] Error fetching gateways:', err.message);

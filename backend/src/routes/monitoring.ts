@@ -21,6 +21,21 @@ const COUNTRY_CURRENCY: Record<string, string> = {
   'PE': 'PEN', 'CL': 'CLP', 'EC': 'USD', 'BR': 'BRL', 'MX': 'MXN', 'CO': 'COP', 'AR': 'ARS',
 };
 
+// Helper: parsear commerce_id que puede ser un solo ID o múltiples separados por coma
+function parseCommerceIds(commerce_id: string): number[] {
+  return commerce_id.split(',').map(Number).filter(n => !isNaN(n) && n > 0);
+}
+
+// Helper: construir filtro de gateway para queries
+function buildGatewayClause(gateway: string | undefined, payinCol = 'method', payoutCol = 'type'): { payinGw: string; payoutGw: string } {
+  if (!gateway) return { payinGw: '', payoutGw: '' };
+  const gws = gateway.split(',').map(g => "'" + g.trim().replace(/'/g, "''") + "'");
+  return {
+    payinGw: ` AND ${payinCol} IN (${gws.join(',')})`,
+    payoutGw: ` AND ${payoutCol} IN (${gws.join(',')})`,
+  };
+}
+
 // ─── GET /countries — países disponibles
 router.get('/countries', async (_req: AuthenticatedRequest, res: Response) => {
   try {
@@ -65,8 +80,11 @@ router.get('/commerces', async (req: AuthenticatedRequest, res: Response) => {
 // ─── GET /daily-volume — Volumen diario payin/payout por comercio
 router.get('/daily-volume', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { date_from, date_to, commerce_id } = req.query as any;
+    const { date_from, date_to, commerce_id, gateway } = req.query as any;
     if (!commerce_id) return res.json({ payin: [], payout: [], currency: 'USD' });
+
+    const cids = parseCommerceIds(commerce_id);
+    if (!cids.length) return res.json({ payin: [], payout: [], currency: 'USD' });
 
     const rawFrom = date_from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const rawTo = date_to || new Date().toISOString().slice(0, 10);
@@ -80,41 +98,39 @@ router.get('/daily-volume', async (req: AuthenticatedRequest, res: Response) => 
       : rawFrom;
     const to = rawTo;
 
-    const cacheKey = `daily-vol:${from}:${to}:${commerce_id}`;
+    const cacheKey = `daily-vol:${from}:${to}:${cids.join(',')}:${gateway || ''}`;
     const cached = getCached(cacheKey);
     if (cached) return res.json(cached);
 
-    const cid = Number(commerce_id);
+    const { payinGw, payoutGw } = buildGatewayClause(gateway);
+    const commerceInClause = cids.join(',');
 
-    // Obtener moneda de la pasarela activa del comercio
+    // Obtener moneda de la pasarela activa del primer comercio
     const gwCurRows = await mysqlQuery(
       `SELECT cur.isocode FROM commerce_gateway cg
        JOIN currency cur ON cur.id = cg.currency_id
        WHERE cg.commerce_id = ? AND cg.deleted_at IS NULL 
        AND (cg.status = 'active' OR cg.status = '1' OR cg.status = 1)
-       AND cur.isocode IS NOT NULL LIMIT 1`, [cid]
+       AND cur.isocode IS NOT NULL LIMIT 1`, [cids[0]]
     );
-    const commerceRows = await mysqlQuery(`SELECT country FROM commerce WHERE id = ? LIMIT 1`, [cid]);
+    const commerceRows = await mysqlQuery(`SELECT country FROM commerce WHERE id = ? LIMIT 1`, [cids[0]]);
     const country = commerceRows[0]?.country || '';
     const currency = gwCurRows[0]?.isocode || COUNTRY_CURRENCY[country?.toUpperCase()] || 'USD';
-
-    const dateParams = [from + ' 00:00:00', to + ' 23:59:59', cid];
 
     // Una sola query para payin agrupada por fecha — usa índice (commerce_id, created_at)
     const payinSql = `SELECT DATE(created_at) as fecha, COUNT(*) as cantidad, COALESCE(SUM(amount), 0) as monto
       FROM payment
-      WHERE commerce_id = ? AND deleted_at IS NULL AND created_at BETWEEN ? AND ?
+      WHERE commerce_id IN (${commerceInClause}) AND deleted_at IS NULL AND created_at BETWEEN ? AND ?${payinGw}
       GROUP BY DATE(created_at) ORDER BY fecha`;
 
     const payoutSql = `SELECT DATE(created_at) as fecha, COUNT(*) as cantidad, COALESCE(SUM(amount), 0) as monto
       FROM withdrawal
-      WHERE commerce_id = ? AND deleted_at IS NULL AND created_at BETWEEN ? AND ?
+      WHERE commerce_id IN (${commerceInClause}) AND deleted_at IS NULL AND created_at BETWEEN ? AND ?${payoutGw}
       GROUP BY DATE(created_at) ORDER BY fecha`;
 
-    // commerce_id primero en params para que use el índice
     const [payin, payout] = await Promise.all([
-      mysqlQuery(payinSql, [cid, from + ' 00:00:00', to + ' 23:59:59']),
-      mysqlQuery(payoutSql, [cid, from + ' 00:00:00', to + ' 23:59:59']),
+      mysqlQuery(payinSql, [from + ' 00:00:00', to + ' 23:59:59']),
+      mysqlQuery(payoutSql, [from + ' 00:00:00', to + ' 23:59:59']),
     ]);
 
     const result = { payin, payout, currency };
@@ -129,23 +145,28 @@ router.get('/daily-volume', async (req: AuthenticatedRequest, res: Response) => 
 // ─── GET /by-method — Volumen por método payin y payout con evolución diaria
 router.get('/by-method', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { date_from, date_to, commerce_id } = req.query as any;
+    const { date_from, date_to, commerce_id, gateway } = req.query as any;
     if (!commerce_id) return res.json({ payin: [], payout: [] });
+
+    const cids = parseCommerceIds(commerce_id);
+    if (!cids.length) return res.json({ payin: [], payout: [] });
 
     const from = date_from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const to = date_to || new Date().toISOString().slice(0, 10);
-    const cid = Number(commerce_id);
 
-    const cacheKey = `by-method:${from}:${to}:${cid}`;
+    const cacheKey = `by-method:${from}:${to}:${cids.join(',')}:${gateway || ''}`;
     const cached = getCached(cacheKey);
     if (cached) return res.json(cached);
+
+    const { payinGw, payoutGw } = buildGatewayClause(gateway);
+    const commerceInClause = cids.join(',');
 
     // Payin: volumen por método con evolución diaria
     const payinSql = `SELECT method, DATE(created_at) as fecha, COUNT(*) as cantidad, COALESCE(SUM(amount), 0) as monto,
       SUM(CASE WHEN status IN ('success','completed') THEN 1 ELSE 0 END) as aprobadas,
       SUM(CASE WHEN status IN ('error','canceled','expired','bank_error','authentication_error','rejected') THEN 1 ELSE 0 END) as rechazadas
       FROM payment
-      WHERE commerce_id = ? AND deleted_at IS NULL AND method IS NOT NULL AND created_at BETWEEN ? AND ?
+      WHERE commerce_id IN (${commerceInClause}) AND deleted_at IS NULL AND method IS NOT NULL AND created_at BETWEEN ? AND ?${payinGw}
       GROUP BY method, DATE(created_at) ORDER BY method, fecha`;
 
     // Payout: volumen por tipo con evolución diaria
@@ -153,12 +174,12 @@ router.get('/by-method', async (req: AuthenticatedRequest, res: Response) => {
       SUM(CASE WHEN status IN ('success','completed') THEN 1 ELSE 0 END) as aprobadas,
       SUM(CASE WHEN status IN ('error','canceled','expired','bank_error','rejected') THEN 1 ELSE 0 END) as rechazadas
       FROM withdrawal
-      WHERE commerce_id = ? AND deleted_at IS NULL AND type IS NOT NULL AND created_at BETWEEN ? AND ?
+      WHERE commerce_id IN (${commerceInClause}) AND deleted_at IS NULL AND type IS NOT NULL AND created_at BETWEEN ? AND ?${payoutGw}
       GROUP BY type, DATE(created_at) ORDER BY type, fecha`;
 
     const [payin, payout] = await Promise.all([
-      mysqlQuery(payinSql, [cid, from + ' 00:00:00', to + ' 23:59:59']),
-      mysqlQuery(payoutSql, [cid, from + ' 00:00:00', to + ' 23:59:59']),
+      mysqlQuery(payinSql, [from + ' 00:00:00', to + ' 23:59:59']),
+      mysqlQuery(payoutSql, [from + ' 00:00:00', to + ' 23:59:59']),
     ]);
 
     const result = { payin, payout };
@@ -173,16 +194,21 @@ router.get('/by-method', async (req: AuthenticatedRequest, res: Response) => {
 // ─── GET /approval-rate — Tasa de aprobación por método del comercio
 router.get('/approval-rate', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { date_from, date_to, commerce_id } = req.query as any;
+    const { date_from, date_to, commerce_id, gateway } = req.query as any;
     if (!commerce_id) return res.json([]);
+
+    const cids = parseCommerceIds(commerce_id);
+    if (!cids.length) return res.json([]);
 
     const from = date_from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const to = date_to || new Date().toISOString().slice(0, 10);
-    const cid = Number(commerce_id);
 
-    const cacheKey = `approval:${from}:${to}:${cid}`;
+    const cacheKey = `approval:${from}:${to}:${cids.join(',')}:${gateway || ''}`;
     const cached = getCached(cacheKey);
     if (cached) return res.json(cached);
+
+    const { payinGw } = buildGatewayClause(gateway);
+    const commerceInClause = cids.join(',');
 
     const sql = `SELECT method,
       COUNT(*) as total,
@@ -190,12 +216,12 @@ router.get('/approval-rate', async (req: AuthenticatedRequest, res: Response) =>
       SUM(CASE WHEN status IN ('error','canceled','expired','bank_error','authentication_error','rejected') THEN 1 ELSE 0 END) as rechazadas,
       ROUND(SUM(CASE WHEN status IN ('success','completed') THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) as tasa_aprobacion
       FROM payment
-      WHERE commerce_id = ? AND deleted_at IS NULL AND method IS NOT NULL
+      WHERE commerce_id IN (${commerceInClause}) AND deleted_at IS NULL AND method IS NOT NULL
       AND status NOT IN ('pending','new','created','processing')
-      AND created_at BETWEEN ? AND ?
+      AND created_at BETWEEN ? AND ?${payinGw}
       GROUP BY method ORDER BY tasa_aprobacion ASC`;
 
-    const results = await mysqlQuery(sql, [cid, from + ' 00:00:00', to + ' 23:59:59']);
+    const results = await mysqlQuery(sql, [from + ' 00:00:00', to + ' 23:59:59']);
     setCache(cacheKey, results, CACHE_5MIN);
     res.json(results);
   } catch (err: any) {
@@ -210,8 +236,11 @@ router.get('/alerts', async (req: AuthenticatedRequest, res: Response) => {
     const { commerce_id } = req.query as any;
     if (!commerce_id) return res.json({ inactivity: [], drops: [] });
 
-    const cid = Number(commerce_id);
-    const cacheKey = `alerts:${cid}`;
+    const cids = parseCommerceIds(commerce_id);
+    if (!cids.length) return res.json({ inactivity: [], drops: [] });
+
+    const commerceInClause = cids.join(',');
+    const cacheKey = `alerts:${commerceInClause}`;
     const cached = getCached(cacheKey);
     if (cached) return res.json(cached);
 
@@ -231,7 +260,7 @@ router.get('/alerts', async (req: AuthenticatedRequest, res: Response) => {
     const inactivitySql = `SELECT method, MAX(created_at) as ultima_transaccion,
       TIMESTAMPDIFF(HOUR, MAX(created_at), NOW()) as horas_inactivo
       FROM payment
-      WHERE commerce_id = ? AND deleted_at IS NULL AND method IS NOT NULL
+      WHERE commerce_id IN (${commerceInClause}) AND deleted_at IS NULL AND method IS NOT NULL
       AND created_at >= DATE_SUB(NOW(), INTERVAL 72 HOUR)
       GROUP BY method
       HAVING horas_inactivo >= ${alertHours}
@@ -243,15 +272,15 @@ router.get('/alerts', async (req: AuthenticatedRequest, res: Response) => {
       SUM(CASE WHEN status IN ('error','bank_error','authentication_error','rejected') THEN 1 ELSE 0 END) as errores,
       ROUND(SUM(CASE WHEN status IN ('error','bank_error','authentication_error','rejected') THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) as tasa_error
       FROM payment
-      WHERE commerce_id = ? AND deleted_at IS NULL AND method IS NOT NULL
+      WHERE commerce_id IN (${commerceInClause}) AND deleted_at IS NULL AND method IS NOT NULL
       AND created_at >= DATE_SUB(NOW(), INTERVAL 1 HOUR)
       GROUP BY method
       HAVING total >= 3 AND tasa_error > ${alertDropPct}
       ORDER BY tasa_error DESC`;
 
     const [inactivity, drops] = await Promise.all([
-      mysqlQuery(inactivitySql, [cid]),
-      mysqlQuery(dropSql, [cid]),
+      mysqlQuery(inactivitySql, []),
+      mysqlQuery(dropSql, []),
     ]);
 
     const result = { inactivity, drops };

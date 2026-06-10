@@ -3,13 +3,16 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { Activity, RefreshCw, AlertTriangle, Clock, XCircle, TrendingUp, FileText } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../lib/api';
+import MultiSelect from '../components/MultiSelect';
+import type { MultiSelectOption } from '../components/MultiSelect';
 
 const METHOD_COLORS = ['#1E3A5F', '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#F97316', '#84CC16', '#EC4899'];
 
 export default function MonitoringPage() {
   const controllerRef = useRef<AbortController | null>(null);
   const [country, setCountry] = useState('');
-  const [commerceId, setCommerceId] = useState('');
+  const [commerceIds, setCommerceIds] = useState<string[]>([]);
+  const [gatewayFilter, setGatewayFilter] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState(() => {
     const d = new Date(); d.setDate(d.getDate() - 30);
     return d.toISOString().slice(0, 10);
@@ -18,6 +21,7 @@ export default function MonitoringPage() {
 
   const [countries, setCountries] = useState<string[]>([]);
   const [commerces, setCommerces] = useState<any[]>([]);
+  const [gatewayOptions, setGatewayOptions] = useState<MultiSelectOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [currency, setCurrency] = useState('USD');
   const [chartData, setChartData] = useState<any[]>([]);
@@ -28,22 +32,31 @@ export default function MonitoringPage() {
 
   useEffect(() => {
     api.get('/monitoring/countries').then(r => setCountries(r.data || [])).catch(() => {});
+    api.get('/transactions/gateways').then(r => {
+      const gws = (r.data || []).filter((g: any) => g.name);
+      const opts: MultiSelectOption[] = gws.map((g: any) => ({
+        value: g.name,
+        label: `[${g.id}] ${g.name} (${g.type === 'payin' ? 'Pay In' : 'Pay Out'})`,
+      }));
+      setGatewayOptions(opts.sort((a, b) => a.label.localeCompare(b.label)));
+    }).catch(() => {});
     return () => { controllerRef.current?.abort(); };
   }, []);
 
   useEffect(() => {
-    if (!country) { setCommerces([]); setCommerceId(''); return; }
+    if (!country) { setCommerces([]); setCommerceIds([]); return; }
     api.get('/monitoring/commerces', { params: { country } })
-      .then(r => { setCommerces(r.data || []); setCommerceId(''); })
+      .then(r => { setCommerces(r.data || []); setCommerceIds([]); })
       .catch(() => setCommerces([]));
   }, [country]);
 
   const fetchData = useCallback(async () => {
-    if (!commerceId) { toast.error('Selecciona un comercio'); return; }
+    if (!commerceIds.length) { toast.error('Selecciona al menos un comercio'); return; }
     setLoading(true);
     const controller = new AbortController();
     controllerRef.current = controller;
-    const params = { commerce_id: commerceId, date_from: dateFrom, date_to: dateTo };
+    const params: any = { commerce_id: commerceIds.join(','), date_from: dateFrom, date_to: dateTo };
+    if (gatewayFilter.length) params.gateway = gatewayFilter.join(',');
     const signal = controller.signal;
 
     try {
@@ -75,7 +88,7 @@ export default function MonitoringPage() {
       setApprovalRate(appR.data || []);
 
       // Alertas
-      const alertR = await api.get('/monitoring/alerts', { params: { commerce_id: commerceId }, signal });
+      const alertR = await api.get('/monitoring/alerts', { params: { commerce_id: commerceIds.join(',') }, signal });
       setAlerts(alertR.data || { inactivity: [], drops: [] });
 
     } catch (err: any) {
@@ -85,7 +98,7 @@ export default function MonitoringPage() {
     } finally {
       setLoading(false);
     }
-  }, [commerceId, dateFrom, dateTo]);
+  }, [commerceIds, gatewayFilter, dateFrom, dateTo]);
 
   const sym = currency === 'PEN' ? 'S/' : currency === 'CLP' ? '$' : currency === 'BRL' ? 'R$' : '$';
   const formatMoney = (v: number) => {
@@ -143,14 +156,14 @@ export default function MonitoringPage() {
                 const toastId = toast.loading('Generando Acta...');
                 try {
                   const response = await api.get('/monitoring/acta-entrega-pdf', {
-                    params: { commerce_id: commerceId, date_from: dateFrom, date_to: dateTo },
+                    params: { commerce_id: commerceIds.join(','), date_from: dateFrom, date_to: dateTo },
                     responseType: 'blob',
                   });
                   const blob = new Blob([response.data], { type: 'application/pdf' });
                   const url = URL.createObjectURL(blob);
                   const link = document.createElement('a');
                   link.href = url;
-                  const name = commerces.find(c => String(c.id) === commerceId)?.name || 'comercio';
+                  const name = commerces.find(c => commerceIds.includes(String(c.id)))?.name || 'comercio';
                   link.download = `acta_entrega_${name.replace(/\s+/g, '_')}_${dateTo}.pdf`;
                   document.body.appendChild(link);
                   link.click();
@@ -170,14 +183,14 @@ export default function MonitoringPage() {
                 const toastId = toast.loading('Generando PDF...');
                 try {
                   const response = await api.get('/monitoring/report-pdf', {
-                    params: { commerce_id: commerceId, date_from: dateFrom, date_to: dateTo },
+                    params: { commerce_id: commerceIds.join(','), date_from: dateFrom, date_to: dateTo },
                     responseType: 'blob',
                   });
                   const blob = new Blob([response.data], { type: 'application/pdf' });
                   const url = URL.createObjectURL(blob);
                   const link = document.createElement('a');
                   link.href = url;
-                  const name = commerces.find(c => String(c.id) === commerceId)?.name || 'comercio';
+                  const name = commerces.find(c => commerceIds.includes(String(c.id)))?.name || 'comercio';
                   link.download = `informe_monitoreo_${name.replace(/\s+/g, '_')}_${dateFrom}_${dateTo}.pdf`;
                   document.body.appendChild(link);
                   link.click();
@@ -210,12 +223,23 @@ export default function MonitoringPage() {
             {countries.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Comercio</label>
-          <select value={commerceId} onChange={e => setCommerceId(e.target.value)} className="input-field text-sm" disabled={!country}>
-            <option value="">Seleccionar comercio</option>
-            {commerces.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+        <div className="min-w-[200px]">
+          <label className="block text-xs font-medium text-gray-600 mb-1">Comercios</label>
+          <MultiSelect
+            options={commerces.map(c => ({ value: String(c.id), label: `${c.name}` }))}
+            selected={commerceIds}
+            onChange={setCommerceIds}
+            placeholder={!country ? 'Seleccionar país primero' : 'Seleccionar comercios'}
+          />
+        </div>
+        <div className="min-w-[200px]">
+          <label className="block text-xs font-medium text-gray-600 mb-1">Pasarelas</label>
+          <MultiSelect
+            options={gatewayOptions}
+            selected={gatewayFilter}
+            onChange={setGatewayFilter}
+            placeholder="Todas las pasarelas"
+          />
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">Desde</label>
