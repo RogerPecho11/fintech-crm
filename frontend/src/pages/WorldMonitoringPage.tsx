@@ -14,7 +14,7 @@ const PERIODS = [
 const PIE_COLORS = ['#10B981', '#EF4444', '#F59E0B', '#F97316', '#6B7280'];
 
 export default function WorldMonitoringPage() {
-  const [period, setPeriod] = useState('24h');
+  const [period, setPeriod] = useState('1h');
   const [overview, setOverview] = useState<any>(null);
   const [timeline, setTimeline] = useState<any[]>([]);
   const [byGateway, setByGateway] = useState<any[]>([]);
