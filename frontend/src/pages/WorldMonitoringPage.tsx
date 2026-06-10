@@ -1,85 +1,61 @@
 import { useState, useEffect, useCallback } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend, PieChart, Pie, Cell } from 'recharts';
-import { Globe, RefreshCw, TrendingUp, TrendingDown, AlertTriangle, Zap, DollarSign, Activity } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
+import { Globe, RefreshCw, TrendingUp, TrendingDown, AlertTriangle, Zap, DollarSign, Activity, Calendar, Filter } from 'lucide-react';
 import api from '../lib/api';
-
-const PERIODS = [
-  { value: '1h', label: '1 Hora' },
-  { value: '6h', label: '6 Horas' },
-  { value: '24h', label: '24 Horas' },
-  { value: '7d', label: '7 Dias' },
-  { value: '30d', label: '30 Dias' },
-];
+import toast from 'react-hot-toast';
 
 const PIE_COLORS = ['#10B981', '#EF4444', '#F59E0B', '#F97316', '#6B7280'];
 
 export default function WorldMonitoringPage() {
-  const [period, setPeriod] = useState('1h');
+  const [dateFrom] = useState('2026-06-08');
+  const [dateTo, setDateTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [commerceIds, setCommerceIds] = useState('');
+  const [gatewayFilter, setGatewayFilter] = useState('');
   const [overview, setOverview] = useState<any>(null);
   const [timeline, setTimeline] = useState<any[]>([]);
-  const [byGateway, setByGateway] = useState<any[]>([]);
-  const [byCommerce, setByCommerce] = useState<any[]>([]);
+  const [topCommerces, setTopCommerces] = useState<{ payin: any[]; payout: any[] }>({ payin: [], payout: [] });
+  const [topGateways, setTopGateways] = useState<{ payin: any[]; payout: any[] }>({ payin: [], payout: [] });
   const [byCountry, setByCountry] = useState<any[]>([]);
   const [errors, setErrors] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [type, setType] = useState<'payin' | 'payout'>('payin');
   const [autoRefresh, setAutoRefresh] = useState(0);
+  const [methods, setMethods] = useState<string[]>([]);
 
-  // Comercios seleccionados para monitorear
-  const [commerces, setCommerces] = useState<any[]>([]);
-  const [selectedCommerces, setSelectedCommerces] = useState<number[]>([]);
-  const [commerceSearch, setCommerceSearch] = useState('');
-  const [showCommerceSelector, setShowCommerceSelector] = useState(false);
-
-  // Cargar lista de comercios al abrir
+  // Cargar metodos disponibles
   useEffect(() => {
-    api.get('/transactions/commerces').then(r => setCommerces(r.data || [])).catch(() => {});
-    // Cargar comercios guardados del localStorage
-    try {
-      const saved = localStorage.getItem('wm_selected_commerces');
-      if (saved) setSelectedCommerces(JSON.parse(saved));
-    } catch {}
+    api.get('/transactions/methods').then(r => {
+      const ms = [...new Set((r.data || []).map((m: any) => m.method))].filter(Boolean) as string[];
+      setMethods(ms.sort());
+    }).catch(() => {});
   }, []);
 
-  // Guardar selección
-  const saveSelection = (ids: number[]) => {
-    setSelectedCommerces(ids);
-    localStorage.setItem('wm_selected_commerces', JSON.stringify(ids));
-  };
-
-  const toggleCommerce = (id: number) => {
-    const newIds = selectedCommerces.includes(id)
-      ? selectedCommerces.filter(i => i !== id)
-      : [...selectedCommerces, id];
-    saveSelection(newIds);
-  };
-
   const fetchAll = useCallback(async () => {
-    if (selectedCommerces.length === 0) return;
     setLoading(true);
     try {
-      const commerceIds = selectedCommerces.join(',');
-      const [ov, tl, gw, cm, ct, er] = await Promise.all([
-        api.get('/world-monitoring/overview', { params: { period, commerce_ids: commerceIds } }),
-        api.get('/world-monitoring/timeline', { params: { period, type, commerce_ids: commerceIds } }),
-        api.get('/world-monitoring/by-gateway', { params: { period, type, commerce_ids: commerceIds } }),
-        api.get('/world-monitoring/by-commerce', { params: { period, type, commerce_ids: commerceIds } }),
-        api.get('/world-monitoring/by-country', { params: { period, commerce_ids: commerceIds } }),
-        api.get('/world-monitoring/errors', { params: { period, commerce_ids: commerceIds } }),
+      const params: any = { period: '24h' };
+      if (commerceIds) params.commerce_ids = commerceIds;
+      if (gatewayFilter) params.gateway = gatewayFilter;
+
+      const [ov, tl, cmPi, cmPo, gwPi, gwPo, ct, er] = await Promise.all([
+        api.get('/world-monitoring/overview', { params }),
+        api.get('/world-monitoring/timeline', { params: { ...params, type: 'payin' } }),
+        api.get('/world-monitoring/by-commerce', { params: { ...params, type: 'payin' } }),
+        api.get('/world-monitoring/by-commerce', { params: { ...params, type: 'payout' } }),
+        api.get('/world-monitoring/by-gateway', { params: { ...params, type: 'payin' } }),
+        api.get('/world-monitoring/by-gateway', { params: { ...params, type: 'payout' } }),
+        api.get('/world-monitoring/by-country', { params }),
+        api.get('/world-monitoring/errors', { params }),
       ]);
       setOverview(ov.data);
       setTimeline(tl.data);
-      setByGateway(gw.data);
-      setByCommerce(cm.data);
+      setTopCommerces({ payin: cmPi.data, payout: cmPo.data });
+      setTopGateways({ payin: gwPi.data, payout: gwPo.data });
       setByCountry(ct.data);
       setErrors(er.data);
-    } catch { /* silent */ }
-    finally { setLoading(false); }
-  }, [period, type, selectedCommerces]);
-
-  useEffect(() => {
-    // NO cargar automáticamente — solo cuando el usuario haga clic en Actualizar
-  }, []);
+    } catch (err: any) {
+      toast.error('Error al cargar datos');
+    } finally { setLoading(false); }
+  }, [commerceIds, gatewayFilter]);
 
   useEffect(() => {
     if (autoRefresh <= 0) return;
@@ -87,202 +63,172 @@ export default function WorldMonitoringPage() {
     return () => clearInterval(interval);
   }, [autoRefresh, fetchAll]);
 
-  const formatNum = (n: number) => n >= 1000000 ? (n/1000000).toFixed(1) + 'M' : n >= 1000 ? (n/1000).toFixed(1) + 'K' : String(n);
-  const formatMoney = (n: number) => '$' + formatNum(n);
-
-  const piData = overview ? [
-    { name: 'Success', value: overview[type].success },
-    { name: 'Failed', value: overview[type].failed },
-    { name: 'Pending', value: overview[type].pending },
-    { name: 'Expired', value: overview[type].expired },
-    { name: 'Cancelled', value: overview[type].cancelled },
-  ].filter(d => d.value > 0) : [];
+  const fmt = (n: number) => n >= 1000000 ? (n/1000000).toFixed(1)+'M' : n >= 1000 ? (n/1000).toFixed(1)+'K' : String(n);
+  const fmtMoney = (n: number) => '$' + fmt(n);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             <Globe className="w-6 h-6" style={{ color: '#FC2B5F' }} /> Monitoreo Mundial
           </h1>
-          <p className="text-gray-500 text-sm">Monitoreo transaccional global desde la replica de produccion</p>
+          <p className="text-gray-500 text-sm">Monitoreo transaccional global</p>
         </div>
         <div className="flex items-center gap-2">
-          <select className="input text-sm" value={autoRefresh} onChange={e => setAutoRefresh(Number(e.target.value))}>
+          <select className="input text-xs" value={autoRefresh} onChange={e => setAutoRefresh(Number(e.target.value))}>
             <option value={0}>Auto-refresh: Off</option>
-            <option value={30}>Cada 30s</option>
             <option value={60}>Cada 1 min</option>
             <option value={300}>Cada 5 min</option>
           </select>
           <button onClick={fetchAll} disabled={loading} className="btn-primary flex items-center gap-2 text-sm">
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            {loading ? 'Cargando...' : 'Actualizar'}
+            Actualizar
           </button>
         </div>
-      </div>
-
-      {/* Selector de comercios */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold text-gray-700">Comercios monitoreados</h3>
-            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{selectedCommerces.length} seleccionados</span>
-          </div>
-          <button onClick={() => setShowCommerceSelector(!showCommerceSelector)} className="text-xs text-blue-600 hover:text-blue-800">
-            {showCommerceSelector ? 'Ocultar' : 'Configurar comercios'}
-          </button>
-        </div>
-
-        {showCommerceSelector && (
-          <div className="border border-gray-200 rounded-lg p-3">
-            <input
-              type="text"
-              className="input text-sm w-full mb-2"
-              placeholder="Buscar comercio..."
-              value={commerceSearch}
-              onChange={e => setCommerceSearch(e.target.value)}
-            />
-            <div className="flex gap-2 mb-2">
-              <button onClick={() => saveSelection(commerces.map((c: any) => c.id))} className="text-xs text-blue-600 hover:underline">Seleccionar todos</button>
-              <button onClick={() => saveSelection([])} className="text-xs text-gray-500 hover:underline">Quitar todos</button>
-            </div>
-            <div className="max-h-48 overflow-y-auto space-y-1">
-              {commerces
-                .filter((c: any) => !commerceSearch || c.name.toLowerCase().includes(commerceSearch.toLowerCase()))
-                .map((c: any) => (
-                <label key={c.id} className="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm">
-                  <input
-                    type="checkbox"
-                    checked={selectedCommerces.includes(c.id)}
-                    onChange={() => toggleCommerce(c.id)}
-                    className="rounded border-gray-300 text-pink-600"
-                  />
-                  <span className="truncate">{c.name}</span>
-                  <span className="text-xs text-gray-400 ml-auto">{c.country}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {selectedCommerces.length === 0 && (
-          <p className="text-sm text-amber-600 bg-amber-50 p-3 rounded-lg">
-            Selecciona al menos un comercio para monitorear. Haz clic en "Configurar comercios".
-          </p>
-        )}
       </div>
 
       {/* Filtros */}
-      <div className="flex flex-wrap gap-3 bg-white rounded-lg shadow p-4 items-center">
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
-          {PERIODS.map(p => (
-            <button key={p.value} onClick={() => setPeriod(p.value)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${period === p.value ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
-              {p.label}
-            </button>
-          ))}
+      <div className="bg-white rounded-lg shadow p-4 space-y-3">
+        <div className="flex flex-wrap gap-3 items-end">
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Desde</label>
+            <input type="date" className="input text-sm" value={dateFrom} disabled />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Hasta</label>
+            <input type="date" className="input text-sm" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+          </div>
+          <div className="flex-1 min-w-[200px]">
+            <label className="text-xs text-gray-500 block mb-1">Metodo de Pago</label>
+            <select className="input text-sm w-full" value={gatewayFilter} onChange={e => setGatewayFilter(e.target.value)}>
+              <option value="">Todos los metodos</option>
+              {methods.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
+          <div className="flex-1 min-w-[150px]">
+            <label className="text-xs text-gray-500 block mb-1">IDs Comercios (separados por coma)</label>
+            <input className="input text-sm w-full" placeholder="84,139,170..." value={commerceIds} onChange={e => setCommerceIds(e.target.value)} />
+          </div>
         </div>
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
-          <button onClick={() => setType('payin')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md ${type === 'payin' ? 'bg-blue-500 text-white' : 'text-gray-500'}`}>
-            Pay In
-          </button>
-          <button onClick={() => setType('payout')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md ${type === 'payout' ? 'bg-purple-500 text-white' : 'text-gray-500'}`}>
-            Pay Out
-          </button>
-        </div>
-        {autoRefresh > 0 && <span className="text-xs text-green-600 flex items-center gap-1"><Zap className="w-3 h-3" /> Auto-refresh activo</span>}
       </div>
 
-      {/* KPIs */}
+      {/* KPIs - Pay In y Pay Out juntos */}
       {overview && (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          <KpiCard title="Total Trx" value={formatNum(overview[type].total)} icon={Activity} color="blue" />
-          <KpiCard title="Success Rate" value={`${overview[type].successRate}%`} icon={TrendingUp}
-            color={Number(overview[type].successRate) >= 80 ? 'green' : Number(overview[type].successRate) >= 50 ? 'yellow' : 'red'} />
-          <KpiCard title="Fallidas" value={formatNum(overview[type].failed)} icon={TrendingDown} color="red" />
-          <KpiCard title="Pendientes" value={formatNum(overview[type].pending)} icon={AlertTriangle} color="yellow" />
-          <KpiCard title="Volumen" value={formatMoney(overview[type].volume)} icon={DollarSign} color="green" />
-          <KpiCard title="TPM" value={String(Math.round(overview.payin.tpm || 0))} icon={Zap} color="purple" />
+        <div className="grid grid-cols-2 gap-4">
+          {/* Pay In */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <h3 className="text-xs font-semibold text-blue-600 uppercase mb-3">Pay In</h3>
+            <div className="grid grid-cols-3 gap-3">
+              <div><p className="text-[10px] text-gray-500">Total</p><p className="text-lg font-bold">{fmt(overview.payin.total)}</p></div>
+              <div><p className="text-[10px] text-gray-500">Success Rate</p><p className={`text-lg font-bold ${Number(overview.payin.successRate) >= 80 ? 'text-green-600' : 'text-red-600'}`}>{overview.payin.successRate}%</p></div>
+              <div><p className="text-[10px] text-gray-500">Fallidas</p><p className="text-lg font-bold text-red-600">{fmt(overview.payin.failed)}</p></div>
+              <div><p className="text-[10px] text-gray-500">Pendientes</p><p className="text-lg font-bold text-yellow-600">{fmt(overview.payin.pending)}</p></div>
+              <div><p className="text-[10px] text-gray-500">Volumen</p><p className="text-lg font-bold text-green-600">{fmtMoney(overview.payin.volume)}</p></div>
+              <div><p className="text-[10px] text-gray-500">TPM</p><p className="text-lg font-bold">{overview.payin.tpm}</p></div>
+            </div>
+          </div>
+          {/* Pay Out */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <h3 className="text-xs font-semibold text-purple-600 uppercase mb-3">Pay Out</h3>
+            <div className="grid grid-cols-3 gap-3">
+              <div><p className="text-[10px] text-gray-500">Total</p><p className="text-lg font-bold">{fmt(overview.payout.total)}</p></div>
+              <div><p className="text-[10px] text-gray-500">Success Rate</p><p className={`text-lg font-bold ${Number(overview.payout.successRate) >= 80 ? 'text-green-600' : 'text-red-600'}`}>{overview.payout.successRate}%</p></div>
+              <div><p className="text-[10px] text-gray-500">Fallidas</p><p className="text-lg font-bold text-red-600">{fmt(overview.payout.failed)}</p></div>
+              <div><p className="text-[10px] text-gray-500">Pendientes</p><p className="text-lg font-bold text-yellow-600">{fmt(overview.payout.pending)}</p></div>
+              <div><p className="text-[10px] text-gray-500">Volumen</p><p className="text-lg font-bold text-green-600">{fmtMoney(overview.payout.volume)}</p></div>
+              <div><p className="text-[10px] text-gray-500">Expiradas</p><p className="text-lg font-bold text-orange-500">{fmt(overview.payout.expired)}</p></div>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Gráficos principales */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Timeline */}
-        <div className="lg:col-span-2 bg-white rounded-lg shadow p-6">
-          <h3 className="text-sm font-semibold text-gray-700 mb-4">Evolucion Temporal ({type === 'payin' ? 'Pay In' : 'Pay Out'})</h3>
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={timeline}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
-              <XAxis dataKey="time" tick={{ fontSize: 10 }} />
-              <YAxis tick={{ fontSize: 10 }} />
-              <Tooltip />
-              <Legend />
-              <Line type="monotone" dataKey="success" name="Exitosas" stroke="#10B981" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="failed" name="Fallidas" stroke="#EF4444" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="total" name="Total" stroke="#3B82F6" strokeWidth={1} strokeDasharray="5 5" dot={false} />
-            </LineChart>
-          </ResponsiveContainer>
+      {/* Grafico temporal + Pie */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div className="lg:col-span-2 bg-white rounded-lg shadow p-5">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">Evolucion por Hora (Pay In)</h3>
+          {timeline.length > 0 ? (
+            <ResponsiveContainer width="100%" height={250}>
+              <AreaChart data={timeline}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
+                <XAxis dataKey="time" tick={{ fontSize: 9 }} />
+                <YAxis tick={{ fontSize: 10 }} />
+                <Tooltip />
+                <Legend />
+                <Area type="monotone" dataKey="success" name="Exitosas" stroke="#10B981" fill="#10B98130" />
+                <Area type="monotone" dataKey="failed" name="Fallidas" stroke="#EF4444" fill="#EF444430" />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : <p className="text-center text-gray-400 py-10">Haz clic en Actualizar</p>}
         </div>
+        <div className="bg-white rounded-lg shadow p-5">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">Por Pais</h3>
+          {byCountry.length > 0 ? (
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={byCountry.slice(0, 6)} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis type="number" tick={{ fontSize: 9 }} />
+                <YAxis type="category" dataKey="country" width={30} tick={{ fontSize: 10 }} />
+                <Tooltip />
+                <Bar dataKey="success" name="OK" fill="#10B981" stackId="a" />
+                <Bar dataKey="failed" name="Fail" fill="#EF4444" stackId="a" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : null}
+        </div>
+      </div>
 
-        {/* Pie chart */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-sm font-semibold text-gray-700 mb-4">Distribucion por Estado</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <PieChart>
-              <Pie data={piData} cx="50%" cy="50%" innerRadius={40} outerRadius={70} dataKey="value" paddingAngle={2}>
-                {piData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="space-y-1 mt-2">
-            {piData.map((d, i) => (
-              <div key={d.name} className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-full" style={{ background: PIE_COLORS[i] }} />
-                  <span className="text-gray-600">{d.name}</span>
-                </div>
-                <span className="font-medium">{formatNum(d.value)}</span>
+      {/* Top Errores */}
+      {errors.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-5">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">Top Errores</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            {errors.slice(0, 8).map((e: any, i: number) => (
+              <div key={i} className="p-2 bg-red-50 rounded-lg">
+                <p className="text-xs font-medium text-gray-700 truncate">{e.method}</p>
+                <p className="text-xs text-red-600">{e.status}</p>
+                <p className="text-sm font-bold text-red-700">{Number(e.cantidad).toLocaleString()}</p>
               </div>
             ))}
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Por País */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-sm font-semibold text-gray-700 mb-4">Pay In por Pais</h3>
-          <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={byCountry.slice(0, 8)} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" tick={{ fontSize: 10 }} />
-              <YAxis type="category" dataKey="country" width={40} tick={{ fontSize: 11 }} />
-              <Tooltip />
-              <Bar dataKey="success" name="Exitosas" fill="#10B981" stackId="a" />
-              <Bar dataKey="failed" name="Fallidas" fill="#EF4444" stackId="a" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Top Errores */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-sm font-semibold text-gray-700 mb-4">Top Errores</h3>
-          <div className="overflow-y-auto max-h-[250px]">
+      {/* Top Comercios Pay In y Pay Out lado a lado */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="bg-white rounded-lg shadow p-5">
+          <h3 className="text-sm font-semibold text-blue-600 mb-3">Top Comercios - Pay In</h3>
+          <div className="overflow-y-auto max-h-[300px]">
             <table className="w-full text-xs">
-              <thead className="sticky top-0 bg-white">
-                <tr className="border-b"><th className="text-left p-1">Metodo</th><th className="text-left p-1">Estado</th><th className="text-right p-1">Cant</th></tr>
-              </thead>
+              <thead className="sticky top-0 bg-white"><tr className="border-b">
+                <th className="text-left p-1">Comercio</th><th className="text-right p-1">Total</th><th className="text-right p-1">Rate</th>
+              </tr></thead>
               <tbody>
-                {errors.slice(0, 15).map((e: any, i: number) => (
-                  <tr key={i} className="border-b border-gray-50">
-                    <td className="p-1 truncate max-w-[120px]">{e.method}</td>
-                    <td className="p-1 text-red-600">{e.status}</td>
-                    <td className="p-1 text-right font-medium">{Number(e.cantidad).toLocaleString()}</td>
+                {topCommerces.payin.map((c: any) => (
+                  <tr key={c.commerce_id} className="border-b border-gray-50">
+                    <td className="p-1 truncate max-w-[120px]">{c.name}</td>
+                    <td className="p-1 text-right">{fmt(c.total)}</td>
+                    <td className="p-1 text-right"><span className={`font-bold ${Number(c.successRate)>=80?'text-green-600':'text-red-600'}`}>{c.successRate}%</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow p-5">
+          <h3 className="text-sm font-semibold text-purple-600 mb-3">Top Comercios - Pay Out</h3>
+          <div className="overflow-y-auto max-h-[300px]">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-white"><tr className="border-b">
+                <th className="text-left p-1">Comercio</th><th className="text-right p-1">Total</th><th className="text-right p-1">Rate</th>
+              </tr></thead>
+              <tbody>
+                {topCommerces.payout.map((c: any) => (
+                  <tr key={c.commerce_id} className="border-b border-gray-50">
+                    <td className="p-1 truncate max-w-[120px]">{c.name}</td>
+                    <td className="p-1 text-right">{fmt(c.total)}</td>
+                    <td className="p-1 text-right"><span className={`font-bold ${Number(c.successRate)>=80?'text-green-600':'text-red-600'}`}>{c.successRate}%</span></td>
                   </tr>
                 ))}
               </tbody>
@@ -291,98 +237,49 @@ export default function WorldMonitoringPage() {
         </div>
       </div>
 
-      {/* Top Comercios */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-sm font-semibold text-gray-700 mb-4">Top Comercios ({type === 'payin' ? 'Pay In' : 'Pay Out'})</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-gray-50">
-                <th className="text-left p-2">Comercio</th>
-                <th className="text-left p-2">Pais</th>
-                <th className="text-right p-2">Total</th>
-                <th className="text-right p-2">Exitosas</th>
-                <th className="text-right p-2">Fallidas</th>
-                <th className="text-right p-2">Success Rate</th>
-                <th className="text-right p-2">Volumen</th>
-              </tr>
-            </thead>
-            <tbody>
-              {byCommerce.map((c: any) => (
-                <tr key={c.commerce_id} className="border-b border-gray-50 hover:bg-gray-50">
-                  <td className="p-2 font-medium">{c.name}</td>
-                  <td className="p-2 text-gray-500">{c.country}</td>
-                  <td className="p-2 text-right">{Number(c.total).toLocaleString()}</td>
-                  <td className="p-2 text-right text-green-600">{Number(c.success).toLocaleString()}</td>
-                  <td className="p-2 text-right text-red-600">{Number(c.failed).toLocaleString()}</td>
-                  <td className="p-2 text-right">
-                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${
-                      Number(c.successRate) >= 80 ? 'bg-green-100 text-green-800' :
-                      Number(c.successRate) >= 50 ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>{c.successRate}%</span>
-                  </td>
-                  <td className="p-2 text-right">{formatMoney(Number(c.volume))}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Pasarelas Pay In y Pay Out */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="bg-white rounded-lg shadow p-5">
+          <h3 className="text-sm font-semibold text-blue-600 mb-3">Pasarelas - Pay In</h3>
+          <div className="overflow-y-auto max-h-[300px]">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-white"><tr className="border-b">
+                <th className="text-left p-1">Pasarela</th><th className="p-1">Pais</th><th className="text-right p-1">Total</th><th className="text-right p-1">Rate</th>
+              </tr></thead>
+              <tbody>
+                {topGateways.payin.map((g: any, i: number) => (
+                  <tr key={i} className="border-b border-gray-50">
+                    <td className="p-1 truncate max-w-[100px]">{g.gateway}</td>
+                    <td className="p-1 text-center">{g.country}</td>
+                    <td className="p-1 text-right">{fmt(g.total)}</td>
+                    <td className="p-1 text-right"><span className={`font-bold ${Number(g.successRate)>=80?'text-green-600':'text-red-600'}`}>{g.successRate}%</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow p-5">
+          <h3 className="text-sm font-semibold text-purple-600 mb-3">Pasarelas - Pay Out</h3>
+          <div className="overflow-y-auto max-h-[300px]">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-white"><tr className="border-b">
+                <th className="text-left p-1">Pasarela</th><th className="p-1">Pais</th><th className="text-right p-1">Total</th><th className="text-right p-1">Rate</th>
+              </tr></thead>
+              <tbody>
+                {topGateways.payout.map((g: any, i: number) => (
+                  <tr key={i} className="border-b border-gray-50">
+                    <td className="p-1 truncate max-w-[100px]">{g.gateway}</td>
+                    <td className="p-1 text-center">{g.country}</td>
+                    <td className="p-1 text-right">{fmt(g.total)}</td>
+                    <td className="p-1 text-right"><span className={`font-bold ${Number(g.successRate)>=80?'text-green-600':'text-red-600'}`}>{g.successRate}%</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
-
-      {/* Por Pasarela */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-sm font-semibold text-gray-700 mb-4">Por Pasarela ({type === 'payin' ? 'Pay In' : 'Pay Out'})</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-gray-50">
-                <th className="text-left p-2">Pasarela</th>
-                <th className="text-left p-2">Pais</th>
-                <th className="text-right p-2">Total</th>
-                <th className="text-right p-2">Success Rate</th>
-                <th className="text-right p-2">Volumen</th>
-              </tr>
-            </thead>
-            <tbody>
-              {byGateway.map((g: any, i: number) => (
-                <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
-                  <td className="p-2 font-medium">{g.gateway}</td>
-                  <td className="p-2 text-gray-500">{g.country}</td>
-                  <td className="p-2 text-right">{Number(g.total).toLocaleString()}</td>
-                  <td className="p-2 text-right">
-                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${
-                      Number(g.successRate) >= 80 ? 'bg-green-100 text-green-800' :
-                      Number(g.successRate) >= 50 ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>{g.successRate}%</span>
-                  </td>
-                  <td className="p-2 text-right">{formatMoney(Number(g.volume))}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function KpiCard({ title, value, icon: Icon, color }: { title: string; value: string; icon: any; color: string }) {
-  const colors: Record<string, string> = {
-    blue: 'bg-blue-50 text-blue-600', green: 'bg-green-50 text-green-600',
-    red: 'bg-red-50 text-red-600', yellow: 'bg-yellow-50 text-yellow-600',
-    purple: 'bg-purple-50 text-purple-600',
-  };
-  return (
-    <div className="bg-white rounded-lg shadow p-4">
-      <div className="flex items-center gap-2 mb-1">
-        <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${colors[color] || colors.blue}`}>
-          <Icon className="w-4 h-4" />
-        </div>
-        <span className="text-xs text-gray-500">{title}</span>
-      </div>
-      <p className="text-xl font-bold text-gray-900">{value}</p>
     </div>
   );
 }
