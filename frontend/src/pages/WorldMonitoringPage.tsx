@@ -46,7 +46,9 @@ export default function WorldMonitoringPage() {
     finally { setLoading(false); }
   }, [period, type]);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => {
+    // NO cargar automáticamente — solo cuando el usuario haga clic en Actualizar
+  }, []);
 
   useEffect(() => {
     if (autoRefresh <= 0) return;

@@ -108,7 +108,7 @@ router.get('/overview', async (req: AuthenticatedRequest, res: Response) => {
       period,
     };
 
-    setCache(cacheKey, result, period === '15m' ? CACHE_1MIN : CACHE_5MIN);
+    setCache(cacheKey, result, CACHE_15MIN);
     res.json(result);
   } catch (err: any) {
     console.error('[WorldMonitoring] overview error:', err.message);
