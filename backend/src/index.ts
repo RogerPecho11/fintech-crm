@@ -69,7 +69,12 @@ app.use('/uploads', (req, res, next) => {
 }));
 
 // Middleware
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' }, xDownloadOptions: false }));
+app.use(helmet({ 
+  crossOriginResourcePolicy: { policy: 'cross-origin' }, 
+  xDownloadOptions: false,
+  crossOriginOpenerPolicy: false,
+  crossOriginEmbedderPolicy: false,
+}));
 app.use(cors({
   origin: (origin, callback) => {
     const allowed = [
