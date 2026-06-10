@@ -96,7 +96,7 @@ export default function DashboardPage() {
   // New item forms
   const [newStatus, setNewStatus] = useState({ label: '', value: '', hex: '#6B7280' });
   const [newRisk, setNewRisk] = useState({ label: '', value: '', icon: '⭐', hex: '#6B7280' });
-  const [newPayment, setNewPayment] = useState({ name: '', type: 'both' as 'pay_in' | 'pay_out' | 'both' });
+  const [newPayment, setNewPayment] = useState({ name: '', type: 'both' as 'pay_in' | 'pay_out' | 'both', countries: [] as string[] });
   const [newMcc, setNewMcc] = useState({ code: '', description: '' });
   const [newBusinessType, setNewBusinessType] = useState('');
   const [newIndustry, setNewIndustry] = useState('');
@@ -165,14 +165,23 @@ export default function DashboardPage() {
   const handleAddPayment = () => {
     if (!newPayment.name.trim()) return;
     const id = 'custom_' + Date.now();
-    const updated = [...paymentMethods, { id, name: newPayment.name, type: newPayment.type, countries: [] }];
+    const updated = [...paymentMethods, { id, name: newPayment.name, type: newPayment.type, countries: newPayment.countries }];
     setPaymentMethods(updated);
     savePaymentMethods(updated);
-    setNewPayment({ name: '', type: 'both' });
+    setNewPayment({ name: '', type: 'both', countries: [] });
     toast.success('Método de pago agregado');
   };
   const handleRemovePayment = (id: string) => {
     const updated = paymentMethods.filter(m => m.id !== id);
+    setPaymentMethods(updated);
+    savePaymentMethods(updated);
+  };
+  const handleTogglePaymentCountry = (id: string, countryCode: string) => {
+    const updated = paymentMethods.map(m => {
+      if (m.id !== id) return m;
+      const has = m.countries.includes(countryCode);
+      return { ...m, countries: has ? m.countries.filter(c => c !== countryCode) : [...m.countries, countryCode] };
+    });
     setPaymentMethods(updated);
     savePaymentMethods(updated);
   };
@@ -575,63 +584,117 @@ export default function DashboardPage() {
               <span className="text-xs text-gray-400">{paymentMethods.length} métodos</span>
             </div>
 
-            <div className="border border-gray-100 rounded-xl overflow-hidden max-h-64 overflow-y-auto">
+            <div className="border border-gray-100 rounded-xl overflow-hidden max-h-80 overflow-y-auto">
               {paymentMethods.map((m, i) => (
                 <div
                   key={m.id}
-                  className={`flex items-center justify-between px-4 py-2.5 ${i < paymentMethods.length - 1 ? 'border-b border-gray-50' : ''} hover:bg-gray-50 transition-colors`}
+                  className={`px-4 py-2.5 ${i < paymentMethods.length - 1 ? 'border-b border-gray-50' : ''} hover:bg-gray-50 transition-colors`}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="text-sm font-medium text-gray-800 truncate">{m.name}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                      m.type === 'pay_in'  ? 'bg-blue-50 text-blue-600' :
-                      m.type === 'pay_out' ? 'bg-purple-50 text-purple-600' :
-                                             'bg-gray-100 text-gray-500'
-                    }`}>
-                      {m.type === 'both' ? 'In / Out' : m.type === 'pay_in' ? 'Pay In' : 'Pay Out'}
-                    </span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="text-sm font-medium text-gray-800 truncate">{m.name}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        m.type === 'pay_in'  ? 'bg-blue-50 text-blue-600' :
+                        m.type === 'pay_out' ? 'bg-purple-50 text-purple-600' :
+                                               'bg-gray-100 text-gray-500'
+                      }`}>
+                        {m.type === 'both' ? 'In / Out' : m.type === 'pay_in' ? 'Pay In' : 'Pay Out'}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        handleRemovePayment(m.id);
+                        toast.success(`Método "${m.name}" eliminado`);
+                      }}
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0 ml-2"
+                      title={`Eliminar "${m.name}"`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => {
-                      handleRemovePayment(m.id);
-                      toast.success(`Método "${m.name}" eliminado`);
-                    }}
-                    className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0 ml-2"
-                    title={`Eliminar "${m.name}"`}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  {/* Países asignados */}
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {activeCountries.map(c => {
+                      const isActive = m.countries.includes(c.code);
+                      return (
+                        <button
+                          key={c.code}
+                          onClick={() => handleTogglePaymentCountry(m.id, c.code)}
+                          className={`text-xs px-1.5 py-0.5 rounded border transition-colors ${
+                            isActive
+                              ? 'bg-blue-50 text-blue-700 border-blue-200'
+                              : 'bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100'
+                          }`}
+                          title={isActive ? `Quitar ${c.name}` : `Agregar ${c.name}`}
+                        >
+                          {c.flag} {c.code}
+                        </button>
+                      );
+                    })}
+                    {m.countries.length === 0 && (
+                      <span className="text-xs text-amber-500 italic">⚠️ Todos los países (asignar países para filtrar)</span>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
 
             {/* Add form */}
-            <div className="flex gap-2 items-end pt-1">
-              <div className="flex-1">
-                <label className="text-xs text-gray-500 mb-1 block">Nombre del método</label>
-                <input
-                  className="input text-sm"
-                  value={newPayment.name}
-                  onChange={e => setNewPayment(p => ({ ...p, name: e.target.value }))}
-                  placeholder="Ej: Nequi"
-                  onKeyDown={e => e.key === 'Enter' && handleAddPayment()}
-                />
+            <div className="space-y-2 pt-1">
+              <div className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <label className="text-xs text-gray-500 mb-1 block">Nombre del método</label>
+                  <input
+                    className="input text-sm"
+                    value={newPayment.name}
+                    onChange={e => setNewPayment(p => ({ ...p, name: e.target.value }))}
+                    placeholder="Ej: Nequi"
+                    onKeyDown={e => e.key === 'Enter' && handleAddPayment()}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Tipo</label>
+                  <select
+                    className="input text-sm w-28"
+                    value={newPayment.type}
+                    onChange={e => setNewPayment(p => ({ ...p, type: e.target.value as any }))}
+                  >
+                    <option value="pay_in">Pay In</option>
+                    <option value="pay_out">Pay Out</option>
+                    <option value="both">Ambos</option>
+                  </select>
+                </div>
+                <button onClick={handleAddPayment} disabled={!newPayment.name.trim()} className="btn-primary text-sm flex items-center gap-1 h-9 disabled:opacity-40">
+                  <Plus className="w-3.5 h-3.5" /> Agregar
+                </button>
               </div>
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">Tipo</label>
-                <select
-                  className="input text-sm w-28"
-                  value={newPayment.type}
-                  onChange={e => setNewPayment(p => ({ ...p, type: e.target.value as any }))}
-                >
-                  <option value="pay_in">Pay In</option>
-                  <option value="pay_out">Pay Out</option>
-                  <option value="both">Ambos</option>
-                </select>
+                <label className="text-xs text-gray-500 mb-1 block">Países (vacío = todos)</label>
+                <div className="flex flex-wrap gap-1">
+                  {activeCountries.map(c => {
+                    const isSelected = newPayment.countries.includes(c.code);
+                    return (
+                      <button
+                        key={c.code}
+                        type="button"
+                        onClick={() => setNewPayment(p => ({
+                          ...p,
+                          countries: isSelected
+                            ? p.countries.filter(cc => cc !== c.code)
+                            : [...p.countries, c.code]
+                        }))}
+                        className={`text-xs px-2 py-1 rounded border transition-colors ${
+                          isSelected
+                            ? 'bg-blue-50 text-blue-700 border-blue-300'
+                            : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        {c.flag} {c.code}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-              <button onClick={handleAddPayment} disabled={!newPayment.name.trim()} className="btn-primary text-sm flex items-center gap-1 h-9 disabled:opacity-40">
-                <Plus className="w-3.5 h-3.5" /> Agregar
-              </button>
             </div>
           </div>
         )}

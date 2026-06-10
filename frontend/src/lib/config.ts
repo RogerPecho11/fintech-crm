@@ -313,10 +313,31 @@ export function getRiskConfig(value: string): RiskLevelConfig {
 }
 
 export function getPaymentMethodsForCountry(countryCode: string, type: 'pay_in' | 'pay_out'): PaymentMethod[] {
-  return getPaymentMethods().filter(m =>
-    (m.type === type || m.type === 'both') &&
-    (m.countries.length === 0 || m.countries.includes(countryCode))
-  );
+  // Prefijos de país conocidos para detectar métodos que pertenecen a un país específico
+  const COUNTRY_PREFIXES = ['PE', 'CL', 'EC', 'BR', 'MX', 'CO', 'AR', 'UY', 'PY', 'BO', 'CR', 'PA', 'GT', 'HN', 'SV', 'NI', 'DO', 'VE', 'US'];
+
+  return getPaymentMethods().filter(m => {
+    // Filtrar por tipo
+    if (m.type !== type && m.type !== 'both') return false;
+
+    // Si tiene países asignados explícitamente, usar esos
+    if (m.countries.length > 0) {
+      return m.countries.includes(countryCode);
+    }
+
+    // Si no tiene países asignados, verificar si el nombre empieza con un código de país
+    // Ej: "CL Mach" → solo Chile, "PE Transferencia bancaria" → solo Perú
+    const nameParts = m.name.split(' ');
+    if (nameParts.length > 1) {
+      const prefix = nameParts[0].toUpperCase();
+      if (COUNTRY_PREFIXES.includes(prefix)) {
+        return prefix === countryCode;
+      }
+    }
+
+    // Si no tiene prefijo de país ni países asignados → disponible para todos
+    return true;
+  });
 }
 
 // ── Hook para re-render cuando la config cambia ───────────────
