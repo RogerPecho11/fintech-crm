@@ -28,7 +28,7 @@ function setCache(key: string, data: any, ttl: number) {
 }
 
 // Fecha mínima de monitoreo
-const MIN_DATE = '2026-07-08';
+const MIN_DATE = '2026-06-08';
 
 // ─── GET /overview — Métricas globales ───────────────────────────────────────
 router.get('/overview', async (req: AuthenticatedRequest, res: Response) => {
