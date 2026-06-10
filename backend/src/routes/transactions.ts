@@ -39,8 +39,7 @@ router.get('/commerces', async (_req: AuthenticatedRequest, res: Response) => {
       `SELECT id, name, slug, rut, country, enabled, created_at
        FROM commerce
        WHERE (is_deleted IS NULL OR is_deleted = 0)
-       ORDER BY name ASC
-       LIMIT 200`,
+       ORDER BY name ASC`,
       [],
       MysqlCache.TTL_STATIC // 30 min — comercios no cambian seguido
     );
@@ -74,6 +73,43 @@ router.get('/methods', async (_req: AuthenticatedRequest, res: Response) => {
   } catch (err: any) {
     console.error('[Transactions] Error fetching methods:', err.message);
     res.status(500).json({ error: 'Error al consultar métodos.' });
+  }
+});
+
+// ─── GET /api/v1/transactions/gateways — lista pasarelas reales (Pay In + Pay Out)
+router.get('/gateways', async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    const cacheKey = 'gateways-list';
+    const cached = getCached(cacheKey);
+    if (cached) return res.json(cached);
+
+    // Obtener pasarelas Pay In (gateway_payment) y Pay Out (gateway_withdrawal)
+    const [payinGateways, payoutGateways] = await Promise.all([
+      mysqlQuery(
+        `SELECT DISTINCT gp.name
+         FROM gateway_payment gp
+         WHERE gp.name IS NOT NULL AND gp.name != ''
+         ORDER BY gp.name ASC`
+      ),
+      mysqlQuery(
+        `SELECT DISTINCT gw.name
+         FROM gateway_withdrawal gw
+         WHERE gw.name IS NOT NULL AND gw.name != ''
+         ORDER BY gw.name ASC`
+      ),
+    ]);
+
+    // Unificar nombres únicos
+    const allNames = new Set<string>();
+    (payinGateways as any[]).forEach((g: any) => allNames.add(g.name));
+    (payoutGateways as any[]).forEach((g: any) => allNames.add(g.name));
+
+    const gateways = [...allNames].sort().map(name => ({ name }));
+    setCache(cacheKey, gateways, MysqlCache.TTL_STATIC); // 30 min
+    res.json(gateways);
+  } catch (err: any) {
+    console.error('[Transactions] Error fetching gateways:', err.message);
+    res.status(500).json({ error: 'Error al consultar pasarelas.' });
   }
 });
 

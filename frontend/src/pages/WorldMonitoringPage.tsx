@@ -20,12 +20,16 @@ export default function WorldMonitoringPage() {
   const [loading, setLoading] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(0);
   const [methods, setMethods] = useState<string[]>([]);
+  const [commerceList, setCommerceList] = useState<any[]>([]);
 
-  // Cargar metodos disponibles
+  // Cargar pasarelas y comercios disponibles
   useEffect(() => {
-    api.get('/transactions/methods').then(r => {
-      const ms = [...new Set((r.data || []).map((m: any) => m.method))].filter(Boolean) as string[];
-      setMethods(ms.sort());
+    api.get('/transactions/gateways').then(r => {
+      const gws = (r.data || []).map((g: any) => g.name).filter(Boolean) as string[];
+      setMethods(gws.sort());
+    }).catch(() => {});
+    api.get('/transactions/commerces').then(r => {
+      setCommerceList(r.data || []);
     }).catch(() => {});
   }, []);
 
@@ -101,15 +105,18 @@ export default function WorldMonitoringPage() {
             <input type="date" className="input text-sm" value={dateTo} onChange={e => setDateTo(e.target.value)} />
           </div>
           <div className="flex-1 min-w-[200px]">
-            <label className="text-xs text-gray-500 block mb-1">Metodo de Pago</label>
+            <label className="text-xs text-gray-500 block mb-1">Pasarela</label>
             <select className="input text-sm w-full" value={gatewayFilter} onChange={e => setGatewayFilter(e.target.value)}>
-              <option value="">Todos los metodos</option>
+              <option value="">Todas las pasarelas</option>
               {methods.map(m => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
-          <div className="flex-1 min-w-[150px]">
-            <label className="text-xs text-gray-500 block mb-1">IDs Comercios (separados por coma)</label>
-            <input className="input text-sm w-full" placeholder="84,139,170..." value={commerceIds} onChange={e => setCommerceIds(e.target.value)} />
+          <div className="flex-1 min-w-[200px]">
+            <label className="text-xs text-gray-500 block mb-1">Comercio</label>
+            <select className="input text-sm w-full" value={commerceIds} onChange={e => setCommerceIds(e.target.value)}>
+              <option value="">Todos los comercios</option>
+              {commerceList.map((c: any) => <option key={c.id} value={String(c.id)}>{c.name} ({c.country})</option>)}
+            </select>
           </div>
         </div>
       </div>
