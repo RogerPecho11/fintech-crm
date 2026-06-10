@@ -33,8 +33,8 @@ const MIN_DATE = '2026-07-08';
 // ─── GET /overview — Métricas globales ───────────────────────────────────────
 router.get('/overview', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { period = '1h' } = req.query as any;
-    const cacheKey = `wm:overview:${period}`;
+    const { period = '1h', commerce_ids } = req.query as any;
+    const cacheKey = `wm:overview:${period}:${commerce_ids || 'all'}`;
     const c = cached(cacheKey);
     if (c) return res.json(c);
 
@@ -44,6 +44,13 @@ router.get('/overview', async (req: AuthenticatedRequest, res: Response) => {
       '24h': '24 HOUR', '7d': '7 DAY', '30d': '30 DAY',
     };
     const interval = intervals[period] || '1 HOUR';
+
+    // Filtro de comercios
+    let commerceFilter = '';
+    if (commerce_ids) {
+      const ids = commerce_ids.split(',').map(Number).filter((n: number) => !isNaN(n));
+      if (ids.length > 0) commerceFilter = ` AND commerce_id IN (${ids.join(',')})`;
+    }
 
     // Métricas PayIn
     const [payinMetrics] = await Promise.all([
@@ -59,7 +66,7 @@ router.get('/overview', async (req: AuthenticatedRequest, res: Response) => {
           COUNT(*) / GREATEST(TIMESTAMPDIFF(MINUTE, MIN(created_at), MAX(created_at)), 1) as tpm
         FROM payment
         WHERE deleted_at IS NULL AND created_at >= DATE_SUB(NOW(), INTERVAL ${interval})
-        AND created_at >= '${MIN_DATE}'
+        AND created_at >= '${MIN_DATE}'${commerceFilter}
       `),
     ]);
 
@@ -75,7 +82,7 @@ router.get('/overview', async (req: AuthenticatedRequest, res: Response) => {
         COALESCE(SUM(amount), 0) as volume
       FROM withdrawal
       WHERE deleted_at IS NULL AND created_at >= DATE_SUB(NOW(), INTERVAL ${interval})
-      AND created_at >= '${MIN_DATE}'
+      AND created_at >= '${MIN_DATE}'${commerceFilter}
     `);
 
     const pi = payinMetrics[0] || {};
@@ -119,8 +126,8 @@ router.get('/overview', async (req: AuthenticatedRequest, res: Response) => {
 // ─── GET /timeline — Datos para gráfico de línea temporal ────────────────────
 router.get('/timeline', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { period = '24h', type = 'payin' } = req.query as any;
-    const cacheKey = `wm:timeline:${period}:${type}`;
+    const { period = '24h', type = 'payin', commerce_ids } = req.query as any;
+    const cacheKey = `wm:timeline:${period}:${type}:${commerce_ids || 'all'}`;
     const c = cached(cacheKey);
     if (c) return res.json(c);
 
@@ -132,6 +139,12 @@ router.get('/timeline', async (req: AuthenticatedRequest, res: Response) => {
     if (period === '7d') { groupBy = 'DAY'; interval = '7 DAY'; dateFormat = '%Y-%m-%d'; }
     else if (period === '30d') { groupBy = 'DAY'; interval = '30 DAY'; dateFormat = '%Y-%m-%d'; }
     else if (period === '1h') { interval = '1 HOUR'; dateFormat = '%Y-%m-%d %H:%i'; }
+
+    let commerceFilter = '';
+    if (commerce_ids) {
+      const ids = commerce_ids.split(',').map(Number).filter((n: number) => !isNaN(n));
+      if (ids.length > 0) commerceFilter = ` AND commerce_id IN (${ids.join(',')})`;
+    }
 
     const data = await mysqlQuery(`
       SELECT 

@@ -23,18 +23,49 @@ export default function WorldMonitoringPage() {
   const [errors, setErrors] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [type, setType] = useState<'payin' | 'payout'>('payin');
-  const [autoRefresh, setAutoRefresh] = useState(0); // 0 = off, seconds
+  const [autoRefresh, setAutoRefresh] = useState(0);
+
+  // Comercios seleccionados para monitorear
+  const [commerces, setCommerces] = useState<any[]>([]);
+  const [selectedCommerces, setSelectedCommerces] = useState<number[]>([]);
+  const [commerceSearch, setCommerceSearch] = useState('');
+  const [showCommerceSelector, setShowCommerceSelector] = useState(false);
+
+  // Cargar lista de comercios al abrir
+  useEffect(() => {
+    api.get('/transactions/commerces').then(r => setCommerces(r.data || [])).catch(() => {});
+    // Cargar comercios guardados del localStorage
+    try {
+      const saved = localStorage.getItem('wm_selected_commerces');
+      if (saved) setSelectedCommerces(JSON.parse(saved));
+    } catch {}
+  }, []);
+
+  // Guardar selección
+  const saveSelection = (ids: number[]) => {
+    setSelectedCommerces(ids);
+    localStorage.setItem('wm_selected_commerces', JSON.stringify(ids));
+  };
+
+  const toggleCommerce = (id: number) => {
+    const newIds = selectedCommerces.includes(id)
+      ? selectedCommerces.filter(i => i !== id)
+      : [...selectedCommerces, id];
+    saveSelection(newIds);
+  };
 
   const fetchAll = useCallback(async () => {
+    if (selectedCommerces.length === 0) return;
     setLoading(true);
     try {
+      const commerceIds = selectedCommerces.join(',');
       const [ov, tl, gw, cm, ct, er] = await Promise.all([
-        api.get('/world-monitoring/overview', { params: { period } }),
-        api.get('/world-monitoring/timeline', { params: { period, type } }),
-        api.get('/world-monitoring/by-gateway', { params: { period, type } }),
-        api.get('/world-monitoring/by-commerce', { params: { period, type } }),
-        api.get('/world-monitoring/by-country', { params: { period } }),
-        api.get('/world-monitoring/errors', { params: { period } }),
+        api.get('/world-monitoring/overview', { params: { period, commerce_ids: commerceIds } }),
+        api.get('/world-monitoring/timeline', { params: { period, type, commerce_ids: commerceIds } }),
+        api.get('/world-monitoring/by-gateway', { params: { period, type, commerce_ids: commerceIds } }),
+        api.get('/world-monitoring/by-commerce', { params: { period, type, commerce_ids: commerceIds } }),
+        api.get('/world-monitoring/by-country', { params: { period, commerce_ids: commerceIds } }),
+        api.get('/world-monitoring/errors', { params: { period, commerce_ids: commerceIds } }),
       ]);
       setOverview(ov.data);
       setTimeline(tl.data);
@@ -44,7 +75,7 @@ export default function WorldMonitoringPage() {
       setErrors(er.data);
     } catch { /* silent */ }
     finally { setLoading(false); }
-  }, [period, type]);
+  }, [period, type, selectedCommerces]);
 
   useEffect(() => {
     // NO cargar automáticamente — solo cuando el usuario haga clic en Actualizar
@@ -89,6 +120,57 @@ export default function WorldMonitoringPage() {
             {loading ? 'Cargando...' : 'Actualizar'}
           </button>
         </div>
+      </div>
+
+      {/* Selector de comercios */}
+      <div className="bg-white rounded-lg shadow p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-gray-700">Comercios monitoreados</h3>
+            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{selectedCommerces.length} seleccionados</span>
+          </div>
+          <button onClick={() => setShowCommerceSelector(!showCommerceSelector)} className="text-xs text-blue-600 hover:text-blue-800">
+            {showCommerceSelector ? 'Ocultar' : 'Configurar comercios'}
+          </button>
+        </div>
+
+        {showCommerceSelector && (
+          <div className="border border-gray-200 rounded-lg p-3">
+            <input
+              type="text"
+              className="input text-sm w-full mb-2"
+              placeholder="Buscar comercio..."
+              value={commerceSearch}
+              onChange={e => setCommerceSearch(e.target.value)}
+            />
+            <div className="flex gap-2 mb-2">
+              <button onClick={() => saveSelection(commerces.map((c: any) => c.id))} className="text-xs text-blue-600 hover:underline">Seleccionar todos</button>
+              <button onClick={() => saveSelection([])} className="text-xs text-gray-500 hover:underline">Quitar todos</button>
+            </div>
+            <div className="max-h-48 overflow-y-auto space-y-1">
+              {commerces
+                .filter((c: any) => !commerceSearch || c.name.toLowerCase().includes(commerceSearch.toLowerCase()))
+                .map((c: any) => (
+                <label key={c.id} className="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm">
+                  <input
+                    type="checkbox"
+                    checked={selectedCommerces.includes(c.id)}
+                    onChange={() => toggleCommerce(c.id)}
+                    className="rounded border-gray-300 text-pink-600"
+                  />
+                  <span className="truncate">{c.name}</span>
+                  <span className="text-xs text-gray-400 ml-auto">{c.country}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {selectedCommerces.length === 0 && (
+          <p className="text-sm text-amber-600 bg-amber-50 p-3 rounded-lg">
+            Selecciona al menos un comercio para monitorear. Haz clic en "Configurar comercios".
+          </p>
+        )}
       </div>
 
       {/* Filtros */}
