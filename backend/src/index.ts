@@ -35,6 +35,8 @@ import configRoutes from './routes/config';
 import mexicoRoutes from './routes/mexico';
 import transactionsRoutes from './routes/transactions';
 import monitoringRoutes from './routes/monitoring';
+import worldMonitoringRoutes from './routes/worldMonitoring';
+import worldMonitoringRoutes from './routes/worldMonitoring';
 
 const app = express();
 const httpServer = createServer(app);
@@ -115,6 +117,8 @@ app.use(`${API_PREFIX}/config`, configRoutes);
 app.use(`${API_PREFIX}/mexico`, mexicoRoutes);
 app.use(`${API_PREFIX}/transactions`, transactionsRoutes);
 app.use(`${API_PREFIX}/monitoring`, monitoringRoutes);
+app.use(`${API_PREFIX}/world-monitoring`, worldMonitoringRoutes);
+app.use(`${API_PREFIX}/world-monitoring`, worldMonitoringRoutes);
 
 // Health check
 app.get('/health', (_req, res) => {

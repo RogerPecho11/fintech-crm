@@ -18,6 +18,7 @@ const navItems = [
   { to: '/calendar', icon: Calendar, label: 'Calendario',      roles: ['admin', 'onboarding'] },
   { to: '/reports', icon: BarChart3, label: 'Reportes',        roles: ['admin', 'commercial', 'onboarding'] },
   { to: '/monitoring', icon: Activity, label: 'Monitoreo',    roles: ['admin', 'onboarding'] },
+  { to: '/world-monitoring', icon: Globe, label: 'Monitoreo Mundial', roles: ['admin'] },
   { to: '/notifications', icon: Bell, label: 'Notificaciones', roles: ['admin', 'commercial', 'onboarding'] },
 ];
 
